@@ -1,0 +1,15 @@
+{
+	"generated": [
+		".claude/rules/AGENTS.md",
+		"AGENTS.md",
+		"scripts/AGENTS.md",
+		"scripts/agents/AGENTS.md",
+		"scripts/quality/AGENTS.md",
+		"scripts/setup/AGENTS.md",
+		"scripts/testing/AGENTS.md",
+		"scripts/validation/AGENTS.md",
+		"src/AGENTS.md",
+		"template-sources/AGENTS.md",
+		"templates/AGENTS.md"
+	]
+}

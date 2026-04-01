@@ -1,0 +1,120 @@
+import type { InitOptions } from "../types.ts";
+import type { InstallRuntime } from "./install.ts";
+import { describe, expect, test } from "bun:test";
+import { defaultInstallRuntime, finalizeProject, maybeInstallMiseWithRuntime } from "./install.ts";
+
+function makeOptions(overrides: Partial<InitOptions> = {}): InitOptions {
+  return {
+    destination: "/tmp/forge-install",
+    projectName: "forge-install",
+    packageName: "forge-install",
+    binName: "forge-install",
+    frontend: "none",
+    ai: false,
+    install: false,
+    gitInit: false,
+    yes: false,
+    ...overrides,
+  };
+}
+
+function createInstallRuntime(overrides: Partial<InstallRuntime> = {}) {
+  const commands: string[][] = [];
+  const warnings: string[] = [];
+
+  const runtime: InstallRuntime = {
+    ...defaultInstallRuntime,
+    mkdir: async () => {},
+    runCommand: async (command) => {
+      commands.push(command);
+    },
+    hasCommand: () => false,
+    confirm: async () => true,
+    warn: (message: string) => {
+      warnings.push(message);
+    },
+    ...overrides,
+  };
+
+  return { runtime, commands, warnings };
+}
+
+describe("maybeInstallMiseWithRuntime", () => {
+  test("runs mise install when mise is available", async () => {
+    const { runtime, commands } = createInstallRuntime({ hasCommand: () => true });
+    await maybeInstallMiseWithRuntime(makeOptions({ install: true }), runtime);
+    expect(commands).toEqual([["mise", "install"]]);
+  });
+
+  test("warns and skips in --yes mode when mise is missing", async () => {
+    const { runtime, commands, warnings } = createInstallRuntime();
+    await maybeInstallMiseWithRuntime(makeOptions({ install: true, yes: true }), runtime);
+    expect(commands).toHaveLength(0);
+    expect(warnings[0]).toContain("Skipping `mise install`.");
+  });
+
+  test("warns and returns when the user agrees to continue without mise", async () => {
+    const { runtime, commands, warnings } = createInstallRuntime({ confirm: async () => true });
+    await maybeInstallMiseWithRuntime(makeOptions({ install: true }), runtime);
+    expect(commands).toHaveLength(0);
+    expect(warnings).toEqual([
+      "mise is not installed. Install it from https://mise.jdx.dev/getting-started.html",
+    ]);
+  });
+
+  test("warns and continues in --yes mode when mise install fails", async () => {
+    const { runtime, warnings } = createInstallRuntime({
+      hasCommand: () => true,
+      runCommand: async (command) => {
+        if (command[0] === "mise") {
+          throw new Error("mise failed in untrusted config");
+        }
+      },
+    });
+
+    await maybeInstallMiseWithRuntime(makeOptions({ install: true, yes: true }), runtime);
+    expect(warnings).toEqual([
+      "`mise install` failed: mise failed in untrusted config. Continuing without a successful `mise install`.",
+    ]);
+  });
+
+  test("warns again when the user does not continue without mise", async () => {
+    const { runtime, warnings } = createInstallRuntime({ confirm: async () => false });
+    await maybeInstallMiseWithRuntime(makeOptions({ install: true }), runtime);
+    expect(warnings).toEqual([
+      "mise is not installed. Install it from https://mise.jdx.dev/getting-started.html",
+      "Skipping `mise install`. Run it manually after installing mise.",
+    ]);
+  });
+});
+
+describe("finalizeProject", () => {
+  test("syncs AGENTS before git and install steps when AI is enabled", async () => {
+    const { runtime, commands } = createInstallRuntime({
+      hasCommand: () => true,
+    });
+
+    await finalizeProject(
+      makeOptions({
+        ai: true,
+        gitInit: true,
+        install: true,
+      }),
+      runtime,
+    );
+
+    expect(commands).toEqual([
+      ["bun", "scripts/agents/sync-agents-md.ts", "--write"],
+      ["git", "init"],
+      ["bun", "install"],
+      ["bun", "run", "prepare"],
+      ["mise", "install"],
+    ]);
+  });
+
+  test("skips all optional commands when disabled", async () => {
+    const { runtime, commands } = createInstallRuntime();
+    await finalizeProject(makeOptions(), runtime);
+    expect(commands).toHaveLength(0);
+  });
+});

@@ -1,0 +1,50 @@
+{
+  "base": {
+    "copied": [
+      "bunfig.toml",
+      "tsconfig.json",
+      ".editorconfig",
+      ".gitattributes",
+      ".gitignore",
+      ".gitleaks.toml",
+      ".lycheeignore",
+      ".oxlintrc.jsonc",
+      ".oxfmtrc.jsonc",
+      ".dependency-cruiser.cjs",
+      ".jscpd.json",
+      "mise.toml",
+      "scripts/validation/detect-scope.ts",
+      "scripts/validation/resolve-bin.ts",
+      "scripts/validation/typecheck-staged.ts",
+      "scripts/validation/validate-push.ts",
+      "scripts/validation/validate.ts",
+      "scripts/setup/bootstrap-git-config.ts",
+      "scripts/setup/bootstrap-prepare.ts",
+      "scripts/quality/audit-oxlint-rules.ts",
+      "scripts/quality/check-links-local.ts"
+    ]
+  },
+  "frontend-tanstack": {
+    "copied": [
+      "apps/frontend/.oxlintrc.jsonc",
+      "apps/frontend/.oxfmtrc.jsonc",
+      "apps/frontend/.dependency-cruiser.cjs",
+      "apps/frontend/.gitignore",
+      "apps/frontend/.stylelintrc.json",
+      "apps/frontend/tsconfig.json",
+      "apps/frontend/tsconfig.app.json",
+      "apps/frontend/tsconfig.node.json"
+    ]
+  },
+  "ai": {
+    "copied": [
+      ".mcp.json",
+      ".codex/config.toml",
+      ".claude/settings.json",
+      ".claude/hooks/guard-destructive.ts",
+      "scripts/validation/format-and-lint.ts",
+      "scripts/validation/validate-on-stop.ts",
+      "scripts/agents/sync-agents-md.ts"
+    ]
+  }
+}

@@ -1,0 +1,43 @@
+import { afterEach, describe, expect, test } from "bun:test";
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { collectLinkCheckFiles } from "./check-links-local.ts";
+
+const tempDirs: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(
+    tempDirs.splice(0).map(async (dir) => rm(dir, { recursive: true, force: true })),
+  );
+});
+
+function makeTempDir(): string {
+  const dir = mkdtempSync(join(tmpdir(), "bun-forge-links-"));
+  tempDirs.push(dir);
+  return dir;
+}
+
+describe("collectLinkCheckFiles", () => {
+  test("finds README.md even when git has no tracked files", () => {
+    const dir = makeTempDir();
+    writeFileSync(join(dir, "README.md"), "# Readme");
+    expect(collectLinkCheckFiles(dir)).toEqual(["README.md"]);
+  });
+
+  test("collects markdown and html docs recursively", () => {
+    const dir = makeTempDir();
+    mkdirSync(join(dir, "docs/nested"), { recursive: true });
+    writeFileSync(join(dir, "README.md"), "# Readme");
+    writeFileSync(join(dir, "docs/guide.md"), "# Guide");
+    writeFileSync(join(dir, "docs/nested/index.html"), "<h1>Guide</h1>");
+    writeFileSync(join(dir, "docs/ignore.txt"), "ignore");
+
+    expect(collectLinkCheckFiles(dir)).toEqual([
+      "docs/guide.md",
+      "docs/nested/index.html",
+      "README.md",
+    ]);
+  });
+});
