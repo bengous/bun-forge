@@ -5,7 +5,9 @@ describe("e2eContractScenariosFromArgv", () => {
   test("returns the reduced real-e2e matrix by default", () => {
     expect(e2eContractScenariosFromArgv(["bun", "scripts/testing/e2e-contract.ts"])).toEqual([
       "none-ai",
+      "none-effect",
       "tanstack-ai",
+      "tanstack-ai-effect",
     ]);
   });
 

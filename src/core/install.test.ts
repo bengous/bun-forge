@@ -11,6 +11,7 @@ function makeOptions(overrides: Partial<InitOptions> = {}): InitOptions {
     binName: "forge-install",
     frontend: "none",
     ai: false,
+    effect: false,
     install: false,
     gitInit: false,
     yes: false,

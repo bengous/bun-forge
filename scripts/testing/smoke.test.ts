@@ -6,8 +6,12 @@ describe("smokeScenariosFromArgv", () => {
     expect(smokeScenariosFromArgv(["bun", "scripts/testing/smoke.ts"])).toEqual([
       "none-plain",
       "none-ai",
+      "none-effect",
+      "none-ai-effect",
       "tanstack-plain",
       "tanstack-ai",
+      "tanstack-effect",
+      "tanstack-ai-effect",
     ]);
   });
 

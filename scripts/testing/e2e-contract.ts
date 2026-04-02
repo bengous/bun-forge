@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import type { ScaffoldScenario } from "./scenarios.ts";
+import type { ScaffoldScenario, ScenarioConfig } from "./scenarios.ts";
 import { existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -11,7 +11,9 @@ export type E2eContractScenario = ScaffoldScenario;
 
 const DEFAULT_E2E_CONTRACT_SCENARIOS = [
   "none-ai",
+  "none-effect",
   "tanstack-ai",
+  "tanstack-ai-effect",
 ] as const satisfies readonly E2eContractScenario[];
 
 async function run(command: string[], cwd: string): Promise<void> {
@@ -73,7 +75,7 @@ async function expectFileNotContains(
 
 async function assertGeneratedProject(
   root: string,
-  scenario: E2eContractScenario,
+  config: ScenarioConfig,
   projectName: string,
 ): Promise<void> {
   const packageJson = await Bun.file(join(root, "package.json")).json();
@@ -88,13 +90,6 @@ async function assertGeneratedProject(
 
   await expectFileContains(root, "README.md", `# ${projectName}`);
   await expectFileContains(root, "src/index.ts", `export const projectName = "${projectName}"`);
-  await expectFileContains(root, "src/index.ts", "export function createGreeting");
-  await expectFileContains(root, "src/index.ts", "console.log(createGreeting())");
-  await expectFileContains(
-    root,
-    "src/index.test.ts",
-    "createGreeting returns the starter greeting",
-  );
   await expectFileContains(root, "README.md", "Hooks and validation");
   await expectFileContains(root, "README.md", "glob_matcher: doublestar");
   await expectFileContains(root, "lefthook.yml", "glob_matcher: doublestar");
@@ -120,7 +115,7 @@ async function assertGeneratedProject(
   expectMissing(root, "bun.lock");
   expectMissing(root, "node_modules");
 
-  if (scenario.includes("ai")) {
+  if (config.ai) {
     expectExists(root, "CLAUDE.md");
     expectExists(root, ".claude/rules/project-conventions.md");
     expectExists(root, "AGENTS.md");
@@ -160,7 +155,27 @@ async function assertGeneratedProject(
     }
   }
 
-  if (scenario.startsWith("tanstack")) {
+  if (config.effect) {
+    await expectFileContains(root, "package.json", '"effect"');
+    await expectFileContains(root, "package.json", '"@effect/cli"');
+    await expectFileContains(root, "package.json", '"@effect/platform"');
+    await expectFileContains(root, "package.json", '"@effect/platform-bun"');
+    await expectFileContains(root, "package.json", '"@effect/language-service"');
+    await expectFileContains(root, "package.json", '"effect:diagnose"');
+    await expectFileContains(root, "package.json", '"effect:quickfixes"');
+    await expectFileContains(root, "tsconfig.json", "@effect/language-service");
+    await expectFileContains(root, "src/index.ts", "BunRuntime");
+    await expectFileContains(root, "src/index.ts", "Effect.gen");
+    await expectFileContains(root, "src/index.ts", "Context.Tag");
+  } else {
+    await expectFileNotContains(root, "package.json", '"effect"');
+    await expectFileNotContains(root, "package.json", '"@effect/language-service"');
+    await expectFileNotContains(root, "package.json", '"effect:diagnose"');
+    await expectFileNotContains(root, "tsconfig.json", "plugins");
+    await expectFileContains(root, "src/index.ts", "createGreeting");
+  }
+
+  if (config.frontend === "tanstack") {
     const frontendPackage = await Bun.file(join(root, "apps/frontend/package.json")).json();
 
     expectExists(root, "apps/frontend/package.json");
@@ -192,7 +207,7 @@ async function assertGeneratedProject(
       throw new Error("Expected frontend test script to use Vitest + jsdom");
     }
 
-    if (scenario.endsWith("ai")) {
+    if (config.ai) {
       expectExists(root, "apps/frontend/src/AGENTS.md");
       expectExists(root, ".claude/rules/frontend-conventions.md");
     } else {
@@ -214,6 +229,7 @@ async function assertGeneratedProject(
 export async function e2eContract(
   frontend: "none" | "tanstack",
   ai: boolean,
+  effect: boolean,
   scenario: E2eContractScenario,
 ): Promise<void> {
   const dir = await mkdtemp(join(tmpdir(), `bun-forge-e2e-contract-${scenario}-`));
@@ -233,6 +249,8 @@ export async function e2eContract(
         frontend,
         "--ai",
         String(ai),
+        "--effect",
+        String(effect),
         "--git-init",
         "false",
         "--install",
@@ -241,7 +259,7 @@ export async function e2eContract(
       process.cwd(),
     );
 
-    await assertGeneratedProject(dir, scenario, projectName);
+    await assertGeneratedProject(dir, { frontend, ai, effect }, projectName);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -250,6 +268,6 @@ export async function e2eContract(
 if (import.meta.main) {
   for (const scenario of e2eContractScenariosFromArgv(process.argv)) {
     const config = SCAFFOLD_SCENARIO_CONFIG[scenario];
-    await e2eContract(config.frontend, config.ai, scenario);
+    await e2eContract(config.frontend, config.ai, config.effect, scenario);
   }
 }

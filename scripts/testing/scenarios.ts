@@ -1,26 +1,42 @@
-export type ScaffoldScenario = "none-plain" | "none-ai" | "tanstack-plain" | "tanstack-ai";
+export type ScaffoldScenario =
+  | "none-plain"
+  | "none-ai"
+  | "none-effect"
+  | "none-ai-effect"
+  | "tanstack-plain"
+  | "tanstack-ai"
+  | "tanstack-effect"
+  | "tanstack-ai-effect";
 
 export const ALL_SCAFFOLD_SCENARIOS = [
   "none-plain",
   "none-ai",
+  "none-effect",
+  "none-ai-effect",
   "tanstack-plain",
   "tanstack-ai",
+  "tanstack-effect",
+  "tanstack-ai-effect",
 ] as const satisfies readonly ScaffoldScenario[];
 
 export const SCAFFOLD_SCENARIO_CONFIG = {
-  "none-plain": { frontend: "none", ai: false },
-  "none-ai": { frontend: "none", ai: true },
-  "tanstack-plain": { frontend: "tanstack", ai: false },
-  "tanstack-ai": { frontend: "tanstack", ai: true },
-} as const satisfies Record<ScaffoldScenario, { frontend: "none" | "tanstack"; ai: boolean }>;
+  "none-plain": { frontend: "none", ai: false, effect: false },
+  "none-ai": { frontend: "none", ai: true, effect: false },
+  "none-effect": { frontend: "none", ai: false, effect: true },
+  "none-ai-effect": { frontend: "none", ai: true, effect: true },
+  "tanstack-plain": { frontend: "tanstack", ai: false, effect: false },
+  "tanstack-ai": { frontend: "tanstack", ai: true, effect: false },
+  "tanstack-effect": { frontend: "tanstack", ai: false, effect: true },
+  "tanstack-ai-effect": { frontend: "tanstack", ai: true, effect: true },
+} as const satisfies Record<
+  ScaffoldScenario,
+  { frontend: "none" | "tanstack"; ai: boolean; effect: boolean }
+>;
+
+export type ScenarioConfig = (typeof SCAFFOLD_SCENARIO_CONFIG)[ScaffoldScenario];
 
 export function isScaffoldScenario(value: string): value is ScaffoldScenario {
-  return (
-    value === "none-plain" ||
-    value === "none-ai" ||
-    value === "tanstack-plain" ||
-    value === "tanstack-ai"
-  );
+  return (ALL_SCAFFOLD_SCENARIOS as readonly string[]).includes(value);
 }
 
 export function parseScenariosFromArgv(

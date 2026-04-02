@@ -110,6 +110,7 @@ export function buildProgram(runtime: CliRuntime = defaultCliRuntime): Command {
     .option("--name <projectName>", "override the generated project name")
     .option("--frontend <preset>", "frontend preset: none | tanstack")
     .option("--ai <enabled>", "install Claude/AGENTS tooling: true | false")
+    .option("--effect <enabled>", "install Effect runtime and tooling: true | false")
     .option("--install <enabled>", "run bun install and prepare steps: true | false")
     .option("--git-init <enabled>", "initialize a git repository: true | false")
     .option("--yes", "skip prompts and use defaults from the destination basename")
@@ -126,6 +127,7 @@ export function buildProgram(runtime: CliRuntime = defaultCliRuntime): Command {
             ? { frontend: parseFrontendPreset(flags["frontend"]) }
             : {}),
           ...(typeof flags["ai"] === "string" ? { ai: parseBoolean(flags["ai"]) } : {}),
+          ...(typeof flags["effect"] === "string" ? { effect: parseBoolean(flags["effect"]) } : {}),
           ...(typeof flags["install"] === "string"
             ? { install: parseBoolean(flags["install"]) }
             : {}),

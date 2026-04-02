@@ -2,7 +2,6 @@
   "base": {
     "copied": [
       "bunfig.toml",
-      "tsconfig.json",
       ".editorconfig",
       ".gitattributes",
       ".gitignore",
@@ -46,5 +45,8 @@
       "scripts/validation/validate-on-stop.ts",
       "scripts/agents/sync-agents-md.ts"
     ]
+  },
+  "effect": {
+    "copied": []
   }
 }

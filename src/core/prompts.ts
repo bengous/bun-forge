@@ -119,6 +119,16 @@ export async function collectOptionsWithRuntime(
       }),
     );
 
+  const effect =
+    flags.effect ??
+    assertNotCancelled(
+      runtime,
+      await runtime.confirm({
+        message: "Install Effect runtime and tooling?",
+        initialValue: false,
+      }),
+    );
+
   const install =
     flags.install ??
     assertNotCancelled(
@@ -148,6 +158,7 @@ export async function collectOptionsWithRuntime(
     binName: flags.binName ?? toBinName(normalizedProjectName),
     frontend,
     ai,
+    effect,
     install,
     gitInit,
     yes: flags.yes ?? false,
@@ -174,6 +185,7 @@ export function normalizeFlagOptions(
     binName: flags.binName ?? toBinName(projectName),
     frontend: flags.frontend ?? "none",
     ai: flags.ai ?? true,
+    effect: flags.effect ?? false,
     install: flags.install ?? true,
     gitInit: flags.gitInit ?? true,
     yes: flags.yes ?? false,

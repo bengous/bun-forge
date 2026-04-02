@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import type { ScaffoldScenario, ScenarioConfig } from "./scenarios.ts";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -7,7 +8,6 @@ import {
   ALL_SCAFFOLD_SCENARIOS,
   parseScenariosFromArgv,
   SCAFFOLD_SCENARIO_CONFIG,
-  type ScaffoldScenario,
 } from "./scenarios.ts";
 
 export type SmokeScenario = ScaffoldScenario;
@@ -35,8 +35,8 @@ export function smokeScenariosFromArgv(argv: readonly string[]): SmokeScenario[]
   return parseScenariosFromArgv(argv, ALL_SCAFFOLD_SCENARIOS);
 }
 
-export async function smoke(frontend: "none" | "tanstack", ai: boolean): Promise<void> {
-  const dir = await mkdtemp(join(tmpdir(), `bun-forge-${frontend}-${ai ? "ai" : "plain"}-`));
+export async function smoke(scenario: SmokeScenario, config: ScenarioConfig): Promise<void> {
+  const dir = await mkdtemp(join(tmpdir(), `bun-forge-${scenario}-`));
   try {
     await run(
       [
@@ -46,9 +46,11 @@ export async function smoke(frontend: "none" | "tanstack", ai: boolean): Promise
         dir,
         "--yes",
         "--frontend",
-        frontend,
+        config.frontend,
         "--ai",
-        String(ai),
+        String(config.ai),
+        "--effect",
+        String(config.effect),
         "--git-init",
         "false",
         "--install",
@@ -65,7 +67,6 @@ export async function smoke(frontend: "none" | "tanstack", ai: boolean): Promise
 
 if (import.meta.main) {
   for (const scenario of smokeScenariosFromArgv(process.argv)) {
-    const config = SCAFFOLD_SCENARIO_CONFIG[scenario];
-    await smoke(config.frontend, config.ai);
+    await smoke(scenario, SCAFFOLD_SCENARIO_CONFIG[scenario]);
   }
 }

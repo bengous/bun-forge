@@ -7,6 +7,7 @@ export type InitOptions = {
   readonly binName: string;
   readonly frontend: FrontendPreset;
   readonly ai: boolean;
+  readonly effect: boolean;
   readonly install: boolean;
   readonly gitInit: boolean;
   readonly yes: boolean;
@@ -18,6 +19,7 @@ export type TemplateContext = {
   readonly binName: string;
   readonly frontend: FrontendPreset;
   readonly ai: boolean;
+  readonly effect: boolean;
   readonly hasWorkspaces: boolean;
 };
 

@@ -18,4 +18,9 @@ export const PRESETS: readonly Preset[] = [
     sourceDir: join(TEMPLATE_SOURCES_DIR, "ai"),
     enabled: (options) => options.ai,
   },
+  {
+    name: "effect",
+    sourceDir: join(TEMPLATE_SOURCES_DIR, "effect"),
+    enabled: (options) => options.effect,
+  },
 ] as const;

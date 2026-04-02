@@ -50,6 +50,7 @@ describe("normalizeFlagOptions", () => {
       binName: "my-app",
       frontend: "none",
       ai: true,
+      effect: false,
       install: true,
       gitInit: true,
       yes: false,
@@ -77,6 +78,7 @@ describe("normalizeFlagOptions", () => {
       binName: "custom-bin",
       frontend: "tanstack",
       ai: false,
+      effect: false,
       install: false,
       gitInit: false,
       yes: true,
@@ -108,7 +110,7 @@ describe("collectOptionsWithRuntime", () => {
         {
           texts: ["Forge App"],
           selects: ["tanstack"],
-          confirms: [true, false, true],
+          confirms: [true, true, false, true],
         },
         "/workspace",
       ),
@@ -121,6 +123,7 @@ describe("collectOptionsWithRuntime", () => {
       binName: "forge-app",
       frontend: "tanstack",
       ai: true,
+      effect: true,
       install: false,
       gitInit: true,
       yes: false,
@@ -135,6 +138,7 @@ describe("collectOptionsWithRuntime", () => {
         destination: "/repo/starter",
         frontend: "none",
         ai: false,
+        effect: false,
         install: false,
         gitInit: false,
       },
@@ -148,6 +152,7 @@ describe("collectOptionsWithRuntime", () => {
       binName: "starter",
       frontend: "none",
       ai: false,
+      effect: false,
       install: false,
       gitInit: false,
       yes: false,
@@ -174,7 +179,7 @@ describe("collectOptionsWithRuntime", () => {
       createPromptRuntime({
         texts: ["Forge App"],
         selects: ["none"],
-        confirms: [true, true, true],
+        confirms: [true, false, true, true],
       }),
     );
 
@@ -191,7 +196,7 @@ describe("collectOptionsWithRuntime", () => {
         createPromptRuntime({
           texts: ["   "],
           selects: ["none"],
-          confirms: [true, true, true],
+          confirms: [true, false, true, true],
         }),
       );
       throw new Error("Expected empty project name to fail");

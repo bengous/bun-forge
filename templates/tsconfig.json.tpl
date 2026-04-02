@@ -19,7 +19,7 @@
     "exactOptionalPropertyTypes": true,
     "noPropertyAccessFromIndexSignature": true,
     "allowUnreachableCode": false,
-    "allowUnusedLabels": false
+    "allowUnusedLabels": false__EFFECT_TSCONFIG_PLUGINS__
   },
   "include": ["src/**/*.ts", "scripts/**/*.ts"]
 }

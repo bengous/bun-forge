@@ -20,13 +20,13 @@ __WORKSPACES_BLOCK__  "scripts": {
     "test": "bun test ./src",
     "lint:audit": "bun scripts/quality/audit-oxlint-rules.ts",
     "check:links": "bun scripts/quality/check-links-local.ts",
-__AI_SCRIPTS__    "repo:bootstrap": "bun scripts/setup/bootstrap-git-config.ts",
+__AI_SCRIPTS____EFFECT_SCRIPTS__    "repo:bootstrap": "bun scripts/setup/bootstrap-git-config.ts",
     "prepare": "bun scripts/setup/bootstrap-prepare.ts",
 __FRONTEND_SCRIPTS__    "validate": "bun scripts/validation/validate.ts",
     "validate:scale": "bun run --silent validate && bun run --silent lint:dead && bun run --silent lint:arch && bun run --silent lint:dupes && bun run --silent check:links"
   },
-  "devDependencies": {
-    "@types/bun": "1.3.11",
+__EFFECT_DEPENDENCIES_BLOCK__  "devDependencies": {
+__EFFECT_DEV_DEPENDENCIES__    "@types/bun": "1.3.11",
     "dependency-cruiser": "17.3.10",
     "jscpd": "4.0.8",
     "knip": "6.1.1",

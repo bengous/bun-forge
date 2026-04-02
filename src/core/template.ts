@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { TEMPLATES_DIR } from "./paths.ts";
 
-const TOKEN_PATTERN = /__([A-Z0-9_]+)__/g;
+const TOKEN_PATTERN = /__([A-Z0-9_]+?)__/g;
 
 export function templateValues(context: TemplateContext): Record<string, string> {
   const workspacesBlock = context.hasWorkspaces ? '  "workspaces": ["apps/*"],\n' : "";
@@ -16,6 +16,20 @@ export function templateValues(context: TemplateContext): Record<string, string>
     context.frontend === "tanstack"
       ? '    "dev:frontend": "cd apps/frontend && bun run dev",\n    "typecheck:frontend": "cd apps/frontend && bun run typecheck",\n    "lint:frontend": "cd apps/frontend && bun run lint",\n    "format:check:frontend": "cd apps/frontend && bun run format:check",\n    "lint:arch:frontend": "cd apps/frontend && dependency-cruiser --config .dependency-cruiser.cjs --output-type err src",\n    "lint:css:frontend": "cd apps/frontend && bun run lint:css",\n    "build:frontend": "cd apps/frontend && bun run build",\n    "validate:frontend": "bun run --silent typecheck:frontend && cd apps/frontend && bun run --silent test && cd ../.. && bun run --silent lint:frontend && bun run --silent format:check:frontend && bun run --silent lint:arch:frontend && bun run --silent lint:css:frontend && bun run --silent build:frontend",\n'
       : "";
+
+  const effectScripts = context.effect
+    ? '    "effect:diagnose": "effect-language-service diagnostics --project tsconfig.json",\n    "effect:quickfixes": "effect-language-service quickfixes --project tsconfig.json",\n'
+    : "";
+
+  const effectDependenciesBlock = context.effect
+    ? '  "dependencies": {\n    "@effect/cli": "0.75.0",\n    "@effect/platform": "0.96.0",\n    "@effect/platform-bun": "0.89.0",\n    "effect": "3.21.0"\n  },\n'
+    : "";
+
+  const effectDevDependencies = context.effect ? '    "@effect/language-service": "0.84.2",\n' : "";
+
+  const effectTsconfigPlugins = context.effect
+    ? ',\n    "plugins": [{\n      "name": "@effect/language-service",\n      "diagnostics": true,\n      "quickinfo": true,\n      "completions": true,\n      "ignoreEffectWarningsInTscExitCode": false,\n      "diagnosticSeverity": {\n        "anyUnknownInErrorContext": "warning",\n        "deterministicKeys": "warning",\n        "extendsNativeError": "warning",\n        "importFromBarrel": "warning",\n        "instanceOfSchema": "warning",\n        "missedPipeableOpportunity": "suggestion",\n        "missingEffectServiceDependency": "warning",\n        "nodeBuiltinImport": "off",\n        "schemaUnionOfLiterals": "suggestion",\n        "serviceNotAsClass": "warning",\n        "strictBooleanExpressions": "warning",\n        "strictEffectProvide": "warning"\n      }\n    }]'
+    : "";
 
   const frontendLefthookCommand =
     context.frontend === "tanstack"
@@ -34,6 +48,10 @@ export function templateValues(context: TemplateContext): Record<string, string>
     HAS_WORKSPACES: String(context.hasWorkspaces),
     WORKSPACES_BLOCK: workspacesBlock,
     AI_SCRIPTS: aiScripts,
+    EFFECT_SCRIPTS: effectScripts,
+    EFFECT_DEPENDENCIES_BLOCK: effectDependenciesBlock,
+    EFFECT_DEV_DEPENDENCIES: effectDevDependencies,
+    EFFECT_TSCONFIG_PLUGINS: effectTsconfigPlugins,
     FRONTEND_SCRIPTS: frontendScripts,
     FRONTEND_LEFTHOOK_COMMAND: frontendLefthookCommand,
     FRONTEND_TYPECHECK_GLOB: frontendTypecheckGlob,

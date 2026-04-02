@@ -27,6 +27,7 @@ export function buildTemplateContext(options: InitOptions): TemplateContext {
     binName: options.binName,
     frontend: options.frontend,
     ai: options.ai,
+    effect: options.effect,
     hasWorkspaces: options.frontend === "tanstack",
   };
 }
@@ -44,12 +45,21 @@ async function copyPreset(sourceDir: string, destination: string): Promise<void>
 }
 
 export function templateFilesForContext(context: TemplateContext): TemplateFile[] {
+  const indexTemplate: TemplateFile = context.effect
+    ? ["src/index.effect.ts.tpl", "src/index.ts"]
+    : ["src/index.ts.tpl", "src/index.ts"];
+
+  const indexTestTemplate: TemplateFile = context.effect
+    ? ["src/index.effect.test.ts.tpl", "src/index.test.ts"]
+    : ["src/index.test.ts.tpl", "src/index.test.ts"];
+
   const templateFiles: TemplateFile[] = [
     ["package.json.tpl", "package.json"],
+    ["tsconfig.json.tpl", "tsconfig.json"],
     ["lefthook.yml.tpl", "lefthook.yml"],
     ["README.md.tpl", "README.md"],
-    ["src/index.ts.tpl", "src/index.ts"],
-    ["src/index.test.ts.tpl", "src/index.test.ts"],
+    indexTemplate,
+    indexTestTemplate,
   ];
 
   if (context.ai) {

@@ -10,13 +10,16 @@ type Scenario = {
   readonly name: string;
   readonly frontend: "none" | "tanstack";
   readonly ai: boolean;
+  readonly effect: boolean;
 };
 
 const scenarios: readonly Scenario[] = [
-  { name: "none-plain", frontend: "none", ai: false },
-  { name: "none-ai", frontend: "none", ai: true },
-  { name: "tanstack-plain", frontend: "tanstack", ai: false },
-  { name: "tanstack-ai", frontend: "tanstack", ai: true },
+  { name: "none-plain", frontend: "none", ai: false, effect: false },
+  { name: "none-ai", frontend: "none", ai: true, effect: false },
+  { name: "none-effect", frontend: "none", ai: false, effect: true },
+  { name: "none-ai-effect", frontend: "none", ai: true, effect: true },
+  { name: "tanstack-plain", frontend: "tanstack", ai: false, effect: false },
+  { name: "tanstack-ai", frontend: "tanstack", ai: true, effect: false },
 ];
 
 const tempDirs: string[] = [];
@@ -69,6 +72,7 @@ function makeOptions(destination: string, scenario: Scenario): InitOptions {
     binName: `forge-${scenario.name}`,
     frontend: scenario.frontend,
     ai: scenario.ai,
+    effect: scenario.effect,
     install: false,
     gitInit: false,
     yes: true,
@@ -113,8 +117,14 @@ for (const scenario of scenarios) {
     expect(readme).toContain("Hooks and validation");
     expect(readme).toContain("glob_matcher: doublestar");
     expect(backendEntry).toContain(`export const projectName = "forge-${scenario.name}"`);
-    expect(backendEntry).toContain("export function createGreeting");
-    expect(backendEntry).toContain("console.log(createGreeting())");
+    if (scenario.effect) {
+      expect(backendEntry).toContain("Context.Tag");
+      expect(backendEntry).toContain("BunRuntime.runMain");
+      expect(backendEntry).toContain("Effect.gen");
+    } else {
+      expect(backendEntry).toContain("export function createGreeting");
+      expect(backendEntry).toContain("console.log(createGreeting())");
+    }
     expectExists(destination, "bunfig.toml");
     expectExists(destination, "scripts/validation/validate.ts");
     expectExists(destination, "scripts/quality/check-links-local.ts");
@@ -129,6 +139,22 @@ for (const scenario of scenarios) {
     expectMissing(destination, "index.ts");
     expectMissing(destination, "bun.lock");
     expectMissing(destination, "node_modules");
+
+    const tsconfig = await Bun.file(join(destination, "tsconfig.json")).text();
+    if (scenario.effect) {
+      expect(packageJson["dependencies"]["effect"]).toBeDefined();
+      expect(packageJson["dependencies"]["@effect/cli"]).toBeDefined();
+      expect(packageJson["dependencies"]["@effect/platform"]).toBeDefined();
+      expect(packageJson["dependencies"]["@effect/platform-bun"]).toBeDefined();
+      expect(packageJson["devDependencies"]["@effect/language-service"]).toBeDefined();
+      expect(packageJson["scripts"]["effect:diagnose"]).toBeDefined();
+      expect(packageJson["scripts"]["effect:quickfixes"]).toBeDefined();
+      expect(tsconfig).toContain("@effect/language-service");
+    } else {
+      expect(packageJson["dependencies"]).toBeUndefined();
+      expect(packageJson["scripts"]["effect:diagnose"]).toBeUndefined();
+      expect(tsconfig).not.toContain("plugins");
+    }
 
     if (scenario.ai) {
       const claude = await Bun.file(join(destination, "CLAUDE.md")).text();

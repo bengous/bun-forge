@@ -1,3 +1,4 @@
+import type { CliRuntime } from "./index.ts";
 import type { InitOptions } from "./types.ts";
 import { describe, expect, test } from "bun:test";
 import {
@@ -7,7 +8,6 @@ import {
   parseBoolean,
   parseFrontendPreset,
   runCli,
-  type CliRuntime,
 } from "./index.ts";
 
 function createRuntime(overrides: Partial<CliRuntime> = {}) {
@@ -21,7 +21,7 @@ function createRuntime(overrides: Partial<CliRuntime> = {}) {
     normalizeFlagOptions: () => {
       throw new Error("normalizeFlagOptions should not be called");
     },
-    generateProject: async () => undefined,
+    generateProject: async () => {},
     stdout: {
       write(chunk: string) {
         stdout.push(chunk);
@@ -50,6 +50,7 @@ function makeOptions(overrides: Partial<InitOptions> = {}): InitOptions {
     binName: "forge-cli",
     frontend: "none",
     ai: true,
+    effect: false,
     install: true,
     gitInit: true,
     yes: true,
@@ -87,6 +88,7 @@ describe("buildProgram", () => {
       "--name",
       "--frontend",
       "--ai",
+      "--effect",
       "--install",
       "--git-init",
       "--yes",

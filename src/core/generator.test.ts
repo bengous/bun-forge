@@ -17,6 +17,7 @@ function makeOptions(overrides: Partial<InitOptions> = {}): InitOptions {
     binName: "forge-generator",
     frontend: "none",
     ai: false,
+    effect: false,
     install: false,
     gitInit: false,
     yes: true,
@@ -71,11 +72,19 @@ describe("templateFilesForContext", () => {
     const files = templateFilesForContext(buildTemplateContext(makeOptions()));
     expect(files).toEqual([
       ["package.json.tpl", "package.json"],
+      ["tsconfig.json.tpl", "tsconfig.json"],
       ["lefthook.yml.tpl", "lefthook.yml"],
       ["README.md.tpl", "README.md"],
       ["src/index.ts.tpl", "src/index.ts"],
       ["src/index.test.ts.tpl", "src/index.test.ts"],
     ]);
+  });
+
+  test("uses Effect starter templates when effect is enabled", () => {
+    const files = templateFilesForContext(buildTemplateContext(makeOptions({ effect: true })));
+    expect(files).toContainEqual(["src/index.effect.ts.tpl", "src/index.ts"]);
+    expect(files).toContainEqual(["src/index.effect.test.ts.tpl", "src/index.test.ts"]);
+    expect(files).not.toContainEqual(["src/index.ts.tpl", "src/index.ts"]);
   });
 
   test("adds AI and frontend templates when enabled", () => {
@@ -120,6 +129,13 @@ describe("enabledPresets", () => {
     expect(
       enabledPresets(makeOptions({ frontend: "tanstack", ai: true })).map((preset) => preset.name),
     ).toEqual(["base", "frontend-tanstack", "ai"]);
+  });
+
+  test("includes effect preset when effect is enabled", () => {
+    expect(enabledPresets(makeOptions({ effect: true })).map((preset) => preset.name)).toEqual([
+      "base",
+      "effect",
+    ]);
   });
 });
 
