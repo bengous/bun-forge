@@ -1,8 +1,8 @@
 ## Antipattern Coverage
 
-Last audit: 2026-04-01 | OXLint 1.58.0 | TypeScript 6.0.2 | Bun 1.3.11
+Last audit: 2026-04-19 | OXLint 1.60.0 | TypeScript 6.0.3 | Bun 1.3.12
 
-Active rules: 242 | Available candidates: 439
+Active rules: 245 | Available candidates: 439
 
 When upgrading OXLint, TypeScript, or Bun, run `/antipattern-audit`.
 
