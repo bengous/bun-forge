@@ -19,11 +19,9 @@ export interface HookInput {
 	};
 }
 
+// Regex-matchable commands whose danger is expressible as a single literal
+// shape. For anything with flag-order sensitivity (rm), we tokenise instead.
 export const BLOCKED_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
-	[/rm\s+-rf\b/, "rm -rf"],
-	[/rm\s+-r\s+\//, "rm -r /"],
-	[/rm\s+(-[a-z]*r[a-z]*\s+-[a-z]*f|-[a-z]*f[a-z]*\s+-[a-z]*r)\b/, "rm -r -f"],
-	[/rm\s+--recursive\b/, "rm --recursive"],
 	[/git\s+push\s+--force-with-lease\b/, "git push --force-with-lease"],
 	[/git\s+push\s+--force(?!-)/, "git push --force"],
 	[/git\s+push\s+-f\b/, "git push -f"],
@@ -50,8 +48,41 @@ export function stripStringLiterals(cmd: string): string {
 	return stripped;
 }
 
+// Best-effort tokeniser for the simple `rm …` shape. We ignore heredocs
+// (already stripped), quoted strings (already blanked to ""/''), and
+// variable expansion (out of scope — documented non-goal).
+function tokenise(cmd: string): string[] {
+	return cmd.trim().split(/\s+/).filter(Boolean);
+}
+
+// Detect dangerous `rm` invocations regardless of flag order or bundling.
+// Matches: -rf, -fr, -Rf, -fR, -Rvf, -r -f, --recursive --force, …
+// Also matches recursive deletion targeting `/` even without -f.
+export function checkRm(tokens: readonly string[]): string | null {
+	if (tokens[0] !== "rm") return null;
+
+	let shortLetters = "";
+	const longFlags = new Set<string>();
+	const positional: string[] = [];
+	for (const t of tokens.slice(1)) {
+		if (t.startsWith("--")) longFlags.add(t);
+		else if (/^-[a-zA-Z]+$/.test(t)) shortLetters += t.slice(1);
+		else positional.push(t);
+	}
+
+	const recursive = /[rR]/.test(shortLetters) || longFlags.has("--recursive");
+	const force = shortLetters.includes("f") || longFlags.has("--force");
+	const absoluteTarget = positional.some((p) => p.startsWith("/"));
+
+	if (recursive && force) return "rm recursive + force";
+	if (recursive && absoluteTarget) return "rm recursive on absolute path";
+	return null;
+}
+
 export function checkCommand(cmd: string): string | null {
 	const sanitized = stripStringLiterals(cmd);
+	const rmMatch = checkRm(tokenise(sanitized));
+	if (rmMatch) return rmMatch;
 	for (const [pattern, label] of BLOCKED_PATTERNS) {
 		if (pattern.test(sanitized)) {
 			return label;

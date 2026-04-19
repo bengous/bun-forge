@@ -30,7 +30,6 @@ async function main(): Promise<void> {
 
   const scopes = expandConfigScope(classifyScopes(codeFiles));
   const oxlint = resolveBin(projectRoot, "oxlint");
-  const oxfmt = resolveBin(projectRoot, "oxfmt");
   const errors: string[] = [];
 
   if (scopes.has("backend") || scopes.has("scripts")) {
@@ -40,12 +39,7 @@ async function main(): Promise<void> {
       projectRoot,
       errors,
     );
-    run(
-      "format:check",
-      [oxfmt, "--check", "-c", ".oxfmtrc.jsonc", "src/", "scripts/"],
-      projectRoot,
-      errors,
-    );
+    run("format:check", ["bun", "run", "--silent", "format:check"], projectRoot, errors);
   }
 
   if (errors.length > 0) {
