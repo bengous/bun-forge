@@ -30,7 +30,7 @@
     "validate:scale": "bun run --silent validate && bun run --silent lint:dead && bun run --silent lint:dupes && bun run --silent check:links && bun run --silent test:e2e-contract && bun run --silent test:smoke"
   },
   "dependencies": {
-    "@clack/prompts": "0.11.0",
+    "@clack/prompts": "1.2.0",
     "commander": "14.0.3"
   },
   "devDependencies": {
