@@ -7,7 +7,7 @@ import { ensureDestinationIsSafe } from "./conflicts.ts";
 const tempDirs: string[] = [];
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => Bun.$`rm -rf ${dir}`.quiet()));
+  await Promise.all(tempDirs.splice(0).map(async (dir) => Bun.$`rm -rf ${dir}`.quiet()));
 });
 
 function makeTempDir(): string {
