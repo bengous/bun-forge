@@ -59,8 +59,9 @@
  *
  * ## Usage
  *
- *   bun scripts/agents/sync-agents-md.ts --write   # generate/update files
- *   bun scripts/agents/sync-agents-md.ts --check   # verify no drift (default)
+ *   bun scripts/agents/sync-agents-md.ts --write                 # generate/update files
+ *   bun scripts/agents/sync-agents-md.ts --check                 # verify no drift (default)
+ *   bun scripts/agents/sync-agents-md.ts --write --preserve-root # keep existing root AGENTS.md
  */
 
 import { Glob } from "bun";
@@ -198,8 +199,8 @@ async function writeLfFile(path: string, content: string): Promise<void> {
   await Bun.write(path, normalized);
 }
 
-async function listManagedAgentsPaths(): Promise<string[]> {
-  const paths = [ROOT_AGENTS_MD];
+async function listManagedAgentsPaths(includeRoot: boolean): Promise<string[]> {
+  const paths = includeRoot ? [ROOT_AGENTS_MD] : [];
   for (const pattern of MANAGED_AGENTS_GLOBS) {
     const glob = new Glob(pattern);
     for await (const path of glob.scan({ cwd: "." })) {
@@ -253,14 +254,22 @@ async function buildDirectoryMap(): Promise<{
 
 async function main() {
   const mode = process.argv.includes("--write") ? "write" : "check";
+  const preserveRoot = process.argv.includes("--preserve-root");
 
   const { dirToRules } = await buildDirectoryMap();
   const rootContent = normalizeNewlines(await Bun.file(ROOT_MD).text());
-  const targetPaths = new Set<string>([ROOT_AGENTS_MD]);
+  const oldManifest = await readManifest();
+  const rootAgentsFile = Bun.file(ROOT_AGENTS_MD);
+  const rootExists = await rootAgentsFile.exists();
+  const rootWasManaged = oldManifest.generated.includes(ROOT_AGENTS_MD);
+  const preserveExistingRoot = preserveRoot && rootExists && !rootWasManaged;
+  const targetPaths = new Set<string>(preserveExistingRoot ? [] : [ROOT_AGENTS_MD]);
 
   // Generate layer AGENTS.md (rules only, no root duplication)
   const generated = new Map<string, string>();
-  generated.set(ROOT_AGENTS_MD, rootContent);
+  if (!preserveExistingRoot) {
+    generated.set(ROOT_AGENTS_MD, rootContent);
+  }
   for (const [dir, rules] of dirToRules) {
     const path = `${dir}/AGENTS.md`;
     targetPaths.add(path);
@@ -268,11 +277,10 @@ async function main() {
   }
 
   // Detect stale files from previous manifest
-  const oldManifest = await readManifest();
   const stale = oldManifest.generated.filter((p) => !targetPaths.has(p));
 
   const errors: string[] = [];
-  const managedAgentsPaths = await listManagedAgentsPaths();
+  const managedAgentsPaths = await listManagedAgentsPaths(!preserveExistingRoot);
 
   for (const path of managedAgentsPaths) {
     const symlinkError = await ensureManagedPathIsRegularFile(path);

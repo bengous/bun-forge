@@ -384,3 +384,51 @@ describe("integration: sandbox project", () => {
     runScript(dir, "--write");
   });
 });
+
+describe("integration: preserve root mode", () => {
+  let dir: string;
+
+  beforeAll(async () => {
+    dir = makeTempDir();
+    await Bun.write(`${dir}/AI.md`, "## Existing Root\n\nProject-specific guidance.\n");
+    symlinkSync("AI.md", `${dir}/CLAUDE.md`);
+    symlinkSync("AI.md", `${dir}/AGENTS.md`);
+    await Bun.write(
+      `${dir}/.claude/rules/bun-forge-project-conventions.md`,
+      `---\npaths:\n  - "src/**/*.ts"\n---\n\n## Bun Forge Rule\n\nAdopted rule content.\n`,
+    );
+    await $`mkdir -p ${dir}/src`.quiet();
+  });
+
+  afterAll(async () => {
+    await removeTempDir(dir);
+  });
+
+  test("--write --preserve-root keeps existing root AGENTS.md symlink", async () => {
+    const { exitCode, stdout, stderr } = runScript(dir, "--write", "--preserve-root");
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(stdout).not.toContain("wrote AGENTS.md");
+    expect(stdout).toContain("wrote src/AGENTS.md");
+    expect(await pathIsSymlink(`${dir}/AGENTS.md`)).toBe(true);
+    expect(await Bun.file(`${dir}/AI.md`).text()).toBe(
+      "## Existing Root\n\nProject-specific guidance.\n",
+    );
+  });
+
+  test("--check --preserve-root accepts existing root AGENTS.md symlink", async () => {
+    const { exitCode, stderr } = runScript(dir, "--check", "--preserve-root");
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+  });
+
+  test("preserve-root manifest only lists generated managed files", async () => {
+    const manifest = await readJsonObject(`${dir}/.agents/agents-md-manifest.json`);
+    const generated = stringArray(manifest["generated"]);
+
+    expect(generated).not.toContain("AGENTS.md");
+    expect(generated).toContain("src/AGENTS.md");
+  });
+});

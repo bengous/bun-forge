@@ -95,6 +95,8 @@ async function main(): Promise<void> {
     { cwd: process.cwd() },
   );
 
+  await run(["bun", "run", "agents:sync"], { cwd: destination });
+  await run(["bun", "run", "agents:check"], { cwd: destination });
   await run(["bun", "install"], { cwd: destination });
   await run(["bun", "run", "typecheck"], { cwd: destination });
   await run(["bun", "test", "src/", "--ignore", "**/*e2e*/**"], { cwd: destination });

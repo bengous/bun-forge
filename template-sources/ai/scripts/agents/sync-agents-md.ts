@@ -59,8 +59,9 @@
  *
  * ## Usage
  *
- *   bun scripts/agents/sync-agents-md.ts --write   # generate/update files
- *   bun scripts/agents/sync-agents-md.ts --check   # verify no drift (default)
+ *   bun scripts/agents/sync-agents-md.ts --write                 # generate/update files
+ *   bun scripts/agents/sync-agents-md.ts --check                 # verify no drift (default)
+ *   bun scripts/agents/sync-agents-md.ts --write --preserve-root # keep existing root AGENTS.md
  */
 
 import { Glob } from "bun";
@@ -87,27 +88,35 @@ function isManifest(value: unknown): value is Manifest {
 }
 
 export function normalizeNewlines(content: string): string {
-  return content.replace(/\r\n/g, "\n");
+  return content.replaceAll("\r\n", "\n");
 }
 
 export function parsePaths(content: string): string[] {
   content = normalizeNewlines(content);
   const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
-  if (fmMatch === null) return [];
+  if (fmMatch === null) {
+    return [];
+  }
 
   const frontmatter = fmMatch[1] ?? "";
   const pathLines = frontmatter.match(/^\s*-\s*"([^"]+)"/gm);
-  if (pathLines === null) return [];
+  if (pathLines === null) {
+    return [];
+  }
 
   const dirs: string[] = [];
   for (const line of pathLines) {
     const quoted = line.match(/"([^"]+)"/);
-    if (quoted === null) continue;
+    if (quoted === null) {
+      continue;
+    }
     const glob = quoted[1] ?? "";
     const segments = glob.split("/");
     const dirSegments: string[] = [];
     for (const seg of segments) {
-      if (seg.includes("*") || seg.includes("?") || seg.includes("{")) break;
+      if (seg.includes("*") || seg.includes("?") || seg.includes("{")) {
+        break;
+      }
       dirSegments.push(seg);
     }
     if (dirSegments.length >= 1) {
@@ -120,13 +129,17 @@ export function parsePaths(content: string): string[] {
 export function stripFrontmatter(content: string): string {
   content = normalizeNewlines(content);
   const match = content.match(/^---\n[\s\S]*?\n---\n?/);
-  if (match === null) return content;
+  if (match === null) {
+    return content;
+  }
   return content.slice(match[0].length).replace(/^\n/, "");
 }
 
 /** Generate a layer AGENTS.md containing only matched rule bodies. */
 export function generateLayerAgentsMd(rules: { name: string; body: string }[]): string {
-  if (rules.length === 0) return "";
+  if (rules.length === 0) {
+    return "";
+  }
   const parts: string[] = [];
   for (const rule of rules) {
     parts.push(rule.body.trimEnd(), "");
@@ -146,7 +159,9 @@ export function verifyLayerContent(
   for (const [dir, rules] of dirToRules) {
     const path = `${dir}/AGENTS.md`;
     const content = agentsFiles.get(path);
-    if (content === undefined) continue; // missing file already caught by byte check
+    if (content === undefined) {
+      continue;
+    } // missing file already caught by byte check
 
     for (const rule of rules) {
       const ruleBody = rule.body.trimEnd();
@@ -184,15 +199,15 @@ async function writeLfFile(path: string, content: string): Promise<void> {
   await Bun.write(path, normalized);
 }
 
-async function listManagedAgentsPaths(): Promise<string[]> {
-  const paths = [ROOT_AGENTS_MD];
+async function listManagedAgentsPaths(includeRoot: boolean): Promise<string[]> {
+  const paths = includeRoot ? [ROOT_AGENTS_MD] : [];
   for (const pattern of MANAGED_AGENTS_GLOBS) {
     const glob = new Glob(pattern);
     for await (const path of glob.scan({ cwd: "." })) {
       paths.push(path);
     }
   }
-  return [...new Set(paths)].sort();
+  return [...new Set(paths)].toSorted();
 }
 
 async function readManifest(): Promise<Manifest> {
@@ -239,14 +254,22 @@ async function buildDirectoryMap(): Promise<{
 
 async function main() {
   const mode = process.argv.includes("--write") ? "write" : "check";
+  const preserveRoot = process.argv.includes("--preserve-root");
 
   const { dirToRules } = await buildDirectoryMap();
   const rootContent = normalizeNewlines(await Bun.file(ROOT_MD).text());
-  const targetPaths = new Set<string>([ROOT_AGENTS_MD]);
+  const oldManifest = await readManifest();
+  const rootAgentsFile = Bun.file(ROOT_AGENTS_MD);
+  const rootExists = await rootAgentsFile.exists();
+  const rootWasManaged = oldManifest.generated.includes(ROOT_AGENTS_MD);
+  const preserveExistingRoot = preserveRoot && rootExists && !rootWasManaged;
+  const targetPaths = new Set<string>(preserveExistingRoot ? [] : [ROOT_AGENTS_MD]);
 
   // Generate layer AGENTS.md (rules only, no root duplication)
   const generated = new Map<string, string>();
-  generated.set(ROOT_AGENTS_MD, rootContent);
+  if (!preserveExistingRoot) {
+    generated.set(ROOT_AGENTS_MD, rootContent);
+  }
   for (const [dir, rules] of dirToRules) {
     const path = `${dir}/AGENTS.md`;
     targetPaths.add(path);
@@ -254,11 +277,10 @@ async function main() {
   }
 
   // Detect stale files from previous manifest
-  const oldManifest = await readManifest();
   const stale = oldManifest.generated.filter((p) => !targetPaths.has(p));
 
   const errors: string[] = [];
-  const managedAgentsPaths = await listManagedAgentsPaths();
+  const managedAgentsPaths = await listManagedAgentsPaths(!preserveExistingRoot);
 
   for (const path of managedAgentsPaths) {
     const symlinkError = await ensureManagedPathIsRegularFile(path);
@@ -290,7 +312,7 @@ async function main() {
     }
     // Write manifest
     const manifest: Manifest = {
-      generated: [...targetPaths].sort(),
+      generated: [...targetPaths].toSorted(),
     };
     await Bun.write(MANIFEST_PATH, `${JSON.stringify(manifest, null, "\t")}\n`);
     console.log(`wrote ${MANIFEST_PATH}`);
@@ -326,8 +348,8 @@ async function main() {
       if (currentManifest === null) {
         errors.push(`${MANIFEST_PATH}: invalid manifest shape — run \`bun run agents:sync\``);
       }
-      const expectedPaths = [...targetPaths].sort();
-      const actualPaths = currentManifest === null ? [] : [...currentManifest.generated].sort();
+      const expectedPaths = [...targetPaths].toSorted();
+      const actualPaths = currentManifest === null ? [] : [...currentManifest.generated].toSorted();
       if (
         currentManifest !== null &&
         JSON.stringify(expectedPaths) !== JSON.stringify(actualPaths)
@@ -339,7 +361,9 @@ async function main() {
     // Semantic check: verify each layer file contains its expected rules
     const agentsFiles = new Map<string, string>();
     for (const [path] of generated) {
-      if (path === ROOT_AGENTS_MD) continue; // root checked via byte-exact above
+      if (path === ROOT_AGENTS_MD) {
+        continue;
+      } // root checked via byte-exact above
       const file = Bun.file(path);
       if (await file.exists()) {
         agentsFiles.set(path, normalizeNewlines(await file.text()));

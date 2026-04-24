@@ -1,6 +1,6 @@
 import type { AdoptOptions } from "../types.ts";
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdtempSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -217,6 +217,29 @@ describe("buildAdoptionPlan", () => {
     expect(packageJson.devDependencies["@types/bun"]).toBe("^1.3.8");
   });
 
+  test("uses preserve-root agent scripts for adopted projects", async () => {
+    const dir = makeTempProject();
+    seedBunTsProject(dir);
+
+    const plan = await buildAdoptionPlan(makeOptions(dir, { ai: true }));
+    const packageAction = plan.actions.find(
+      (action) => action.kind === "modify" && action.path === "package.json",
+    );
+
+    expect(packageAction?.kind).toBe("modify");
+    if (packageAction?.kind !== "modify") {
+      throw new Error("Expected package.json modify action");
+    }
+
+    const packageJson = packageJsonShape(JSON.parse(packageAction.content) as unknown);
+    expect(packageJson.scripts["agents:sync"]).toBe(
+      "bun scripts/agents/sync-agents-md.ts --write --preserve-root",
+    );
+    expect(packageJson.scripts["agents:check"]).toBe(
+      "bun scripts/agents/sync-agents-md.ts --check --preserve-root",
+    );
+  });
+
   test("does not convert an existing frontend in adopt v1", async () => {
     const dir = makeTempProject();
     seedBunTsProject(dir);
@@ -244,11 +267,42 @@ describe("buildAdoptionPlan", () => {
     expect(
       plan.actions.some(
         (action) =>
-          action.kind === "conflict" &&
+          action.kind === "skip" &&
           action.path === ".codex/config.toml" &&
-          action.reason.includes("existing non-directory path: .codex"),
+          action.reason.includes("Codex config preserved"),
       ),
     ).toBe(true);
+  });
+
+  test("preserves Vex-like root AI files and adds a Bun Forge rule", async () => {
+    const dir = makeTempProject();
+    seedBunTsProject(dir);
+    writeProjectFile(dir, "AI.md", "Existing Vex guidance\n");
+    symlinkSync("AI.md", join(dir, "CLAUDE.md"));
+    symlinkSync("AI.md", join(dir, "AGENTS.md"));
+    writeProjectFile(dir, ".codex", "legacy codex marker\n");
+    mkdirSync(join(dir, ".claude/worktrees"), { recursive: true });
+
+    const plan = await buildAdoptionPlan(makeOptions(dir, { ai: true }));
+
+    expect(
+      plan.actions.some(
+        (action) =>
+          action.kind === "skip" &&
+          action.path === "CLAUDE.md" &&
+          action.reason.includes("preserved"),
+      ),
+    ).toBe(true);
+    expect(
+      plan.actions.some(
+        (action) =>
+          action.kind === "create" &&
+          action.path === ".claude/rules/bun-forge-project-conventions.md",
+      ),
+    ).toBe(true);
+    expect(
+      plan.actions.some((action) => action.path === ".claude/rules/project-conventions.md"),
+    ).toBe(false);
   });
 });
 
@@ -283,22 +337,45 @@ describe("applyAdoptionPlan and rollbackAdoption", () => {
     expect(await Bun.file(join(dir, "lefthook.yml")).exists()).toBe(false);
   });
 
-  test("does not run agent sync while AI conflicts remain", async () => {
+  test("runs preserve-root agent sync while existing guidance is preserved", async () => {
     const dir = await makeAsyncTempProject();
     seedBunTsProject(dir);
     writeProjectFile(dir, "CLAUDE.md", "Existing guidance\n");
     const options = makeOptions(dir, { ai: true });
     const plan = await buildAdoptionPlan(options);
-    let syncCalls = 0;
+    const calls: string[][] = [];
 
     await applyAdoptionPlan(plan, options, {
       now: () => new Date("2026-04-24T00:00:00.000Z"),
-      runCommand: async () => {
-        syncCalls++;
+      runCommand: async (command) => {
+        calls.push(command);
       },
       finalizeProject: async () => {},
     });
 
-    expect(syncCalls).toBe(0);
+    expect(calls).toEqual([
+      ["bun", "scripts/agents/sync-agents-md.ts", "--write", "--preserve-root"],
+    ]);
+    expect(await Bun.file(join(dir, "CLAUDE.md")).text()).toBe("Existing guidance\n");
+  });
+
+  test("keeps root AI symlinks intact during apply", async () => {
+    const dir = await makeAsyncTempProject();
+    seedBunTsProject(dir);
+    writeProjectFile(dir, "AI.md", "Existing Vex guidance\n");
+    symlinkSync("AI.md", join(dir, "CLAUDE.md"));
+    symlinkSync("AI.md", join(dir, "AGENTS.md"));
+    const options = makeOptions(dir, { ai: true });
+    const plan = await buildAdoptionPlan(options);
+
+    await applyAdoptionPlan(plan, options, {
+      now: () => new Date("2026-04-24T00:00:00.000Z"),
+      runCommand: async () => {},
+      finalizeProject: async () => {},
+    });
+
+    expect(lstatSync(join(dir, "CLAUDE.md")).isSymbolicLink()).toBe(true);
+    expect(lstatSync(join(dir, "AGENTS.md")).isSymbolicLink()).toBe(true);
+    expect(await Bun.file(join(dir, "AI.md")).text()).toBe("Existing Vex guidance\n");
   });
 });

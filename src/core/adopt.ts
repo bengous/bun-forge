@@ -250,6 +250,21 @@ function mergePackageJson(existing: JsonObject, expected: JsonObject): JsonObjec
   };
 }
 
+function withAdoptionPackageScripts(expected: JsonObject, context: TemplateContext): JsonObject {
+  if (!context.ai) {
+    return expected;
+  }
+
+  return {
+    ...expected,
+    scripts: {
+      ...objectField(expected, "scripts"),
+      "agents:sync": "bun scripts/agents/sync-agents-md.ts --write --preserve-root",
+      "agents:check": "bun scripts/agents/sync-agents-md.ts --check --preserve-root",
+    },
+  };
+}
+
 function stableJson(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
@@ -309,7 +324,10 @@ async function planPackageJson(
   const relativePath = toSafeRelativePath("package.json");
   const packagePath = join(destination, relativePath);
   const existing = await parseJsonFile(packagePath);
-  const expected = renderJsonTemplate("package.json.tpl", context);
+  const expected = withAdoptionPackageScripts(
+    renderJsonTemplate("package.json.tpl", context),
+    context,
+  );
   const merged = mergePackageJson(existing, expected);
   const content = stableJson(merged);
   const current = await readText(packagePath);
@@ -328,6 +346,37 @@ async function planPackageJson(
     reason: "Merge Bun Forge scripts and dependencies without overwriting existing entries",
     content,
   };
+}
+
+async function planPreservedTemplateFile(
+  destination: string,
+  context: TemplateContext,
+  templateName: string,
+  relativePath: string,
+  createReason: string,
+  preserveReason: string,
+): Promise<AdoptionAction> {
+  const safePath = toSafeRelativePath(relativePath);
+  const content = renderTemplate(templateName, context);
+  const target = join(destination, safePath);
+  const blockedBy = blockingParentPath(destination, safePath);
+  if (blockedBy !== undefined) {
+    return {
+      kind: "conflict",
+      path: safePath,
+      reason: `Cannot create below existing non-directory path: ${blockedBy}`,
+    };
+  }
+  if (!existsSync(target)) {
+    return { kind: "create", path: safePath, reason: createReason, content };
+  }
+
+  const existing = await readText(target);
+  if (existing === content) {
+    return { kind: "skip", path: safePath, reason: "Already matches Bun Forge output" };
+  }
+
+  return { kind: "skip", path: safePath, reason: preserveReason };
 }
 
 async function planTemplateFile(
@@ -455,30 +504,49 @@ async function planAi(destination: string, context: TemplateContext): Promise<Ad
     return [];
   }
 
+  const staticActions = await planStaticPreset(destination, "ai", "AI tooling file");
+  const nonBlockingStaticActions = staticActions.map((action) => {
+    if (
+      action.kind === "conflict" &&
+      action.path.startsWith(".codex/") &&
+      action.reason.includes("existing non-directory path")
+    ) {
+      return {
+        kind: "skip" as const,
+        path: action.path,
+        reason: "Existing .codex path is not a directory; Codex config preserved and skipped",
+      };
+    }
+    return action;
+  });
+
   return [
-    ...(await planStaticPreset(destination, "ai", "AI tooling file")),
-    await planTemplateFile(
+    ...nonBlockingStaticActions,
+    await planPreservedTemplateFile(
       destination,
       context,
       "CLAUDE.md.tpl",
       "CLAUDE.md",
       "create Claude guidance",
+      "Existing Claude/root guidance preserved",
     ),
-    await planTemplateFile(
+    await planPreservedTemplateFile(
       destination,
       context,
       ".claude/rules/project-conventions.md.tpl",
-      ".claude/rules/project-conventions.md",
-      "create Claude project convention rule",
+      ".claude/rules/bun-forge-project-conventions.md",
+      "create Bun Forge Claude project convention rule",
+      "Existing Bun Forge Claude project convention rule preserved",
     ),
     ...(context.frontend === "tanstack"
       ? [
-          await planTemplateFile(
+          await planPreservedTemplateFile(
             destination,
             context,
             ".claude/rules/frontend-conventions.md.tpl",
-            ".claude/rules/frontend-conventions.md",
-            "create Claude frontend convention rule",
+            ".claude/rules/bun-forge-frontend-conventions.md",
+            "create Bun Forge Claude frontend convention rule",
+            "Existing Bun Forge Claude frontend convention rule preserved",
           ),
         ]
       : []),
@@ -604,22 +672,9 @@ export async function applyAdoptionPlan(
 
   await writeText(join(root, "manifest.json"), stableJson(manifest));
 
-  const hasAiConflicts = plan.actions.some(
-    (action) =>
-      action.kind === "conflict" &&
-      (action.path === "CLAUDE.md" ||
-        action.path.startsWith(".claude/") ||
-        action.path.startsWith(".codex/") ||
-        action.path === ".mcp.json"),
-  );
-
-  if (
-    options.ai &&
-    !hasAiConflicts &&
-    existsSync(join(options.destination, "scripts/agents/sync-agents-md.ts"))
-  ) {
+  if (options.ai && existsSync(join(options.destination, "scripts/agents/sync-agents-md.ts"))) {
     await runtime.runCommand(
-      ["bun", "scripts/agents/sync-agents-md.ts", "--write"],
+      ["bun", "scripts/agents/sync-agents-md.ts", "--write", "--preserve-root"],
       options.destination,
     );
   }
