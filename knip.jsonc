@@ -1,0 +1,35 @@
+{
+  "$schema": "./node_modules/knip/schema.json",
+  "entry": [
+    "src/index.ts",
+    "src/**/*.test.ts",
+    "scripts/**/*.test.ts",
+    "scripts/validation/format-and-lint.ts",
+    "scripts/validation/validate-on-stop.ts",
+    ".claude/hooks/guard-destructive.ts",
+
+    // `template-sources` files are copied into generated projects by
+    // `template-sources/manifest.json`; they are product assets, not imports.
+    "template-sources/base/.dependency-cruiser.cjs",
+    "template-sources/base/scripts/quality/audit-oxlint-rules.ts",
+    "template-sources/base/scripts/quality/check-links-local.ts",
+    "template-sources/base/scripts/setup/bootstrap-git-config.ts",
+    "template-sources/base/scripts/setup/bootstrap-prepare.ts",
+    "template-sources/base/scripts/validation/detect-scope.ts",
+    "template-sources/base/scripts/validation/resolve-bin.ts",
+    "template-sources/base/scripts/validation/typecheck-staged.ts",
+    "template-sources/base/scripts/validation/validate-push.ts",
+    "template-sources/base/scripts/validation/validate.ts",
+    "template-sources/frontend-tanstack/apps/frontend/.dependency-cruiser.cjs",
+    "template-sources/ai/.claude/hooks/guard-destructive.ts",
+    "template-sources/ai/scripts/agents/sync-agents-md.ts",
+    "template-sources/ai/scripts/validation/format-and-lint.ts",
+    "template-sources/ai/scripts/validation/validate-on-stop.ts"
+  ],
+  "project": [
+    "src/**/*.{ts,tsx,js,jsx,mjs,cjs}",
+    "scripts/**/*.{ts,tsx,js,jsx,mjs,cjs}",
+    ".claude/hooks/**/*.{ts,tsx,js,jsx,mjs,cjs}",
+    "template-sources/**/*.{ts,tsx,js,jsx,mjs,cjs}"
+  ]
+}
