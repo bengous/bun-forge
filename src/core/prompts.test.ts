@@ -9,6 +9,22 @@ import {
 
 const cancelled = Symbol("cancelled");
 
+function plainOptions(options: InitOptions): Omit<
+  InitOptions,
+  "projectName" | "packageName" | "binName"
+> & {
+  readonly projectName: string;
+  readonly packageName: string;
+  readonly binName: string;
+} {
+  return {
+    ...options,
+    projectName: String(options.projectName),
+    packageName: String(options.packageName),
+    binName: String(options.binName),
+  };
+}
+
 function createPromptRuntime(
   responses: {
     readonly texts?: Array<string | symbol>;
@@ -44,7 +60,7 @@ function createPromptRuntime(
 describe("normalizeFlagOptions", () => {
   test("derives defaults from destination and project name", () => {
     const normalized = normalizeFlagOptions("My App", {});
-    expect(normalized).toMatchObject({
+    expect(plainOptions(normalized)).toMatchObject({
       projectName: "my-app",
       packageName: "my-app",
       binName: "my-app",
@@ -54,7 +70,7 @@ describe("normalizeFlagOptions", () => {
       install: true,
       gitInit: true,
       yes: false,
-    } satisfies Omit<InitOptions, "destination">);
+    });
     expect(normalized.destination.endsWith("/My App")).toBe(true);
   });
 
@@ -71,7 +87,7 @@ describe("normalizeFlagOptions", () => {
       yes: true,
     });
 
-    expect(normalized).toEqual({
+    expect(plainOptions(normalized)).toEqual({
       destination: "/work/custom",
       projectName: "chosen-name",
       packageName: "pkg-name",
@@ -82,14 +98,14 @@ describe("normalizeFlagOptions", () => {
       install: false,
       gitInit: false,
       yes: true,
-    } satisfies InitOptions);
+    });
   });
 
   test("derives the default name from the destination basename", () => {
     const normalized = normalizeFlagOptions("/tmp/nested/Fancy Project", {});
-    expect(normalized.projectName).toBe("fancy-project");
-    expect(normalized.packageName).toBe("fancy-project");
-    expect(normalized.binName).toBe("fancy-project");
+    expect(String(normalized.projectName)).toBe("fancy-project");
+    expect(String(normalized.packageName)).toBe("fancy-project");
+    expect(String(normalized.binName)).toBe("fancy-project");
   });
 
   test("rejects an explicit empty project name", () => {
@@ -116,7 +132,7 @@ describe("collectOptionsWithRuntime", () => {
       ),
     );
 
-    expect(options).toEqual({
+    expect(plainOptions(options)).toEqual({
       destination: "/workspace/Forge App",
       projectName: "Forge App",
       packageName: "forge-app",
@@ -127,7 +143,7 @@ describe("collectOptionsWithRuntime", () => {
       install: false,
       gitInit: true,
       yes: false,
-    } satisfies InitOptions);
+    });
   });
 
   test("uses flag values instead of prompting when already provided", async () => {
@@ -145,7 +161,7 @@ describe("collectOptionsWithRuntime", () => {
       createPromptRuntime({}, "/ignored"),
     );
 
-    expect(options).toEqual({
+    expect(plainOptions(options)).toEqual({
       destination: "/repo/starter",
       projectName: "starter",
       packageName: "starter",
@@ -156,7 +172,7 @@ describe("collectOptionsWithRuntime", () => {
       install: false,
       gitInit: false,
       yes: false,
-    } satisfies InitOptions);
+    });
   });
 
   test("throws when a prompt is cancelled", async () => {
@@ -183,8 +199,8 @@ describe("collectOptionsWithRuntime", () => {
       }),
     );
 
-    expect(options.projectName).toBe("Forge App");
-    expect(options.packageName).toBe("forge-app");
+    expect(String(options.projectName)).toBe("Forge App");
+    expect(String(options.packageName)).toBe("forge-app");
     expect(options.destination).toBe("/tmp/absolute/Forge App");
   });
 

@@ -1,8 +1,9 @@
 #!/usr/bin/env bun
 
-import type { FrontendPreset, InitOptions } from "./types.ts";
+import type { AdoptOptionsInput, FrontendPreset, InitOptionsInput } from "./types.ts";
 import { Command, CommanderError } from "commander";
 import { readFileSync } from "node:fs";
+import { adoptProject, deriveAdoptOptions, formatAdoptionPlan } from "./core/adopt.ts";
 import { generateProject } from "./core/generator.ts";
 import { collectOptions, normalizeFlagOptions } from "./core/prompts.ts";
 
@@ -14,12 +15,16 @@ export type CliRuntime = {
   readonly collectOptions: typeof collectOptions;
   readonly normalizeFlagOptions: typeof normalizeFlagOptions;
   readonly generateProject: typeof generateProject;
+  readonly deriveAdoptOptions: typeof deriveAdoptOptions;
+  readonly adoptProject: typeof adoptProject;
   readonly stdout: Writer;
   readonly stderr: Writer;
 };
 
 function readCliVersion(): string {
-  const parsed = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+  const parsed = JSON.parse(
+    readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+  ) as unknown;
   if (
     typeof parsed === "object" &&
     parsed !== null &&
@@ -38,6 +43,8 @@ export const defaultCliRuntime: CliRuntime = {
   collectOptions,
   normalizeFlagOptions,
   generateProject,
+  deriveAdoptOptions,
+  adoptProject,
   stdout: process.stdout,
   stderr: process.stderr,
 };
@@ -96,7 +103,7 @@ export function formatCliError(error: unknown): string {
 }
 
 export function buildProgram(runtime: CliRuntime = defaultCliRuntime): Command {
-  return new Command()
+  const program = new Command()
     .name("bun-forge")
     .version(CLI_VERSION)
     .description("Scaffold an opinionated Bun project from Bun-forge presets")
@@ -119,7 +126,7 @@ export function buildProgram(runtime: CliRuntime = defaultCliRuntime): Command {
         destination: string | undefined,
         flags: Record<string, string | boolean | undefined>,
       ) => {
-        const partial: Partial<InitOptions> = {
+        const partial: InitOptionsInput = {
           yes: flags["yes"] === true,
           ...(destination !== undefined ? { destination } : {}),
           ...(typeof flags["name"] === "string" ? { projectName: flags["name"] } : {}),
@@ -145,6 +152,58 @@ export function buildProgram(runtime: CliRuntime = defaultCliRuntime): Command {
         writeLine(runtime.stdout, `Project created at ${options.destination}`);
       },
     );
+
+  program
+    .command("adopt [destination]")
+    .description("Adopt Bun Forge tooling in an existing Bun/TypeScript project")
+    .option("--name <projectName>", "override the adopted project name")
+    .option("--frontend <preset>", "frontend preset: none | tanstack")
+    .option("--ai <enabled>", "install Claude/AGENTS tooling: true | false")
+    .option("--effect <enabled>", "install Effect runtime and tooling: true | false")
+    .option("--install <enabled>", "run bun install and prepare steps after apply: true | false")
+    .option("--apply", "apply the adoption plan")
+    .option("--rollback <runId>", "rollback a previous adoption run")
+    .option("--yes", "skip prompts and use defaults from the destination package")
+    .action(
+      async (
+        destination: string | undefined,
+        _flags: Record<string, string | boolean | undefined>,
+        command: Command,
+      ) => {
+        const flags = command.optsWithGlobals<Record<string, string | boolean | undefined>>();
+        const partial: AdoptOptionsInput = {
+          yes: flags["yes"] === true,
+          apply: flags["apply"] === true,
+          ...(destination !== undefined ? { destination } : {}),
+          ...(typeof flags["name"] === "string" ? { projectName: flags["name"] } : {}),
+          ...(typeof flags["frontend"] === "string"
+            ? { frontend: parseFrontendPreset(flags["frontend"]) }
+            : {}),
+          ...(typeof flags["ai"] === "string" ? { ai: parseBoolean(flags["ai"]) } : {}),
+          ...(typeof flags["effect"] === "string" ? { effect: parseBoolean(flags["effect"]) } : {}),
+          ...(typeof flags["install"] === "string"
+            ? { install: parseBoolean(flags["install"]) }
+            : {}),
+          ...(typeof flags["rollback"] === "string" ? { rollback: flags["rollback"] } : {}),
+        };
+
+        const options = await runtime.deriveAdoptOptions(destination, partial);
+        const plan = await runtime.adoptProject(options);
+        if (options.rollback !== undefined) {
+          writeLine(runtime.stdout, `Rolled back Bun Forge adoption run ${options.rollback}`);
+          return;
+        }
+        runtime.stdout.write(formatAdoptionPlan(plan));
+        writeLine(
+          runtime.stdout,
+          options.apply
+            ? `Applied Bun Forge adoption at ${options.destination}`
+            : "Dry run only. Re-run with --apply to write changes.",
+        );
+      },
+    );
+
+  return program;
 }
 
 export async function runCli(

@@ -11,7 +11,7 @@ When upgrading OXLint, TypeScript, or Bun, run `/antipattern-audit`.
 | Plugin     | Active | Focus                                                                          |
 | ---------- | ------ | ------------------------------------------------------------------------------ |
 | eslint     | 94     | Correctness, best practices, no-unused-vars at error                           |
-| typescript | 73     | Type safety, no-explicit-any, no-floating-promises, strict-boolean-expressions |
+| typescript | 73     | Type safety, no-explicit-any, no-unsafe-* flow, strict-boolean-expressions     |
 | unicorn    | 40     | Modern JS idioms, array method safety                                          |
 | oxc        | 20     | Oxc-specific: bad comparisons, const analysis, erasing ops                     |
 | import     | 19     | Module hygiene: no-cycle, no-default-export, consistent-type-specifier         |
@@ -25,6 +25,7 @@ When upgrading OXLint, TypeScript, or Bun, run `/antipattern-audit`.
 | Floating promises          | no-floating-promises                                 | error |
 | Misused promises           | no-misused-promises                                  | error |
 | Unsafe type assertions     | no-unsafe-type-assertion                             | error |
+| Unsafe `any` flow          | no-unsafe-assignment, no-unsafe-call, no-unsafe-*    | error |
 | Unreachable code           | no-unreachable                                       | error |
 | Invalid regex              | no-invalid-regexp                                    | error |
 | Duplicate keys/cases       | no-dupe-keys, no-duplicate-case                      | error |
@@ -39,8 +40,8 @@ When upgrading OXLint, TypeScript, or Bun, run `/antipattern-audit`.
 
 | Gap                        | Reason                                          | Revisit when                     |
 | -------------------------- | ----------------------------------------------- | -------------------------------- |
-| JSON.parse type assertions | No lint rule catches `as T` on parse results    | OXLint adds narrowing-aware rule |
-| Stringly-typed identifiers | No rule enforces branded types over raw strings | Project grows enough to warrant  |
+| Schema-level JSON parsing  | Guards are manual, no schema library            | External JSON contracts grow     |
+| Broad path nominal typing  | Only adoption relative paths are branded        | More path domains appear         |
 
 ## Generated Project Contract
 

@@ -5,6 +5,7 @@ import { existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { objectField, readJsonObject } from "../../src/core/json.ts";
 import { parseScenariosFromArgv, SCAFFOLD_SCENARIO_CONFIG } from "./scenarios.ts";
 
 export type E2eContractScenario = ScaffoldScenario;
@@ -78,7 +79,8 @@ async function assertGeneratedProject(
   config: ScenarioConfig,
   projectName: string,
 ): Promise<void> {
-  const packageJson = await Bun.file(join(root, "package.json")).json();
+  const packageJson = await readJsonObject(join(root, "package.json"));
+  const packageScripts = objectField(packageJson, "scripts");
   const lefthook = await Bun.file(join(root, "lefthook.yml")).text();
 
   expectExists(root, "package.json");
@@ -107,7 +109,7 @@ async function assertGeneratedProject(
       `Expected root package name ${projectName}, got ${String(packageJson["name"])}`,
     );
   }
-  if (packageJson["scripts"]["test"] !== "bun test ./src") {
+  if (packageScripts["test"] !== "bun test ./src") {
     throw new Error("Expected root test script to be `bun test ./src`");
   }
 
@@ -137,10 +139,10 @@ async function assertGeneratedProject(
       "If the repo layout changes, update Lefthook and validation scripts in the same change",
     );
 
-    if (typeof packageJson["scripts"]["agents:sync"] !== "string") {
+    if (typeof packageScripts["agents:sync"] !== "string") {
       throw new TypeError("Expected agents:sync script for AI scenario");
     }
-    if (typeof packageJson["scripts"]["agents:check"] !== "string") {
+    if (typeof packageScripts["agents:check"] !== "string") {
       throw new TypeError("Expected agents:check script for AI scenario");
     }
   } else {
@@ -150,7 +152,7 @@ async function assertGeneratedProject(
     expectMissing(root, ".codex");
     expectMissing(root, "scripts/validation/format-and-lint.ts");
     expectMissing(root, "scripts/validation/validate-on-stop.ts");
-    if (packageJson["scripts"]["agents:sync"] !== undefined) {
+    if (packageScripts["agents:sync"] !== undefined) {
       throw new Error("Did not expect agents:sync script without AI");
     }
   }
@@ -176,7 +178,8 @@ async function assertGeneratedProject(
   }
 
   if (config.frontend === "tanstack") {
-    const frontendPackage = await Bun.file(join(root, "apps/frontend/package.json")).json();
+    const frontendPackage = await readJsonObject(join(root, "apps/frontend/package.json"));
+    const frontendScripts = objectField(frontendPackage, "scripts");
 
     expectExists(root, "apps/frontend/package.json");
     expectExists(root, "apps/frontend/src/routes/index.tsx");
@@ -200,10 +203,10 @@ async function assertGeneratedProject(
     if (!Array.isArray(packageJson["workspaces"]) || packageJson["workspaces"][0] !== "apps/*") {
       throw new Error("Expected root workspaces to include apps/* for TanStack scenario");
     }
-    if (typeof packageJson["scripts"]["validate:frontend"] !== "string") {
+    if (typeof packageScripts["validate:frontend"] !== "string") {
       throw new TypeError("Expected validate:frontend script for TanStack scenario");
     }
-    if (frontendPackage["scripts"]["test"] !== "vitest run --environment jsdom") {
+    if (frontendScripts["test"] !== "vitest run --environment jsdom") {
       throw new Error("Expected frontend test script to use Vitest + jsdom");
     }
 
@@ -220,7 +223,7 @@ async function assertGeneratedProject(
     if (packageJson["workspaces"] !== undefined) {
       throw new Error("Did not expect root workspaces without frontend");
     }
-    if (packageJson["scripts"]["validate:frontend"] !== undefined) {
+    if (packageScripts["validate:frontend"] !== undefined) {
       throw new Error("Did not expect validate:frontend script without frontend");
     }
   }

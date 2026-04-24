@@ -2,13 +2,14 @@ import type { InitOptions } from "../types.ts";
 import type { InstallRuntime } from "./install.ts";
 import { describe, expect, test } from "bun:test";
 import { defaultInstallRuntime, finalizeProject, maybeInstallMiseWithRuntime } from "./install.ts";
+import { toBinName, toPackageName, toProjectName } from "./naming.ts";
 
 function makeOptions(overrides: Partial<InitOptions> = {}): InitOptions {
   return {
     destination: "/tmp/forge-install",
-    projectName: "forge-install",
-    packageName: "forge-install",
-    binName: "forge-install",
+    projectName: toProjectName("forge-install"),
+    packageName: toPackageName("forge-install"),
+    binName: toBinName("forge-install"),
     frontend: "none",
     ai: false,
     effect: false,

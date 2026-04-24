@@ -58,6 +58,14 @@ export const defaultInstallRuntime: InstallRuntime = {
   warn: console.warn,
 };
 
+function bunInstallEnv(): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    BUN_TMPDIR: process.env["BUN_TMPDIR"] ?? "/tmp",
+    BUN_INSTALL: process.env["BUN_INSTALL"] ?? "/tmp/bun-install",
+  };
+}
+
 async function syncAgentsIfEnabled(
   options: InitOptions,
   runtime: InstallRuntime = defaultInstallRuntime,
@@ -136,8 +144,10 @@ export async function finalizeProject(
   }
 
   if (options.install) {
-    await runtime.runCommand(["bun", "install"], options.destination);
-    await runtime.runCommand(["bun", "run", "prepare"], options.destination);
+    await runtime.runCommand(["bun", "install"], options.destination, { env: bunInstallEnv() });
+    await runtime.runCommand(["bun", "run", "prepare"], options.destination, {
+      env: bunInstallEnv(),
+    });
     await maybeInstallMiseWithRuntime(options, runtime);
   }
 }

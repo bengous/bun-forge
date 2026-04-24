@@ -8,13 +8,14 @@ import {
   generateProjectWithRuntime,
   templateFilesForContext,
 } from "./generator.ts";
+import { toBinName, toPackageName, toProjectName } from "./naming.ts";
 
 function makeOptions(overrides: Partial<InitOptions> = {}): InitOptions {
   return {
     destination: "/tmp/forge-generator",
-    projectName: "forge-generator",
-    packageName: "forge-generator",
-    binName: "forge-generator",
+    projectName: toProjectName("forge-generator"),
+    packageName: toPackageName("forge-generator"),
+    binName: toBinName("forge-generator"),
     frontend: "none",
     ai: false,
     effect: false,

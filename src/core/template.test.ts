@@ -1,11 +1,12 @@
 import type { TemplateContext } from "../types.ts";
 import { describe, expect, test } from "bun:test";
+import { toBinName, toPackageName, toProjectName } from "./naming.ts";
 import { renderTemplate, templateValues } from "./template.ts";
 
 const backendContext: TemplateContext = {
-  projectName: "forge-backend",
-  packageName: "forge-backend",
-  binName: "forge-backend",
+  projectName: toProjectName("forge-backend"),
+  packageName: toPackageName("forge-backend"),
+  binName: toBinName("forge-backend"),
   frontend: "none",
   ai: false,
   effect: false,
@@ -13,9 +14,9 @@ const backendContext: TemplateContext = {
 };
 
 const frontendAiContext: TemplateContext = {
-  projectName: "forge-frontend",
-  packageName: "forge-frontend",
-  binName: "forge-frontend",
+  projectName: toProjectName("forge-frontend"),
+  packageName: toPackageName("forge-frontend"),
+  binName: toBinName("forge-frontend"),
   frontend: "tanstack",
   ai: true,
   effect: false,
@@ -23,9 +24,9 @@ const frontendAiContext: TemplateContext = {
 };
 
 const effectContext: TemplateContext = {
-  projectName: "forge-effect",
-  packageName: "forge-effect",
-  binName: "forge-effect",
+  projectName: toProjectName("forge-effect"),
+  packageName: toPackageName("forge-effect"),
+  binName: toBinName("forge-effect"),
   frontend: "none",
   ai: false,
   effect: true,

@@ -1,7 +1,7 @@
-import type { FrontendPreset, InitOptions } from "../types.ts";
+import type { FrontendPreset, InitOptions, InitOptionsInput } from "../types.ts";
 import { confirm, intro, isCancel, outro, select, text } from "@clack/prompts";
 import { basename, resolve } from "node:path";
-import { toBinName, toKebabCase, toPackageName } from "./naming.ts";
+import { toBinName, toKebabCase, toPackageName, toProjectName } from "./naming.ts";
 
 export type PromptRuntime = {
   readonly intro: (message: string) => void;
@@ -64,14 +64,14 @@ function defaultProjectName(destinationArg: string | undefined): string {
 
 export async function collectOptions(
   destinationArg: string | undefined,
-  flags: Partial<InitOptions>,
+  flags: InitOptionsInput,
 ): Promise<InitOptions> {
   return collectOptionsWithRuntime(destinationArg, flags);
 }
 
 export async function collectOptionsWithRuntime(
   destinationArg: string | undefined,
-  flags: Partial<InitOptions>,
+  flags: InitOptionsInput,
   runtime: PromptRuntime = defaultPromptRuntime,
 ): Promise<InitOptions> {
   runtime.intro("bun-forge");
@@ -88,7 +88,7 @@ export async function collectOptionsWithRuntime(
         defaultValue: defaultName,
       }),
     );
-  const normalizedProjectName = normalizeProjectNameInput(projectName);
+  const normalizedProjectName = toProjectName(normalizeProjectNameInput(projectName));
 
   const destination = runtime.resolvePath(
     flags.destination ?? destinationArg ?? normalizedProjectName,
@@ -154,8 +154,12 @@ export async function collectOptionsWithRuntime(
   return {
     destination,
     projectName: normalizedProjectName,
-    packageName: flags.packageName ?? toPackageName(normalizedProjectName),
-    binName: flags.binName ?? toBinName(normalizedProjectName),
+    packageName:
+      flags.packageName !== undefined
+        ? toPackageName(flags.packageName)
+        : toPackageName(normalizedProjectName),
+    binName:
+      flags.binName !== undefined ? toBinName(flags.binName) : toBinName(normalizedProjectName),
     frontend,
     ai,
     effect,
@@ -167,12 +171,12 @@ export async function collectOptionsWithRuntime(
 
 export function normalizeFlagOptions(
   destinationArg: string | undefined,
-  flags: Partial<InitOptions>,
+  flags: InitOptionsInput,
 ): InitOptions {
   const rawName =
     (flags.projectName !== undefined ? normalizeProjectNameInput(flags.projectName) : undefined) ??
     defaultProjectName(flags.destination ?? destinationArg);
-  const projectName = toKebabCase(rawName);
+  const projectName = toProjectName(toKebabCase(rawName));
 
   if (projectName.length === 0) {
     throw new Error("Project name must not be empty");
@@ -181,8 +185,11 @@ export function normalizeFlagOptions(
   return {
     destination: resolve(flags.destination ?? destinationArg ?? projectName),
     projectName,
-    packageName: flags.packageName ?? toPackageName(projectName),
-    binName: flags.binName ?? toBinName(projectName),
+    packageName:
+      flags.packageName !== undefined
+        ? toPackageName(flags.packageName)
+        : toPackageName(projectName),
+    binName: flags.binName !== undefined ? toBinName(flags.binName) : toBinName(projectName),
     frontend: flags.frontend ?? "none",
     ai: flags.ai ?? true,
     effect: flags.effect ?? false,

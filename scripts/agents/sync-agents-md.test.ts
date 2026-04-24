@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { lstatSync, mkdtempSync, symlinkSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { readJsonObject, stringArray } from "../../src/core/json.ts";
 import {
   fileContainsCrlf,
   generateLayerAgentsMd,
@@ -290,11 +291,12 @@ describe("integration: sandbox project", () => {
   });
 
   test("manifest lists all generated files including root and scripts", async () => {
-    const manifest = await Bun.file(`${dir}/.agents/agents-md-manifest.json`).json();
-    expect(manifest.generated).toContain("AGENTS.md");
-    expect(manifest.generated).toContain("src/layerA/AGENTS.md");
-    expect(manifest.generated).toContain("src/layerB/AGENTS.md");
-    expect(manifest.generated).toContain("scripts/tools/AGENTS.md");
+    const manifest = await readJsonObject(`${dir}/.agents/agents-md-manifest.json`);
+    const generated = stringArray(manifest["generated"]);
+    expect(generated).toContain("AGENTS.md");
+    expect(generated).toContain("src/layerA/AGENTS.md");
+    expect(generated).toContain("src/layerB/AGENTS.md");
+    expect(generated).toContain("scripts/tools/AGENTS.md");
   });
 
   test("--check detects drift after rule modification", async () => {
@@ -328,9 +330,13 @@ describe("integration: sandbox project", () => {
 
   test("--check detects stale file via manifest", async () => {
     // Manually add layerC to manifest (simulating a rule that was removed)
-    const manifest = await Bun.file(`${dir}/.agents/agents-md-manifest.json`).json();
-    manifest.generated.push("src/layerC/AGENTS.md");
-    await Bun.write(`${dir}/.agents/agents-md-manifest.json`, JSON.stringify(manifest, null, "\t"));
+    const manifest = await readJsonObject(`${dir}/.agents/agents-md-manifest.json`);
+    const generated = [...stringArray(manifest["generated"]), "src/layerC/AGENTS.md"];
+    const nextManifest = { ...manifest, generated };
+    await Bun.write(
+      `${dir}/.agents/agents-md-manifest.json`,
+      JSON.stringify(nextManifest, null, "\t"),
+    );
     await Bun.write(`${dir}/src/layerC/AGENTS.md`, "# Old generated content\n");
 
     const { exitCode, stderr } = runScript(dir, "--check");

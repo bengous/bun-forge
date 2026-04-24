@@ -5,6 +5,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { defaultGenerationRuntime, generateProjectWithRuntime } from "./generator.ts";
+import { objectField, readJsonObject } from "./json.ts";
+import { toBinName, toPackageName, toProjectName } from "./naming.ts";
 
 type Scenario = {
   readonly name: string;
@@ -67,9 +69,9 @@ async function scaffoldFrontendNative(destination: string): Promise<void> {
 function makeOptions(destination: string, scenario: Scenario): InitOptions {
   return {
     destination,
-    projectName: `forge-${scenario.name}`,
-    packageName: `forge-${scenario.name}`,
-    binName: `forge-${scenario.name}`,
+    projectName: toProjectName(`forge-${scenario.name}`),
+    packageName: toPackageName(`forge-${scenario.name}`),
+    binName: toBinName(`forge-${scenario.name}`),
     frontend: scenario.frontend,
     ai: scenario.ai,
     effect: scenario.effect,
@@ -107,7 +109,10 @@ function expectMissing(root: string, relativePath: string): void {
 for (const scenario of scenarios) {
   test(`generated project contract: ${scenario.name}`, async () => {
     const destination = await generateScenario(scenario);
-    const packageJson = await Bun.file(join(destination, "package.json")).json();
+    const packageJson = await readJsonObject(join(destination, "package.json"));
+    const packageScripts = objectField(packageJson, "scripts");
+    const dependencies = objectField(packageJson, "dependencies");
+    const devDependencies = objectField(packageJson, "devDependencies");
     const readme = await Bun.file(join(destination, "README.md")).text();
     const backendEntry = await Bun.file(join(destination, "src/index.ts")).text();
     const lefthook = await Bun.file(join(destination, "lefthook.yml")).text();
@@ -134,25 +139,25 @@ for (const scenario of scenarios) {
     expect(lefthook).toContain('glob:\n        - "src/**/*.ts"');
 
     expect(packageJson["name"]).toBe(`forge-${scenario.name}`);
-    expect(packageJson["scripts"]["test"]).toBe("bun test ./src");
-    expect(packageJson["scripts"]["check:links"]).toBe("bun scripts/quality/check-links-local.ts");
+    expect(packageScripts["test"]).toBe("bun test ./src");
+    expect(packageScripts["check:links"]).toBe("bun scripts/quality/check-links-local.ts");
     expectMissing(destination, "index.ts");
     expectMissing(destination, "bun.lock");
     expectMissing(destination, "node_modules");
 
     const tsconfig = await Bun.file(join(destination, "tsconfig.json")).text();
     if (scenario.effect) {
-      expect(packageJson["dependencies"]["effect"]).toBeDefined();
-      expect(packageJson["dependencies"]["@effect/cli"]).toBeDefined();
-      expect(packageJson["dependencies"]["@effect/platform"]).toBeDefined();
-      expect(packageJson["dependencies"]["@effect/platform-bun"]).toBeDefined();
-      expect(packageJson["devDependencies"]["@effect/language-service"]).toBeDefined();
-      expect(packageJson["scripts"]["effect:diagnose"]).toBeDefined();
-      expect(packageJson["scripts"]["effect:quickfixes"]).toBeDefined();
+      expect(dependencies["effect"]).toBeDefined();
+      expect(dependencies["@effect/cli"]).toBeDefined();
+      expect(dependencies["@effect/platform"]).toBeDefined();
+      expect(dependencies["@effect/platform-bun"]).toBeDefined();
+      expect(devDependencies["@effect/language-service"]).toBeDefined();
+      expect(packageScripts["effect:diagnose"]).toBeDefined();
+      expect(packageScripts["effect:quickfixes"]).toBeDefined();
       expect(tsconfig).toContain("@effect/language-service");
     } else {
       expect(packageJson["dependencies"]).toBeUndefined();
-      expect(packageJson["scripts"]["effect:diagnose"]).toBeUndefined();
+      expect(packageScripts["effect:diagnose"]).toBeUndefined();
       expect(tsconfig).not.toContain("plugins");
     }
 
@@ -174,8 +179,8 @@ for (const scenario of scenarios) {
       expect(projectConventions).toContain(
         "If the repo layout changes, update Lefthook and validation scripts in the same change",
       );
-      expect(packageJson["scripts"]["agents:sync"]).toBeDefined();
-      expect(packageJson["scripts"]["agents:check"]).toBeDefined();
+      expect(packageScripts["agents:sync"]).toBeDefined();
+      expect(packageScripts["agents:check"]).toBeDefined();
     } else {
       expectMissing(destination, "CLAUDE.md");
       expectMissing(destination, ".claude");
@@ -183,20 +188,19 @@ for (const scenario of scenarios) {
       expectMissing(destination, ".codex");
       expectMissing(destination, "scripts/validation/format-and-lint.ts");
       expectMissing(destination, "scripts/validation/validate-on-stop.ts");
-      expect(packageJson["scripts"]["agents:sync"]).toBeUndefined();
+      expect(packageScripts["agents:sync"]).toBeUndefined();
     }
 
     if (scenario.frontend === "tanstack") {
-      const frontendPackage = await Bun.file(
-        join(destination, "apps/frontend/package.json"),
-      ).json();
+      const frontendPackage = await readJsonObject(join(destination, "apps/frontend/package.json"));
+      const frontendScripts = objectField(frontendPackage, "scripts");
       const frontendRoute = await Bun.file(
         join(destination, "apps/frontend/src/routes/index.tsx"),
       ).text();
 
       expect(packageJson["workspaces"]).toEqual(["apps/*"]);
-      expect(packageJson["scripts"]["validate:frontend"]).toContain("bun run --silent test");
-      expect(frontendPackage["scripts"]["test"]).toBe("vitest run --environment jsdom");
+      expect(packageScripts["validate:frontend"]).toContain("bun run --silent test");
+      expect(frontendScripts["test"]).toBe("vitest run --environment jsdom");
       expect(frontendRoute).toContain(`forge-${scenario.name}`);
       expect(frontendRoute).not.toContain("native-index");
       expect(lefthook).toContain("frontend-oxc:");
@@ -219,7 +223,7 @@ for (const scenario of scenarios) {
       }
     } else {
       expect(packageJson["workspaces"]).toBeUndefined();
-      expect(packageJson["scripts"]["validate:frontend"]).toBeUndefined();
+      expect(packageScripts["validate:frontend"]).toBeUndefined();
       expect(lefthook).not.toContain("frontend-oxc:");
       expect(lefthook).not.toContain("apps/frontend/**/*.{ts,tsx}");
       expectMissing(destination, "apps/frontend");

@@ -25,7 +25,7 @@ describe("toKebabCase", () => {
 
 describe("name derivation helpers", () => {
   test("package and bin names use kebab case", () => {
-    expect(toPackageName("My Tool")).toBe("my-tool");
-    expect(toBinName("My Tool")).toBe("my-tool");
+    expect(String(toPackageName("My Tool"))).toBe("my-tool");
+    expect(String(toBinName("My Tool"))).toBe("my-tool");
   });
 });

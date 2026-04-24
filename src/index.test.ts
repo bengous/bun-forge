@@ -1,6 +1,8 @@
 import type { CliRuntime } from "./index.ts";
 import type { InitOptions } from "./types.ts";
 import { describe, expect, test } from "bun:test";
+import { toBackupRunId, toSafeRelativePath } from "./core/adopt.ts";
+import { toExistingBinName, toExistingPackageName, toProjectName } from "./core/naming.ts";
 import {
   buildProgram,
   CLI_VERSION,
@@ -22,6 +24,12 @@ function createRuntime(overrides: Partial<CliRuntime> = {}) {
       throw new Error("normalizeFlagOptions should not be called");
     },
     generateProject: async () => {},
+    deriveAdoptOptions: async () => {
+      throw new Error("deriveAdoptOptions should not be called");
+    },
+    adoptProject: async () => {
+      throw new Error("adoptProject should not be called");
+    },
     stdout: {
       write(chunk: string) {
         stdout.push(chunk);
@@ -45,9 +53,9 @@ function createRuntime(overrides: Partial<CliRuntime> = {}) {
 function makeOptions(overrides: Partial<InitOptions> = {}): InitOptions {
   return {
     destination: "/tmp/forge-cli",
-    projectName: "forge-cli",
-    packageName: "forge-cli",
-    binName: "forge-cli",
+    projectName: toProjectName("forge-cli"),
+    packageName: toExistingPackageName("forge-cli"),
+    binName: toExistingBinName("forge-cli"),
     frontend: "none",
     ai: true,
     effect: false,
@@ -106,6 +114,7 @@ describe("buildProgram", () => {
     expect(help).toContain("--yes");
     expect(help).toContain("destination");
     expect(help).toContain("basename");
+    expect(help).toContain("adopt");
   });
 });
 
@@ -182,5 +191,79 @@ describe("runCli", () => {
 
     expect(exitCode).toBe(1);
     expect(stderr.join("")).toContain("error: Scaffolding cancelled.");
+  });
+
+  test("prints an adoption dry-run plan", async () => {
+    const { runtime, stdout } = createRuntime({
+      deriveAdoptOptions: async () => ({
+        destination: "/tmp/vex-copy",
+        projectName: toProjectName("vex"),
+        packageName: toExistingPackageName("vex"),
+        binName: toExistingBinName("vex"),
+        frontend: "none",
+        ai: true,
+        effect: true,
+        install: false,
+        apply: false,
+        rollback: undefined,
+        yes: true,
+      }),
+      adoptProject: async () => ({
+        destination: "/tmp/vex-copy",
+        runId: toBackupRunId("2026-04-24T00-00-00-000Z"),
+        actions: [
+          {
+            kind: "modify",
+            path: toSafeRelativePath("package.json"),
+            reason: "Merge Bun Forge scripts and dependencies without overwriting existing entries",
+            content: "{}",
+          },
+        ],
+      }),
+    });
+
+    const exitCode = await runCli(["bun", "bun-forge", "adopt", "/tmp/vex-copy", "--yes"], runtime);
+
+    expect(exitCode).toBe(0);
+    expect(stdout.join("")).toContain("Adoption plan for /tmp/vex-copy");
+    expect(stdout.join("")).toContain("Dry run only");
+  });
+
+  test("parses adoption apply and install flags", async () => {
+    let observedApply = false;
+    let observedInstall = false;
+    const { runtime } = createRuntime({
+      deriveAdoptOptions: async (_destination, partial) => {
+        observedApply = partial.apply ?? false;
+        observedInstall = partial.install ?? false;
+        return {
+          destination: "/tmp/vex-copy",
+          projectName: toProjectName("vex"),
+          packageName: toExistingPackageName("vex"),
+          binName: toExistingBinName("vex"),
+          frontend: "none",
+          ai: true,
+          effect: true,
+          install: partial.install ?? false,
+          apply: partial.apply ?? false,
+          rollback: undefined,
+          yes: true,
+        };
+      },
+      adoptProject: async (options) => ({
+        destination: options.destination,
+        runId: toBackupRunId("2026-04-24T00-00-00-000Z"),
+        actions: [],
+      }),
+    });
+
+    const exitCode = await runCli(
+      ["bun", "bun-forge", "adopt", "/tmp/vex-copy", "--yes", "--apply", "--install", "true"],
+      runtime,
+    );
+
+    expect(exitCode).toBe(0);
+    expect(observedApply).toBe(true);
+    expect(observedInstall).toBe(true);
   });
 });
