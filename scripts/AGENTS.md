@@ -1,8 +1,8 @@
 ## Antipattern Coverage
 
-Last audit: 2026-04-19 | OXLint 1.60.0 | TypeScript 6.0.3 | Bun 1.3.12
+Last audit: 2026-04-24 | OXLint 1.61.0 | TypeScript 6.0.3 | Bun 1.3.13
 
-Active rules: 245 | Available candidates: 439
+Active rules: 246 | Available candidates: 448
 
 When upgrading OXLint, TypeScript, or Bun, run `/antipattern-audit`.
 
@@ -10,9 +10,9 @@ When upgrading OXLint, TypeScript, or Bun, run `/antipattern-audit`.
 
 | Plugin     | Active | Focus                                                                          |
 | ---------- | ------ | ------------------------------------------------------------------------------ |
-| eslint     | 93     | Correctness, best practices, no-unused-vars at error                           |
-| typescript | 72     | Type safety, no-explicit-any, no-floating-promises, strict-boolean-expressions |
-| unicorn    | 38     | Modern JS idioms, array method safety                                          |
+| eslint     | 94     | Correctness, best practices, no-unused-vars at error                           |
+| typescript | 73     | Type safety, no-explicit-any, no-floating-promises, strict-boolean-expressions |
+| unicorn    | 40     | Modern JS idioms, array method safety                                          |
 | oxc        | 20     | Oxc-specific: bad comparisons, const analysis, erasing ops                     |
 | import     | 19     | Module hygiene: no-cycle, no-default-export, consistent-type-specifier         |
 

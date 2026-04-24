@@ -26,13 +26,13 @@ __FRONTEND_SCRIPTS__    "validate": "bun scripts/validation/validate.ts",
     "validate:scale": "bun run --silent validate && bun run --silent lint:dead && bun run --silent lint:arch && bun run --silent lint:dupes && bun run --silent check:links"
   },
 __EFFECT_DEPENDENCIES_BLOCK__  "devDependencies": {
-__EFFECT_DEV_DEPENDENCIES__    "@types/bun": "1.3.11",
+__EFFECT_DEV_DEPENDENCIES__    "@types/bun": "1.3.13",
     "dependency-cruiser": "17.3.10",
     "jscpd": "4.0.8",
-    "knip": "6.1.1",
+    "knip": "6.6.2",
     "lefthook": "2.1.4",
-    "oxfmt": "0.43.0",
-    "oxlint": "1.58.0",
+    "oxfmt": "0.46.0",
+    "oxlint": "1.61.0",
     "oxlint-plugin-complexity": "2.0.3",
     "oxlint-tsgolint": "0.19.0",
     "typescript": "6.0.2"
