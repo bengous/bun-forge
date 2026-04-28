@@ -65,6 +65,14 @@ function blockingLines(output: string): string[] {
     .filter((line) => line !== "" && !SUMMARY_LINE.test(line) && !PHANTOM_WARNING.test(line));
 }
 
+async function readTextFile(filePath: string): Promise<string | null> {
+  try {
+    return await Bun.file(filePath).text();
+  } catch {
+    return null;
+  }
+}
+
 if (import.meta.main) {
   const projectRoot = resolveProjectRoot(import.meta.dir);
   const oxlint = resolveBin(projectRoot, "oxlint");
@@ -76,6 +84,8 @@ if (import.meta.main) {
   if (filePath === null || workspace === null) {
     process.exit(0);
   }
+
+  const beforeFormat = await readTextFile(filePath);
 
   Bun.spawnSync(
     [oxlint, ...workspace.oxlintArgs, "-c", workspace.oxlintConfig, "--fix", "--quiet", filePath],
@@ -110,7 +120,34 @@ if (import.meta.main) {
       .trim();
     const lines = blockingLines(output);
     if (lines.length > 0) {
-      console.log(JSON.stringify({ decision: "block", reason: lines.join("\n") }));
+      const finalContent = await readTextFile(filePath);
+      const result: {
+        decision: "block";
+        reason: string;
+        hookSpecificOutput?: {
+          hookEventName: "PostToolUse";
+          updatedToolOutput: string;
+        };
+      } = { decision: "block", reason: lines.join("\n") };
+      if (beforeFormat !== null && finalContent !== null && finalContent !== beforeFormat) {
+        result.hookSpecificOutput = {
+          hookEventName: "PostToolUse",
+          updatedToolOutput: finalContent,
+        };
+      }
+      console.log(JSON.stringify(result));
+    }
+  } else {
+    const finalContent = await readTextFile(filePath);
+    if (beforeFormat !== null && finalContent !== null && finalContent !== beforeFormat) {
+      console.log(
+        JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: "PostToolUse",
+            updatedToolOutput: finalContent,
+          },
+        }),
+      );
     }
   }
 }
