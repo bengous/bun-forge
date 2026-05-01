@@ -84,12 +84,8 @@ async function main(): Promise<void> {
   }
 
   async function verboseSequential(): Promise<Result[]> {
-    async function runAt(index: number): Promise<Result[]> {
-      const step = steps[index];
-      if (step === undefined) {
-        return [];
-      }
-
+    const results: Result[] = [];
+    for (const step of steps) {
       const startedAt = performance.now();
       const proc = Bun.spawn([process.execPath, "run", "--silent", step], {
         ...SPAWN_OPTS,
@@ -97,13 +93,10 @@ async function main(): Promise<void> {
         stderr: "inherit",
       });
       const exit = await proc.exited;
-      return [
-        { step, exit, output: "", ms: performance.now() - startedAt },
-        ...(await runAt(index + 1)),
-      ];
+      results.push({ step, exit, output: "", ms: performance.now() - startedAt });
     }
 
-    return runAt(0);
+    return results;
   }
 
   async function pool(concurrency: number, onResult: (result: Result) => void): Promise<void> {
@@ -111,13 +104,14 @@ async function main(): Promise<void> {
     const width = concurrency === 0 ? steps.length : Math.min(concurrency, steps.length);
 
     async function worker(): Promise<void> {
-      const index = cursor++;
-      const step = steps[index];
-      if (step === undefined) {
-        return;
+      while (true) {
+        const index = cursor++;
+        const step = steps[index];
+        if (step === undefined) {
+          return;
+        }
+        onResult(await run(step));
       }
-      onResult(await run(step));
-      await worker();
     }
 
     await Promise.all(Array.from({ length: width }, worker));

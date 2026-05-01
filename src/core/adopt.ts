@@ -72,6 +72,10 @@ type BackupManifest = {
   readonly entries: BackupEntry[];
 };
 
+type FileContentMismatch =
+  | { readonly kind: "skip"; readonly reason: string }
+  | { readonly kind: "conflict"; readonly reason: string };
+
 export type AdoptRuntime = {
   readonly now: () => Date;
   readonly runCommand: typeof runCommand;
@@ -286,29 +290,10 @@ async function planStaticFile(
 ): Promise<AdoptionAction> {
   const safePath = toSafeRelativePath(relativePath);
   const content = await readText(join(sourceRoot, safePath));
-  const target = join(destination, safePath);
-  const blockedBy = blockingParentPath(destination, safePath);
-  if (blockedBy !== undefined) {
-    return {
-      kind: "conflict",
-      path: safePath,
-      reason: `Cannot create below existing non-directory path: ${blockedBy}`,
-    };
-  }
-  if (!existsSync(target)) {
-    return { kind: "create", path: safePath, reason, content };
-  }
-
-  const existing = await readText(target);
-  if (existing === content) {
-    return { kind: "skip", path: safePath, reason: "Already matches Bun Forge output" };
-  }
-
-  return {
+  return planFileContent(destination, safePath, content, reason, {
     kind: "conflict",
-    path: safePath,
     reason: `Existing file differs from Bun Forge ${reason}`,
-  };
+  });
 }
 
 function presetAdoptionReason(name: PresetName): string {
@@ -477,6 +462,34 @@ async function planPreservedTemplateFile(
 ): Promise<AdoptionAction> {
   const safePath = toSafeRelativePath(relativePath);
   const content = renderTemplate(templateName, context);
+  return planFileContent(destination, safePath, content, createReason, {
+    kind: "skip",
+    reason: preserveReason,
+  });
+}
+
+async function planTemplateFile(
+  destination: string,
+  context: TemplateContext,
+  templateName: string,
+  relativePath: string,
+  reason: string,
+): Promise<AdoptionAction> {
+  const safePath = toSafeRelativePath(relativePath);
+  const content = renderTemplate(templateName, context);
+  return planFileContent(destination, safePath, content, reason, {
+    kind: "conflict",
+    reason: `Existing file needs review before ${reason}`,
+  });
+}
+
+async function planFileContent(
+  destination: string,
+  safePath: SafeRelativePath,
+  content: string,
+  createReason: string,
+  mismatch: FileContentMismatch,
+): Promise<AdoptionAction> {
   const target = join(destination, safePath);
   const blockedBy = blockingParentPath(destination, safePath);
   if (blockedBy !== undefined) {
@@ -495,41 +508,7 @@ async function planPreservedTemplateFile(
     return { kind: "skip", path: safePath, reason: "Already matches Bun Forge output" };
   }
 
-  return { kind: "skip", path: safePath, reason: preserveReason };
-}
-
-async function planTemplateFile(
-  destination: string,
-  context: TemplateContext,
-  templateName: string,
-  relativePath: string,
-  reason: string,
-): Promise<AdoptionAction> {
-  const safePath = toSafeRelativePath(relativePath);
-  const content = renderTemplate(templateName, context);
-  const target = join(destination, safePath);
-  const blockedBy = blockingParentPath(destination, safePath);
-  if (blockedBy !== undefined) {
-    return {
-      kind: "conflict",
-      path: safePath,
-      reason: `Cannot create below existing non-directory path: ${blockedBy}`,
-    };
-  }
-  if (!existsSync(target)) {
-    return { kind: "create", path: safePath, reason, content };
-  }
-
-  const existing = await readText(target);
-  if (existing === content) {
-    return { kind: "skip", path: safePath, reason: "Already matches Bun Forge output" };
-  }
-
-  return {
-    kind: "conflict",
-    path: safePath,
-    reason: `Existing file needs review before ${reason}`,
-  };
+  return { ...mismatch, path: safePath };
 }
 
 function hasExistingFrontend(
@@ -785,8 +764,7 @@ export async function rollbackAdoption(
     throw new TypeError("Invalid adoption rollback manifest entry");
   });
 
-  await entries.toReversed().reduce(async (previous, entry) => {
-    await previous;
+  for (const entry of entries.toReversed()) {
     const target = join(destination, entry.path);
     if (entry.kind === "created") {
       await rm(target, { recursive: true, force: true });
@@ -794,7 +772,7 @@ export async function rollbackAdoption(
       await mkdir(dirname(target), { recursive: true });
       await copyFile(join(root, entry.backupPath), target);
     }
-  }, Promise.resolve());
+  }
 
   return { runId: toBackupRunId(manifest["runId"]), entries };
 }

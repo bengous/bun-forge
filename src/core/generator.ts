@@ -121,10 +121,9 @@ export function enabledPresets(options: InitOptions) {
 }
 
 async function copyEnabledPresets(options: InitOptions): Promise<void> {
-  await describeGeneratedProject(options).presetCopySpecs.reduce(async (previous, preset) => {
-    await previous;
+  for (const preset of describeGeneratedProject(options).presetCopySpecs) {
     await copyPreset(preset, options.destination);
-  }, Promise.resolve());
+  }
 }
 
 export const defaultGenerationRuntime: GenerationRuntime = {

@@ -25,7 +25,9 @@ async function main(): Promise<void> {
     }
   }
 
-  if (scopes.has("backend") || scopes.has("scripts")) {
+  const validatesCode = scopes.has("backend") || scopes.has("scripts");
+
+  if (validatesCode) {
     await run("typecheck", "typecheck");
     await run("lint:errors", "lint:errors");
     await run("format:check", "format:check");
@@ -34,7 +36,9 @@ async function main(): Promise<void> {
   }
 
   if (scopes.has("product")) {
-    await run("format:check", "format:check");
+    if (!validatesCode) {
+      await run("format:check", "format:check");
+    }
     await run("test:project-contract", "test:project-contract");
   }
 
