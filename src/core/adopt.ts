@@ -7,12 +7,18 @@ import type {
   SafeRelativePath,
   TemplateContext,
 } from "../types.ts";
+import type {
+  GeneratedProjectDescription,
+  PresetCopySpec,
+  PresetName,
+  TemplateRenderSpec,
+} from "./generated-project-contract.ts";
 import type { JsonObject } from "./json.ts";
 import { existsSync, statSync } from "node:fs";
 import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { brandValue } from "../types.ts";
-import { listFilesRecursive } from "./filesystem.ts";
+import { describeGeneratedProject } from "./generated-project-contract.ts";
 import { finalizeProject, runCommand } from "./install.ts";
 import { isJsonObject, objectField, parseJsonObject, stringArray } from "./json.ts";
 import {
@@ -21,7 +27,6 @@ import {
   toPackageName,
   toProjectName,
 } from "./naming.ts";
-import { TEMPLATE_SOURCES_DIR } from "./paths.ts";
 import { renderTemplate } from "./template.ts";
 
 type WritableAdoptionAction = Extract<AdoptionAction, { readonly kind: "create" | "modify" }>;
@@ -219,8 +224,9 @@ function binName(packageJson: JsonObject, fallback: string): BinName {
   return toExistingBinName(fallback);
 }
 
-function templateContext(options: AdoptOptions): TemplateContext {
-  return {
+function describeAdoptedProject(options: AdoptOptions): GeneratedProjectDescription {
+  return describeGeneratedProject({
+    destination: options.destination,
     projectName: options.projectName,
     packageName: options.packageName,
     binName: options.binName,
@@ -228,8 +234,10 @@ function templateContext(options: AdoptOptions): TemplateContext {
     frontend: options.frontend,
     ai: options.ai,
     effect: options.effect,
-    hasWorkspaces: options.frontend === "tanstack",
-  };
+    install: options.install,
+    gitInit: false,
+    yes: options.yes,
+  });
 }
 
 function mergePackageJson(existing: JsonObject, expected: JsonObject): JsonObject {
@@ -303,25 +311,53 @@ async function planStaticFile(
   };
 }
 
-async function planStaticPreset(
+function presetAdoptionReason(name: PresetName): string {
+  switch (name) {
+    case "base":
+      return "base tooling file";
+    case "frontend-tanstack":
+      return "frontend preset file";
+    case "ai":
+      return "AI tooling file";
+    case "effect":
+      return "Effect preset file";
+  }
+}
+
+function applyPresetAdoptionPolicy(action: AdoptionAction): AdoptionAction {
+  if (
+    action.kind === "conflict" &&
+    action.path.startsWith(".codex/") &&
+    action.reason.includes("existing non-directory path")
+  ) {
+    return {
+      kind: "skip",
+      path: action.path,
+      reason: "Existing .codex path is not a directory; Codex config preserved and skipped",
+    };
+  }
+
+  return action;
+}
+
+async function planPresetCopySpec(
   destination: string,
-  presetName: string,
-  reason: string,
+  spec: PresetCopySpec,
 ): Promise<AdoptionAction[]> {
-  const sourceRoot = join(TEMPLATE_SOURCES_DIR, presetName);
-  const files = await listFilesRecursive(sourceRoot);
-  return Promise.all(
-    files.map(async (path) => {
-      const action = await planStaticFile(destination, sourceRoot, path, reason);
-      return action;
-    }),
+  const reason = presetAdoptionReason(spec.name);
+  const actions = await Promise.all(
+    spec.relativePaths.map(async (path) =>
+      planStaticFile(destination, spec.sourceDir, path, reason),
+    ),
   );
+  return actions.map(applyPresetAdoptionPolicy);
 }
 
 async function planPackageJson(
   destination: string,
-  context: TemplateContext,
+  description: GeneratedProjectDescription,
 ): Promise<AdoptionAction> {
+  const context = description.templateContext;
   const relativePath = toSafeRelativePath("package.json");
   const packagePath = join(destination, relativePath);
   const existing = await parseJsonFile(packagePath);
@@ -347,6 +383,88 @@ async function planPackageJson(
     reason: "Merge Bun Forge scripts and dependencies without overwriting existing entries",
     content,
   };
+}
+
+function templateAdoptionPath(spec: TemplateRenderSpec): string {
+  if (spec.relativePath === ".claude/rules/project-conventions.md") {
+    return ".claude/rules/bun-forge-project-conventions.md";
+  }
+
+  if (spec.relativePath === ".claude/rules/frontend-conventions.md") {
+    return ".claude/rules/bun-forge-frontend-conventions.md";
+  }
+
+  return spec.relativePath;
+}
+
+function templateCreateReason(spec: TemplateRenderSpec): string {
+  switch (spec.relativePath) {
+    case "README.md":
+      return "create Bun Forge README";
+    case "tsconfig.json":
+      return "adopt Bun Forge TypeScript config";
+    case "knip.jsonc":
+      return "adopt Bun Forge dead-code config";
+    case "lefthook.yml":
+      return "adopt Bun Forge Git hooks";
+    case "CLAUDE.md":
+      return "create Claude guidance";
+    case ".claude/rules/project-conventions.md":
+      return "create Bun Forge Claude project convention rule";
+    case ".claude/rules/frontend-conventions.md":
+      return "create Bun Forge Claude frontend convention rule";
+    case "apps/frontend/package.json":
+      return "create TanStack frontend package";
+    case "apps/frontend/index.html":
+      return "create TanStack frontend entry HTML";
+    case "apps/frontend/vite.config.ts":
+      return "create TanStack frontend Vite config";
+    case "apps/frontend/playwright.config.ts":
+      return "create TanStack frontend Playwright config";
+    case "apps/frontend/src/main.tsx":
+      return "create TanStack frontend entrypoint";
+    case "apps/frontend/src/routeTree.gen.ts":
+      return "seed TanStack route tree";
+    case "apps/frontend/src/routes/__root.tsx":
+      return "create TanStack root route";
+    case "apps/frontend/src/routes/index.tsx":
+      return "create TanStack index route";
+    case "apps/frontend/src/routes/-index.test.tsx":
+      return "create TanStack route test";
+    case "apps/frontend/src/testing/setup.ts":
+      return "create TanStack frontend test setup";
+    case "apps/frontend/e2e/home.spec.ts":
+      return "create TanStack frontend e2e test";
+    case "apps/frontend/src/styles.css":
+      return "create TanStack frontend styles";
+    default:
+      return `create Bun Forge template output from ${spec.templateName}`;
+  }
+}
+
+function templatePreserveReason(spec: TemplateRenderSpec): string {
+  switch (spec.relativePath) {
+    case "CLAUDE.md":
+      return "Existing Claude/root guidance preserved";
+    case ".claude/rules/project-conventions.md":
+      return "Existing Bun Forge Claude project convention rule preserved";
+    case ".claude/rules/frontend-conventions.md":
+      return "Existing Bun Forge Claude frontend convention rule preserved";
+    default:
+      return "Existing project file preserved";
+  }
+}
+
+function shouldPreserveExistingTemplate(spec: TemplateRenderSpec): boolean {
+  return (
+    spec.relativePath === "CLAUDE.md" ||
+    spec.relativePath === ".claude/rules/project-conventions.md" ||
+    spec.relativePath === ".claude/rules/frontend-conventions.md"
+  );
+}
+
+function shouldSkipTemplateInAdopt(spec: TemplateRenderSpec): boolean {
+  return spec.relativePath === "src/index.ts" || spec.relativePath === "src/index.test.ts";
 }
 
 async function planPreservedTemplateFile(
@@ -414,143 +532,99 @@ async function planTemplateFile(
   };
 }
 
-async function planFrontend(
+function hasExistingFrontend(
   destination: string,
-  context: TemplateContext,
-): Promise<AdoptionAction[]> {
-  if (context.frontend !== "tanstack") {
-    return [];
-  }
-
-  if (existsSync(join(destination, "apps/frontend"))) {
-    return [
-      {
-        kind: "conflict",
-        path: toSafeRelativePath("apps/frontend"),
-        reason: "Existing frontend detected; Bun Forge does not convert frontends in adopt v1",
-      },
-    ];
-  }
-
-  return [
-    ...(await planStaticPreset(destination, "frontend-tanstack", "frontend preset file")),
-    await planTemplateFile(
-      destination,
-      context,
-      "apps/frontend/package.json.tpl",
-      "apps/frontend/package.json",
-      "create TanStack frontend package",
-    ),
-    await planTemplateFile(
-      destination,
-      context,
-      "apps/frontend/index.html.tpl",
-      "apps/frontend/index.html",
-      "create TanStack frontend entry HTML",
-    ),
-    await planTemplateFile(
-      destination,
-      context,
-      "apps/frontend/vite.config.ts.tpl",
-      "apps/frontend/vite.config.ts",
-      "create TanStack frontend Vite config",
-    ),
-    await planTemplateFile(
-      destination,
-      context,
-      "apps/frontend/src/main.tsx.tpl",
-      "apps/frontend/src/main.tsx",
-      "create TanStack frontend entrypoint",
-    ),
-    await planTemplateFile(
-      destination,
-      context,
-      "apps/frontend/src/routeTree.gen.ts.tpl",
-      "apps/frontend/src/routeTree.gen.ts",
-      "seed TanStack route tree",
-    ),
-    await planTemplateFile(
-      destination,
-      context,
-      "apps/frontend/src/routes/__root.tsx.tpl",
-      "apps/frontend/src/routes/__root.tsx",
-      "create TanStack root route",
-    ),
-    await planTemplateFile(
-      destination,
-      context,
-      "apps/frontend/src/routes/index.tsx.tpl",
-      "apps/frontend/src/routes/index.tsx",
-      "create TanStack index route",
-    ),
-    await planTemplateFile(
-      destination,
-      context,
-      "apps/frontend/src/routes/-index.test.tsx.tpl",
-      "apps/frontend/src/routes/-index.test.tsx",
-      "create TanStack route test",
-    ),
-    await planTemplateFile(
-      destination,
-      context,
-      "apps/frontend/src/styles.css.tpl",
-      "apps/frontend/src/styles.css",
-      "create TanStack frontend styles",
-    ),
-  ];
+  description: GeneratedProjectDescription,
+): boolean {
+  return (
+    description.shape.frontend === "tanstack" && existsSync(join(destination, "apps/frontend"))
+  );
 }
 
-async function planAi(destination: string, context: TemplateContext): Promise<AdoptionAction[]> {
-  if (!context.ai) {
+function isFrontendPresetSpec(spec: PresetCopySpec): boolean {
+  return spec.name === "frontend-tanstack";
+}
+
+function isFrontendTemplateSpec(spec: TemplateRenderSpec): boolean {
+  return spec.relativePath.startsWith("apps/frontend/");
+}
+
+async function planPresetCopySpecs(
+  destination: string,
+  description: GeneratedProjectDescription,
+): Promise<AdoptionAction[]> {
+  const preserveExistingFrontend = hasExistingFrontend(destination, description);
+  const specs = description.presetCopySpecs.filter(
+    (spec) => !(preserveExistingFrontend && isFrontendPresetSpec(spec)),
+  );
+  const actionSets = await Promise.all(
+    specs.map(async (spec) => planPresetCopySpec(destination, spec)),
+  );
+  return actionSets.flat();
+}
+
+async function planTemplateSpec(
+  destination: string,
+  description: GeneratedProjectDescription,
+  spec: TemplateRenderSpec,
+): Promise<AdoptionAction> {
+  if (spec.relativePath === "package.json") {
+    return planPackageJson(destination, description);
+  }
+
+  if (shouldSkipTemplateInAdopt(spec)) {
+    return {
+      kind: "skip",
+      path: toSafeRelativePath(spec.relativePath),
+      reason: "Existing project source preserved; Bun Forge starter source skipped",
+    };
+  }
+
+  if (shouldPreserveExistingTemplate(spec)) {
+    return planPreservedTemplateFile(
+      destination,
+      description.templateContext,
+      spec.templateName,
+      templateAdoptionPath(spec),
+      templateCreateReason(spec),
+      templatePreserveReason(spec),
+    );
+  }
+
+  return planTemplateFile(
+    destination,
+    description.templateContext,
+    spec.templateName,
+    spec.relativePath,
+    templateCreateReason(spec),
+  );
+}
+
+async function planTemplateRenderSpecs(
+  destination: string,
+  description: GeneratedProjectDescription,
+): Promise<AdoptionAction[]> {
+  const preserveExistingFrontend = hasExistingFrontend(destination, description);
+  const specs = description.templateRenderSpecs.filter(
+    (spec) => !(preserveExistingFrontend && isFrontendTemplateSpec(spec)),
+  );
+  return Promise.all(specs.map(async (spec) => planTemplateSpec(destination, description, spec)));
+}
+
+function planExistingFrontendConflict(
+  destination: string,
+  description: GeneratedProjectDescription,
+): AdoptionAction[] {
+  if (!hasExistingFrontend(destination, description)) {
     return [];
   }
 
-  const staticActions = await planStaticPreset(destination, "ai", "AI tooling file");
-  const nonBlockingStaticActions = staticActions.map((action) => {
-    if (
-      action.kind === "conflict" &&
-      action.path.startsWith(".codex/") &&
-      action.reason.includes("existing non-directory path")
-    ) {
-      return {
-        kind: "skip" as const,
-        path: action.path,
-        reason: "Existing .codex path is not a directory; Codex config preserved and skipped",
-      };
-    }
-    return action;
-  });
-
   return [
-    ...nonBlockingStaticActions,
-    await planPreservedTemplateFile(
-      destination,
-      context,
-      "CLAUDE.md.tpl",
-      "CLAUDE.md",
-      "create Claude guidance",
-      "Existing Claude/root guidance preserved",
-    ),
-    await planPreservedTemplateFile(
-      destination,
-      context,
-      ".claude/rules/project-conventions.md.tpl",
-      ".claude/rules/bun-forge-project-conventions.md",
-      "create Bun Forge Claude project convention rule",
-      "Existing Bun Forge Claude project convention rule preserved",
-    ),
-    ...(context.frontend === "tanstack"
-      ? [
-          await planPreservedTemplateFile(
-            destination,
-            context,
-            ".claude/rules/frontend-conventions.md.tpl",
-            ".claude/rules/bun-forge-frontend-conventions.md",
-            "create Bun Forge Claude frontend convention rule",
-            "Existing Bun Forge Claude frontend convention rule preserved",
-          ),
-        ]
-      : []),
+    {
+      kind: "conflict",
+      path: toSafeRelativePath("apps/frontend"),
+      reason: "Existing frontend detected; Bun Forge does not convert frontends in adopt v1",
+    },
   ];
 }
 
@@ -605,33 +679,11 @@ export async function buildAdoptionPlan(
   runtime: AdoptRuntime = defaultAdoptRuntime,
 ): Promise<AdoptionPlan> {
   await assertAdoptableProject(options.destination);
-  const context = templateContext(options);
+  const description = describeAdoptedProject(options);
   const actions: AdoptionAction[] = [
-    ...(await planStaticPreset(options.destination, "base", "base tooling file")),
-    await planPackageJson(options.destination, context),
-    await planTemplateFile(
-      options.destination,
-      context,
-      "tsconfig.json.tpl",
-      "tsconfig.json",
-      "adopt Bun Forge TypeScript config",
-    ),
-    await planTemplateFile(
-      options.destination,
-      context,
-      "knip.jsonc.tpl",
-      "knip.jsonc",
-      "adopt Bun Forge dead-code config",
-    ),
-    await planTemplateFile(
-      options.destination,
-      context,
-      "lefthook.yml.tpl",
-      "lefthook.yml",
-      "adopt Bun Forge Git hooks",
-    ),
-    ...(await planAi(options.destination, context)),
-    ...(await planFrontend(options.destination, context)),
+    ...(await planPresetCopySpecs(options.destination, description)),
+    ...(await planTemplateRenderSpecs(options.destination, description)),
+    ...planExistingFrontendConflict(options.destination, description),
   ];
 
   return {

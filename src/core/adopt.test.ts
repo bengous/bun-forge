@@ -240,6 +240,78 @@ describe("buildAdoptionPlan", () => {
     );
   });
 
+  test("plans generated contract preset outputs for AI and Effect adoption", async () => {
+    const dir = makeTempProject();
+    seedBunTsProject(dir);
+
+    const plan = await buildAdoptionPlan(makeOptions(dir, { ai: true, effect: true }));
+
+    expect(
+      plan.actions.some(
+        (action) => action.kind === "create" && action.path === ".codex/hooks/lib.ts",
+      ),
+    ).toBe(true);
+    expect(
+      plan.actions.some(
+        (action) =>
+          action.kind === "create" && action.path === ".claude/hooks/guard-destructive.test.ts",
+      ),
+    ).toBe(true);
+    expect(
+      plan.actions.some((action) => action.kind === "create" && action.path === ".gitkeep"),
+    ).toBe(true);
+  });
+
+  test("plans the full frontend contract when adopting a new frontend", async () => {
+    const dir = makeTempProject();
+    seedBunTsProject(dir);
+
+    const plan = await buildAdoptionPlan(makeOptions(dir, { frontend: "tanstack", ai: false }));
+
+    expect(
+      plan.actions.some(
+        (action) =>
+          action.kind === "create" && action.path === "apps/frontend/playwright.config.ts",
+      ),
+    ).toBe(true);
+    expect(
+      plan.actions.some(
+        (action) =>
+          action.kind === "create" && action.path === "apps/frontend/src/testing/setup.ts",
+      ),
+    ).toBe(true);
+    expect(
+      plan.actions.some(
+        (action) => action.kind === "create" && action.path === "apps/frontend/e2e/home.spec.ts",
+      ),
+    ).toBe(true);
+    expect(plan.actions.some((action) => action.path === "apps/frontend")).toBe(false);
+  });
+
+  test("does not inject backend starter source into adopted projects", async () => {
+    const dir = makeTempProject();
+    seedBunTsProject(dir);
+
+    const plan = await buildAdoptionPlan(makeOptions(dir, { ai: false, effect: false }));
+
+    expect(
+      plan.actions.some(
+        (action) =>
+          action.kind === "skip" &&
+          action.path === "src/index.ts" &&
+          action.reason.includes("starter source skipped"),
+      ),
+    ).toBe(true);
+    expect(
+      plan.actions.some(
+        (action) =>
+          action.kind === "skip" &&
+          action.path === "src/index.test.ts" &&
+          action.reason.includes("starter source skipped"),
+      ),
+    ).toBe(true);
+  });
+
   test("does not convert an existing frontend in adopt v1", async () => {
     const dir = makeTempProject();
     seedBunTsProject(dir);
