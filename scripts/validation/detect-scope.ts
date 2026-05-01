@@ -3,6 +3,11 @@ import { existsSync } from "node:fs";
 
 export type Scope = "backend" | "frontend" | "scripts" | "config" | "product";
 
+export type WorkspacePresence = {
+  readonly backend: boolean;
+  readonly frontend: boolean;
+};
+
 export const CODE_PATTERN = /\.(ts|tsx|js|mjs|cjs|css|html|json|jsonc|md|mdx|toml|ya?ml|tpl)$/;
 
 const CONFIG_FILES = new Set([
@@ -27,16 +32,23 @@ function hasBackendWorkspace(): boolean {
   return existsSync("src/index.ts");
 }
 
-export function classifyFileWithFrontendWorkspace(
+function workspacePresence(): WorkspacePresence {
+  return {
+    backend: hasBackendWorkspace(),
+    frontend: hasFrontendWorkspace(),
+  };
+}
+
+export function classifyFileWithWorkspace(
   filePath: string,
-  frontendWorkspacePresent: boolean,
+  presence: WorkspacePresence,
 ): Scope | null {
   const normalized = filePath.replaceAll("\\", "/").replaceAll(/^\.\//g, "");
 
-  if (normalized.startsWith("apps/frontend/") && frontendWorkspacePresent) {
+  if (normalized.startsWith("apps/frontend/") && presence.frontend) {
     return "frontend";
   }
-  if (normalized.startsWith("src/") && hasBackendWorkspace()) {
+  if (normalized.startsWith("src/") && presence.backend) {
     return "backend";
   }
   if (normalized.startsWith("scripts/")) {
@@ -72,33 +84,54 @@ export function classifyFileWithFrontendWorkspace(
   return null;
 }
 
-export function expandConfigScopeWithFrontendWorkspace(
-  scopes: Set<Scope>,
+export function classifyFileWithFrontendWorkspace(
+  filePath: string,
   frontendWorkspacePresent: boolean,
+): Scope | null {
+  return classifyFileWithWorkspace(filePath, {
+    backend: hasBackendWorkspace(),
+    frontend: frontendWorkspacePresent,
+  });
+}
+
+export function expandConfigScopeWithWorkspace(
+  scopes: Set<Scope>,
+  presence: WorkspacePresence,
 ): Set<Scope> {
   if (!scopes.has("config")) {
     return scopes;
   }
   const expanded = new Set(scopes);
-  if (hasBackendWorkspace()) {
+  if (presence.backend) {
     expanded.add("backend");
   }
   expanded.add("scripts");
   expanded.add("product");
-  if (frontendWorkspacePresent) {
+  if (presence.frontend) {
     expanded.add("frontend");
   }
   return expanded;
 }
 
+export function expandConfigScopeWithFrontendWorkspace(
+  scopes: Set<Scope>,
+  frontendWorkspacePresent: boolean,
+): Set<Scope> {
+  return expandConfigScopeWithWorkspace(scopes, {
+    backend: hasBackendWorkspace(),
+    frontend: frontendWorkspacePresent,
+  });
+}
+
 export function classifyFile(filePath: string): Scope | null {
-  return classifyFileWithFrontendWorkspace(filePath, hasFrontendWorkspace());
+  return classifyFileWithWorkspace(filePath, workspacePresence());
 }
 
 export function classifyScopes(files: string[]): Set<Scope> {
   const scopes = new Set<Scope>();
+  const presence = workspacePresence();
   for (const file of files) {
-    const scope = classifyFile(file);
+    const scope = classifyFileWithWorkspace(file, presence);
     if (scope !== null) {
       scopes.add(scope);
     }
@@ -107,7 +140,7 @@ export function classifyScopes(files: string[]): Set<Scope> {
 }
 
 export function expandConfigScope(scopes: Set<Scope>): Set<Scope> {
-  return expandConfigScopeWithFrontendWorkspace(scopes, hasFrontendWorkspace());
+  return expandConfigScopeWithWorkspace(scopes, workspacePresence());
 }
 
 function parseFileList(output: string): string[] {

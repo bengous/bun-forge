@@ -34,13 +34,12 @@ type Workspace = {
   readonly formatConfig: string;
 };
 
-const generatedPaths = new Set([
-  "AGENTS.md",
-  "src/AGENTS.md",
-  "scripts/AGENTS.md",
-  "apps/frontend/src/AGENTS.md",
-  "apps/frontend/src/routeTree.gen.ts",
-]);
+const generatedPathPatterns = [
+  /^AGENTS\.md$/,
+  /^\.agents\/agents-md-manifest\.json$/,
+  /^apps\/frontend\/src\/routeTree\.gen\.ts$/,
+  /^(?:src|scripts|apps\/frontend\/src|\.claude\/rules)(?:\/[^/]+)*\/AGENTS\.md$/,
+];
 const lintExtensions = new Set([".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"]);
 const formatExtensions = new Set([
   ".js",
@@ -134,6 +133,19 @@ export function extractTouchedPaths(input: HookInput, root = repoRoot(input)): s
     }
   }
 
+  const edits = toolInput["edits"];
+  if (Array.isArray(edits)) {
+    for (const edit of edits) {
+      if (!isRecord(edit)) {
+        continue;
+      }
+      const value = valueAsString(edit["file_path"] ?? edit["filePath"] ?? edit["path"]);
+      if (value !== undefined) {
+        candidates.add(value);
+      }
+    }
+  }
+
   return [...candidates]
     .map((filePath) => normalizeProjectPath(filePath, root, cwd))
     .filter((filePath): filePath is string => filePath !== null)
@@ -171,7 +183,9 @@ export function normalizeProjectPath(filePath: string, root: string, cwd = root)
 }
 
 export function forbiddenTouchedPaths(paths: readonly string[]): string[] {
-  return paths.filter((filePath) => generatedPaths.has(filePath));
+  return paths.filter((filePath) =>
+    generatedPathPatterns.some((pattern) => pattern.test(filePath)),
+  );
 }
 
 export async function recordTouchedPaths(

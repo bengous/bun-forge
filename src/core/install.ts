@@ -58,7 +58,7 @@ export const defaultInstallRuntime: InstallRuntime = {
   warn: console.warn,
 };
 
-function bunInstallEnv(): NodeJS.ProcessEnv {
+export function bunInstallEnv(): NodeJS.ProcessEnv {
   return {
     ...process.env,
     BUN_TMPDIR: process.env["BUN_TMPDIR"] ?? "/tmp",

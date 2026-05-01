@@ -3,31 +3,9 @@
 import { cp, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
+import { runCommand } from "./run-command.ts";
 
 const DEFAULT_VEX_SOURCE = "/home/b3ngous/projects/vex";
-
-type RunOptions = {
-  readonly cwd: string;
-};
-
-async function run(command: string[], options: RunOptions): Promise<void> {
-  const proc = Bun.spawn(command, {
-    cwd: options.cwd,
-    stdin: "ignore",
-    stdout: "inherit",
-    stderr: "inherit",
-    env: {
-      ...process.env,
-      BUN_TMPDIR: process.env["BUN_TMPDIR"] ?? "/tmp",
-      BUN_INSTALL: process.env["BUN_INSTALL"] ?? "/tmp/bun-install",
-    },
-    ...(process.platform === "win32" ? { windowsHide: true } : {}),
-  });
-  const exitCode = await proc.exited;
-  if (exitCode !== 0) {
-    throw new Error(`${command.join(" ")} failed with exit code ${exitCode}`);
-  }
-}
 
 function argValue(flag: string): string | undefined {
   const index = process.argv.indexOf(flag);
@@ -50,7 +28,7 @@ async function main(): Promise<void> {
     filter: shouldCopy,
   });
 
-  await run(
+  await runCommand(
     [
       "bun",
       "run",
@@ -74,7 +52,7 @@ async function main(): Promise<void> {
     throw new Error("Dry-run wrote .bun-forge state");
   }
 
-  await run(
+  await runCommand(
     [
       "bun",
       "run",
@@ -95,11 +73,11 @@ async function main(): Promise<void> {
     { cwd: process.cwd() },
   );
 
-  await run(["bun", "run", "agents:sync"], { cwd: destination });
-  await run(["bun", "run", "agents:check"], { cwd: destination });
-  await run(["bun", "install"], { cwd: destination });
-  await run(["bun", "run", "typecheck"], { cwd: destination });
-  await run(["bun", "test", "src/", "--ignore", "**/*e2e*/**"], { cwd: destination });
+  await runCommand(["bun", "run", "agents:sync"], { cwd: destination });
+  await runCommand(["bun", "run", "agents:check"], { cwd: destination });
+  await runCommand(["bun", "install"], { cwd: destination });
+  await runCommand(["bun", "run", "typecheck"], { cwd: destination });
+  await runCommand(["bun", "test", "src/", "--ignore", "**/*e2e*/**"], { cwd: destination });
 
   console.log(`Vex adoption fixture: ${destination}`);
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import type { ScaffoldScenario } from "./scenarios.ts";
+import type { ScaffoldScenario, ScenarioConfig } from "./scenarios.ts";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -25,11 +25,8 @@ export function e2eContractScenariosFromArgv(argv: readonly string[]): E2eContra
 }
 
 export async function e2eContract(
-  backend: boolean,
-  frontend: "none" | "tanstack",
-  ai: boolean,
-  effect: boolean,
   scenario: E2eContractScenario,
+  config: ScenarioConfig,
 ): Promise<void> {
   const dir = await mkdtemp(join(tmpdir(), `bun-forge-e2e-contract-${scenario}-`));
   const projectName = `forge-e2e-${scenario}`;
@@ -45,13 +42,13 @@ export async function e2eContract(
         "--name",
         projectName,
         "--backend",
-        String(backend),
+        String(config.backend),
         "--frontend",
-        frontend,
+        config.frontend,
         "--ai",
-        String(ai),
+        String(config.ai),
         "--effect",
-        String(effect),
+        String(config.effect),
         "--git-init",
         "false",
         "--install",
@@ -67,10 +64,10 @@ export async function e2eContract(
         projectName: toProjectName(projectName),
         packageName: toPackageName(projectName),
         binName: toBinName(projectName),
-        backend,
-        frontend,
-        ai,
-        effect,
+        backend: config.backend,
+        frontend: config.frontend,
+        ai: config.ai,
+        effect: config.effect,
         install: false,
         gitInit: false,
         yes: true,
@@ -84,6 +81,6 @@ export async function e2eContract(
 if (import.meta.main) {
   for (const scenario of e2eContractScenariosFromArgv(process.argv)) {
     const config = SCAFFOLD_SCENARIO_CONFIG[scenario];
-    await e2eContract(config.backend, config.frontend, config.ai, config.effect, scenario);
+    await e2eContract(scenario, config);
   }
 }

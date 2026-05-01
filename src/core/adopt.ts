@@ -20,7 +20,7 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 import { brandValue } from "../types.ts";
 import { describeGeneratedProject } from "./generated-project-contract.ts";
 import { finalizeProject, runCommand } from "./install.ts";
-import { isJsonObject, objectField, parseJsonObject, stringArray } from "./json.ts";
+import { isJsonObject, objectField, parseJsonObject, readJsonObject, stringArray } from "./json.ts";
 import {
   toExistingBinName,
   toExistingPackageName,
@@ -166,10 +166,6 @@ function mergeStringArrayPreservingExisting(existing: unknown, additions: unknow
   return [...new Set([...stringArray(existing), ...stringArray(additions)])];
 }
 
-async function parseJsonFile(path: string): Promise<JsonObject> {
-  return parseJsonObject(await readText(path), path);
-}
-
 function renderJsonTemplate(templateName: string, context: TemplateContext): JsonObject {
   return parseJsonObject(renderTemplate(templateName, context), templateName);
 }
@@ -202,7 +198,7 @@ async function assertAdoptableProject(destination: string): Promise<JsonObject> 
     throw new Error("Adoption requires an existing tsconfig.json");
   }
 
-  const packageJson = await parseJsonFile(packagePath);
+  const packageJson = await readJsonObject(packagePath);
   if (!packageHasBunSignal(packageJson)) {
     throw new Error("Adoption currently supports Bun/TypeScript projects only");
   }
@@ -345,14 +341,14 @@ async function planPackageJson(
   const context = description.templateContext;
   const relativePath = toSafeRelativePath("package.json");
   const packagePath = join(destination, relativePath);
-  const existing = await parseJsonFile(packagePath);
+  const current = await readText(packagePath);
+  const existing = parseJsonObject(current, packagePath);
   const expected = withAdoptionPackageScripts(
     renderJsonTemplate("package.json.tpl", context),
     context,
   );
   const merged = mergePackageJson(existing, expected);
   const content = stableJson(merged);
-  const current = await readText(packagePath);
 
   if (current === content) {
     return {

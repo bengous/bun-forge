@@ -148,6 +148,7 @@ if (import.meta.main) {
   const failures: string[] = [];
   let updatedToolOutput: string | null = null;
   let needsProductContract = false;
+  const shouldCaptureUpdatedToolOutput = filePaths.length === 1;
 
   if (filePaths.length === 0) {
     process.exit(0);
@@ -163,7 +164,7 @@ if (import.meta.main) {
       continue;
     }
 
-    const beforeFormat = await readTextFile(filePath);
+    const beforeFormat = shouldCaptureUpdatedToolOutput ? await readTextFile(filePath) : null;
 
     if (
       workspace.lint &&
@@ -202,9 +203,9 @@ if (import.meta.main) {
       }
     }
 
-    const finalContent = await readTextFile(filePath);
+    const finalContent = shouldCaptureUpdatedToolOutput ? await readTextFile(filePath) : null;
     if (
-      filePaths.length === 1 &&
+      shouldCaptureUpdatedToolOutput &&
       beforeFormat !== null &&
       finalContent !== null &&
       finalContent !== beforeFormat

@@ -56,7 +56,14 @@ describe("Codex hook path handling", () => {
   });
 
   test("blocks generated files", () => {
-    expect(forbiddenTouchedPaths(["AGENTS.md", "docs/product/PRD.md"])).toEqual(["AGENTS.md"]);
+    expect(
+      forbiddenTouchedPaths([
+        "AGENTS.md",
+        "docs/product/PRD.md",
+        "scripts/validation/AGENTS.md",
+        "apps/frontend/src/routeTree.gen.ts",
+      ]),
+    ).toEqual(["AGENTS.md", "scripts/validation/AGENTS.md", "apps/frontend/src/routeTree.gen.ts"]);
   });
 
   test("extracts file path fields from hook input", async () => {
@@ -67,9 +74,10 @@ describe("Codex hook path handling", () => {
           cwd: root,
           tool_input: {
             file_path: "apps/frontend/src/routes/index.tsx",
+            edits: [{ file_path: "scripts/setup/bootstrap.ts" }],
           },
         }),
-      ).toEqual(["apps/frontend/src/routes/index.tsx"]);
+      ).toEqual(["apps/frontend/src/routes/index.tsx", "scripts/setup/bootstrap.ts"]);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

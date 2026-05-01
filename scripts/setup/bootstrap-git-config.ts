@@ -1,10 +1,5 @@
 #!/usr/bin/env bun
 
-import process from "node:process";
-
-const processModule = process;
-void processModule;
-
 const SETTINGS = [
   ["core.autocrlf", "false"],
   ["core.eol", "lf"],

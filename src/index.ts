@@ -5,6 +5,7 @@ import { Command, CommanderError } from "commander";
 import { readFileSync } from "node:fs";
 import { adoptProject, deriveAdoptOptions, formatAdoptionPlan } from "./core/adopt.ts";
 import { generateProject } from "./core/generator.ts";
+import { isJsonObject } from "./core/json.ts";
 import { collectOptions, normalizeFlagOptions } from "./core/prompts.ts";
 
 type Writer = {
@@ -25,13 +26,9 @@ function readCliVersion(): string {
   const parsed = JSON.parse(
     readFileSync(new URL("../package.json", import.meta.url), "utf8"),
   ) as unknown;
-  if (
-    typeof parsed === "object" &&
-    parsed !== null &&
-    "version" in parsed &&
-    typeof parsed.version === "string"
-  ) {
-    return parsed.version;
+  const version = isJsonObject(parsed) ? parsed["version"] : undefined;
+  if (typeof version === "string") {
+    return version;
   }
 
   return "0.0.0";

@@ -3,6 +3,11 @@ import { existsSync } from "node:fs";
 
 export type Scope = "backend" | "frontend" | "scripts" | "config";
 
+type WorkspacePresence = {
+  readonly backend: boolean;
+  readonly frontend: boolean;
+};
+
 export const CODE_PATTERN = /\.(ts|tsx|js|mjs|cjs|css|html|json|jsonc|md|mdx|toml|ya?ml)$/;
 
 const CONFIG_FILES = new Set([
@@ -27,13 +32,20 @@ function hasBackendWorkspace(): boolean {
   return existsSync("src/index.ts");
 }
 
-export function classifyFile(filePath: string): Scope | null {
+function workspacePresence(): WorkspacePresence {
+  return {
+    backend: hasBackendWorkspace(),
+    frontend: hasFrontendWorkspace(),
+  };
+}
+
+function classifyFileWithWorkspace(filePath: string, presence: WorkspacePresence): Scope | null {
   const normalized = filePath.replaceAll("\\", "/").replaceAll(/^\.\//g, "");
 
-  if (normalized.startsWith("apps/frontend/") && hasFrontendWorkspace()) {
+  if (normalized.startsWith("apps/frontend/") && presence.frontend) {
     return "frontend";
   }
-  if (normalized.startsWith("src/") && hasBackendWorkspace()) {
+  if (normalized.startsWith("src/") && presence.backend) {
     return "backend";
   }
   if (normalized.startsWith("scripts/")) {
@@ -66,10 +78,15 @@ export function classifyFile(filePath: string): Scope | null {
   return null;
 }
 
+export function classifyFile(filePath: string): Scope | null {
+  return classifyFileWithWorkspace(filePath, workspacePresence());
+}
+
 export function classifyScopes(files: string[]): Set<Scope> {
   const scopes = new Set<Scope>();
+  const presence = workspacePresence();
   for (const file of files) {
-    const scope = classifyFile(file);
+    const scope = classifyFileWithWorkspace(file, presence);
     if (scope !== null) {
       scopes.add(scope);
     }
@@ -82,11 +99,12 @@ export function expandConfigScope(scopes: Set<Scope>): Set<Scope> {
     return scopes;
   }
   const expanded = new Set(scopes);
-  if (hasBackendWorkspace()) {
+  const presence = workspacePresence();
+  if (presence.backend) {
     expanded.add("backend");
   }
   expanded.add("scripts");
-  if (hasFrontendWorkspace()) {
+  if (presence.frontend) {
     expanded.add("frontend");
   }
   return expanded;

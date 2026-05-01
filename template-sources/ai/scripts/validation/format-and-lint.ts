@@ -123,6 +123,7 @@ if (import.meta.main) {
   const filePaths = parseFilePaths(input);
   const failures: string[] = [];
   let updatedToolOutput: string | null = null;
+  const shouldCaptureUpdatedToolOutput = filePaths.length === 1;
 
   if (filePaths.length === 0) {
     process.exit(0);
@@ -134,7 +135,7 @@ if (import.meta.main) {
       continue;
     }
 
-    const beforeFormat = await readTextFile(filePath);
+    const beforeFormat = shouldCaptureUpdatedToolOutput ? await readTextFile(filePath) : null;
 
     if (workspace.lintFix) {
       Bun.spawnSync(
@@ -189,9 +190,9 @@ if (import.meta.main) {
       { stdout: "pipe", stderr: "pipe" },
     );
 
-    const finalContent = await readTextFile(filePath);
+    const finalContent = shouldCaptureUpdatedToolOutput ? await readTextFile(filePath) : null;
     if (
-      filePaths.length === 1 &&
+      shouldCaptureUpdatedToolOutput &&
       beforeFormat !== null &&
       finalContent !== null &&
       finalContent !== beforeFormat

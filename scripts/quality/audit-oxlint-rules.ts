@@ -27,6 +27,12 @@ type ParsedConfigJson = {
   readonly rules: Record<string, unknown>;
 };
 
+type OxlintResult = {
+  readonly stdout: string;
+  readonly stderr: string;
+  readonly exitCode: number;
+};
+
 const PROJECT_ROOT = process.cwd();
 const CONFIG_PATH = ".oxlintrc.jsonc";
 const SCAN_PATHS = ["src/", "scripts/"];
@@ -107,40 +113,36 @@ function parseArgs(argv: ReadonlyArray<string>): Options {
   return { subcommand, ruleName };
 }
 
-function exec(args: ReadonlyArray<string>): string {
+function runOxlint(args: ReadonlyArray<string>): OxlintResult {
   const result = Bun.spawnSync([OXLINT_BIN, ...args], {
     cwd: PROJECT_ROOT,
     stdout: "pipe",
     stderr: "pipe",
     env: process.env,
   });
+  return {
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+    exitCode: result.exitCode,
+  };
+}
+
+function exec(args: ReadonlyArray<string>): string {
+  const result = runOxlint(args);
   if (result.exitCode !== 0) {
-    throw new Error(
-      result.stderr.toString().trim() || `oxlint exited with code ${result.exitCode}`,
-    );
+    throw new Error(result.stderr.trim() || `oxlint exited with code ${result.exitCode}`);
   }
-  return result.stdout.toString();
+  return result.stdout;
 }
 
 function execAllowFailure(args: ReadonlyArray<string>): { stdout: string; exitCode: number } {
-  const result = Bun.spawnSync([OXLINT_BIN, ...args], {
-    cwd: PROJECT_ROOT,
-    stdout: "pipe",
-    stderr: "pipe",
-    env: process.env,
-  });
-  return { stdout: result.stdout.toString(), exitCode: result.exitCode };
+  const result = runOxlint(args);
+  return { stdout: result.stdout, exitCode: result.exitCode };
 }
 
 function getVersion(): string {
-  const result = Bun.spawnSync([OXLINT_BIN, "--version"], {
-    cwd: PROJECT_ROOT,
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  return result.stdout
-    .toString()
-    .trim()
+  return runOxlint(["--version"])
+    .stdout.trim()
     .replace(/^Version:\s*/i, "");
 }
 

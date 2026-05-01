@@ -8,7 +8,7 @@ import {
   describeGeneratedProject,
   templateRenderSpecsForShape,
 } from "./generated-project-contract.ts";
-import { finalizeProject, runCommand } from "./install.ts";
+import { bunInstallEnv, finalizeProject, runCommand } from "./install.ts";
 import { PRESETS } from "./presets.ts";
 import { renderTemplate } from "./template.ts";
 
@@ -58,11 +58,7 @@ async function writeTemplates(destination: string, context: TemplateContext): Pr
 
 async function bootstrapBackendNative(destination: string): Promise<void> {
   await runCommand(["bun", "init", "--yes"], destination, {
-    env: {
-      ...process.env,
-      BUN_TMPDIR: process.env["BUN_TMPDIR"] ?? "/tmp",
-      BUN_INSTALL: process.env["BUN_INSTALL"] ?? "/tmp/bun-install",
-    },
+    env: bunInstallEnv(),
   });
 }
 
@@ -88,11 +84,7 @@ async function bootstrapFrontendNative(destination: string): Promise<void> {
     ],
     appsDir,
     {
-      env: {
-        ...process.env,
-        BUN_TMPDIR: process.env["BUN_TMPDIR"] ?? "/tmp",
-        BUN_INSTALL: process.env["BUN_INSTALL"] ?? "/tmp/bun-install",
-      },
+      env: bunInstallEnv(),
     },
   );
 }

@@ -2,10 +2,6 @@
 
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import process from "node:process";
-
-const processModule = process;
-void processModule;
 
 const DOC_EXTENSIONS = new Set([".md", ".html"]);
 const LINK_PATTERN = /\]\([^)]+\)|\bhref\s*=/i;

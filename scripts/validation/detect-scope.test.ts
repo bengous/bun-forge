@@ -1,34 +1,46 @@
 import { describe, expect, test } from "bun:test";
 import {
   classifyFile,
-  classifyFileWithFrontendWorkspace,
+  classifyFileWithWorkspace,
   classifyScopes,
   CODE_PATTERN,
-  expandConfigScopeWithFrontendWorkspace,
+  expandConfigScopeWithWorkspace,
 } from "./detect-scope.ts";
 
-describe("classifyFileWithFrontendWorkspace", () => {
+describe("classifyFileWithWorkspace", () => {
   test("classifies backend, scripts, config, and frontend paths", () => {
-    expect(classifyFileWithFrontendWorkspace("src/index.ts", false)).toBe("backend");
-    expect(classifyFileWithFrontendWorkspace("scripts/setup/bootstrap.ts", false)).toBe("scripts");
-    expect(classifyFileWithFrontendWorkspace(".codex/hooks/post-edit-quality.ts", false)).toBe(
+    const presence = { backend: true, frontend: true };
+    expect(classifyFileWithWorkspace("src/index.ts", presence)).toBe("backend");
+    expect(classifyFileWithWorkspace("scripts/setup/bootstrap.ts", presence)).toBe("scripts");
+    expect(classifyFileWithWorkspace(".codex/hooks/post-edit-quality.ts", presence)).toBe(
       "scripts",
     );
-    expect(classifyFileWithFrontendWorkspace(".claude/hooks/guard-destructive.ts", false)).toBe(
+    expect(classifyFileWithWorkspace(".claude/hooks/guard-destructive.ts", presence)).toBe(
       "scripts",
     );
-    expect(classifyFileWithFrontendWorkspace("templates/package.json.tpl", false)).toBe("product");
-    expect(
-      classifyFileWithFrontendWorkspace("template-sources/ai/.codex/hooks/lib.ts", false),
-    ).toBe("product");
-    expect(classifyFileWithFrontendWorkspace(".codex/config.toml", false)).toBe("config");
-    expect(classifyFileWithFrontendWorkspace(".claude/settings.json", false)).toBe("config");
-    expect(classifyFileWithFrontendWorkspace("package.json", false)).toBe("config");
-    expect(classifyFileWithFrontendWorkspace("apps/frontend/src/main.tsx", true)).toBe("frontend");
+    expect(classifyFileWithWorkspace("templates/package.json.tpl", presence)).toBe("product");
+    expect(classifyFileWithWorkspace("template-sources/ai/.codex/hooks/lib.ts", presence)).toBe(
+      "product",
+    );
+    expect(classifyFileWithWorkspace(".codex/config.toml", presence)).toBe("config");
+    expect(classifyFileWithWorkspace(".claude/settings.json", presence)).toBe("config");
+    expect(classifyFileWithWorkspace("package.json", presence)).toBe("config");
+    expect(classifyFileWithWorkspace("apps/frontend/src/main.tsx", presence)).toBe("frontend");
   });
 
-  test("ignores frontend paths when no workspace is present", () => {
-    expect(classifyFileWithFrontendWorkspace("apps/frontend/src/main.tsx", false)).toBeNull();
+  test("ignores workspace paths when the workspace is absent", () => {
+    expect(
+      classifyFileWithWorkspace("apps/frontend/src/main.tsx", {
+        backend: true,
+        frontend: false,
+      }),
+    ).toBeNull();
+    expect(
+      classifyFileWithWorkspace("src/index.ts", {
+        backend: false,
+        frontend: true,
+      }),
+    ).toBeNull();
   });
 });
 
@@ -45,17 +57,17 @@ describe("classifyScopes", () => {
   });
 });
 
-describe("expandConfigScopeWithFrontendWorkspace", () => {
+describe("expandConfigScopeWithWorkspace", () => {
   test("expands config changes to backend and scripts", () => {
-    expect(expandConfigScopeWithFrontendWorkspace(new Set(["config"]), false)).toEqual(
-      new Set(["config", "backend", "scripts", "product"]),
-    );
+    expect(
+      expandConfigScopeWithWorkspace(new Set(["config"]), { backend: true, frontend: false }),
+    ).toEqual(new Set(["config", "backend", "scripts", "product"]));
   });
 
   test("adds frontend when the workspace exists", () => {
-    expect(expandConfigScopeWithFrontendWorkspace(new Set(["config"]), true)).toEqual(
-      new Set(["config", "backend", "scripts", "product", "frontend"]),
-    );
+    expect(
+      expandConfigScopeWithWorkspace(new Set(["config"]), { backend: true, frontend: true }),
+    ).toEqual(new Set(["config", "backend", "scripts", "product", "frontend"]));
   });
 });
 
