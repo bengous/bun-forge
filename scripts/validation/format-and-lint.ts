@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import { existsSync } from "node:fs";
 import { resolveBin, resolveProjectRoot } from "./resolve-bin";
 
 export type HookInput = {
@@ -139,47 +140,80 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+type BucketEntry = {
+  readonly workspace: Workspace;
+  readonly lintFixPaths: string[];
+  readonly lintCheckPaths: string[];
+  readonly formatPaths: string[];
+};
+
+function bucketByWorkspace(filePaths: readonly string[]): Map<Workspace, BucketEntry> {
+  const buckets = new Map<Workspace, BucketEntry>();
+  for (const filePath of filePaths) {
+    const workspace = resolveWorkspace(filePath);
+    if (workspace === null) {
+      continue;
+    }
+    const ext = filePath.slice(filePath.lastIndexOf("."));
+    let bucket = buckets.get(workspace);
+    if (bucket === undefined) {
+      bucket = { workspace, lintFixPaths: [], lintCheckPaths: [], formatPaths: [] };
+      buckets.set(workspace, bucket);
+    }
+    if (LINTABLE_EXTENSIONS.has(ext) && workspace.lint) {
+      if (workspace.lintFix) {
+        bucket.lintFixPaths.push(filePath);
+      }
+      bucket.lintCheckPaths.push(filePath);
+    }
+    if (FORMATTABLE_EXTENSIONS.has(ext)) {
+      bucket.formatPaths.push(filePath);
+    }
+  }
+  return buckets;
+}
+
+function summarizePaths(paths: readonly string[]): string {
+  if (paths.length === 1) {
+    return paths[0]!;
+  }
+  const head = paths.slice(0, 3).join(", ");
+  return `${paths.length} files: ${head}${paths.length > 3 ? ", ..." : ""}`;
+}
+
 if (import.meta.main) {
   const projectRoot = resolveProjectRoot(import.meta.dir);
   const oxlint = resolveBin(projectRoot, "oxlint");
   const oxfmt = resolveBin(projectRoot, "oxfmt");
   const input = await Bun.stdin.text();
-  const filePaths = parseFilePaths(input);
-  const failures: string[] = [];
-  let updatedToolOutput: string | null = null;
-  let needsProductContract = false;
-  const shouldCaptureUpdatedToolOutput = filePaths.length === 1;
+  const rawPaths = parseFilePaths(input);
+  if (rawPaths.length === 0) {
+    process.exit(0);
+  }
 
+  const filePaths = rawPaths.filter((filePath) => existsSync(filePath));
   if (filePaths.length === 0) {
     process.exit(0);
   }
 
-  for (const filePath of filePaths) {
-    if (isProductSurface(filePath)) {
-      needsProductContract = true;
-    }
+  const captureTarget = filePaths.length === 1 ? filePaths[0]! : null;
+  const beforeFormat = captureTarget !== null ? await readTextFile(captureTarget) : null;
 
-    const workspace = resolveWorkspace(filePath);
-    if (workspace === null) {
-      continue;
-    }
+  const needsProductContract = filePaths.some((filePath) => isProductSurface(filePath));
+  const buckets = bucketByWorkspace(filePaths);
+  const failures: string[] = [];
 
-    const beforeFormat = shouldCaptureUpdatedToolOutput ? await readTextFile(filePath) : null;
-
-    if (
-      workspace.lint &&
-      workspace.lintFix &&
-      LINTABLE_EXTENSIONS.has(filePath.slice(filePath.lastIndexOf(".")))
-    ) {
+  for (const bucket of buckets.values()) {
+    if (bucket.lintFixPaths.length > 0) {
       Bun.spawnSync(
         [
           oxlint,
-          ...workspace.oxlintArgs,
+          ...bucket.workspace.oxlintArgs,
           "-c",
-          workspace.oxlintConfig,
+          bucket.workspace.oxlintConfig,
           "--fix",
           "--quiet",
-          filePath,
+          ...bucket.lintFixPaths,
         ],
         {
           stdout: "ignore",
@@ -188,57 +222,58 @@ if (import.meta.main) {
       );
     }
 
-    if (FORMATTABLE_EXTENSIONS.has(filePath.slice(filePath.lastIndexOf(".")))) {
-      const mode = workspace.formatMode === "write" ? "--write" : "--check";
-      const format = Bun.spawnSync([oxfmt, mode, "-c", workspace.oxfmtConfig, filePath], {
-        stdout: "pipe",
-        stderr: "pipe",
-      });
+    if (bucket.formatPaths.length > 0) {
+      const mode = bucket.workspace.formatMode === "write" ? "--write" : "--check";
+      const format = Bun.spawnSync(
+        [oxfmt, mode, "-c", bucket.workspace.oxfmtConfig, ...bucket.formatPaths],
+        {
+          stdout: "pipe",
+          stderr: "pipe",
+        },
+      );
       if (format.exitCode !== 0) {
         const output = [format.stderr.toString(), format.stdout.toString()]
           .filter(Boolean)
           .join("\n")
           .trim();
-        failures.push(output || `format: ${filePath} exited with code ${format.exitCode}`);
+        failures.push(
+          output ||
+            `format: ${summarizePaths(bucket.formatPaths)} exited with code ${format.exitCode}`,
+        );
       }
     }
 
-    const finalContent = shouldCaptureUpdatedToolOutput ? await readTextFile(filePath) : null;
-    if (
-      shouldCaptureUpdatedToolOutput &&
-      beforeFormat !== null &&
-      finalContent !== null &&
-      finalContent !== beforeFormat
-    ) {
+    if (bucket.lintCheckPaths.length > 0) {
+      const lint = Bun.spawnSync(
+        [
+          oxlint,
+          ...bucket.workspace.oxlintArgs,
+          "-c",
+          bucket.workspace.oxlintConfig,
+          "--quiet",
+          "--format=unix",
+          ...bucket.lintCheckPaths,
+        ],
+        { stdout: "pipe", stderr: "pipe" },
+      );
+      if (lint.exitCode !== 0) {
+        const output = [lint.stderr.toString(), lint.stdout.toString()]
+          .filter(Boolean)
+          .join("\n")
+          .trim();
+        const lines = blockingLines(output);
+        if (lines.length > 0) {
+          failures.push(lines.join("\n"));
+        }
+      }
+    }
+  }
+
+  let updatedToolOutput: string | null = null;
+  if (captureTarget !== null) {
+    const finalContent = await readTextFile(captureTarget);
+    if (beforeFormat !== null && finalContent !== null && finalContent !== beforeFormat) {
       updatedToolOutput = finalContent;
-    }
-
-    if (!workspace.lint || !LINTABLE_EXTENSIONS.has(filePath.slice(filePath.lastIndexOf(".")))) {
-      continue;
-    }
-
-    const lint = Bun.spawnSync(
-      [
-        oxlint,
-        ...workspace.oxlintArgs,
-        "-c",
-        workspace.oxlintConfig,
-        "--quiet",
-        "--format=unix",
-        filePath,
-      ],
-      { stdout: "pipe", stderr: "pipe" },
-    );
-
-    if (lint.exitCode !== 0) {
-      const output = [lint.stderr.toString(), lint.stdout.toString()]
-        .filter(Boolean)
-        .join("\n")
-        .trim();
-      const lines = blockingLines(output);
-      if (lines.length > 0) {
-        failures.push(lines.join("\n"));
-      }
     }
   }
 

@@ -249,27 +249,63 @@ export async function runPostEditQuality(
     return { blockReason: generatedPathMessage(forbidden) };
   }
 
+  const existingPaths = paths.filter((filePath) => existsSync(path.join(root, filePath)));
+  const buckets = bucketByWorkspace(existingPaths);
   const failures: string[] = [];
-  for (const filePath of paths) {
-    const absolute = path.join(root, filePath);
-    if (!existsSync(absolute)) {
-      continue;
+
+  for (const bucket of buckets.values()) {
+    if (bucket.lintFixPaths.length > 0) {
+      const lintFix = await runner(
+        [
+          localTool(root, "oxlint"),
+          ...bucket.workspace.lintArgs,
+          "-c",
+          bucket.workspace.lintConfig,
+          "--fix",
+          "--quiet",
+          ...bucket.lintFixPaths,
+        ],
+        { cwd: root },
+      );
+      if (lintFix.code !== 0) {
+        failures.push(batchedCommandFailure("lint --fix", bucket.lintFixPaths, lintFix));
+        continue;
+      }
     }
 
-    const workspace = workspaceForPath(filePath);
-    if (workspace === null) {
-      continue;
+    if (bucket.formatPaths.length > 0) {
+      const format = await runner(
+        [
+          localTool(root, "oxfmt"),
+          "--write",
+          "-c",
+          bucket.workspace.formatConfig,
+          ...bucket.formatPaths,
+        ],
+        { cwd: root },
+      );
+      if (format.code !== 0) {
+        failures.push(batchedCommandFailure("format", bucket.formatPaths, format));
+        continue;
+      }
     }
 
-    const format = await maybeFormat(root, filePath, workspace, runner);
-    if (format.code !== 0) {
-      failures.push(commandFailure("format", filePath, format));
-      continue;
-    }
-
-    const lint = await maybeLint(root, filePath, workspace, runner);
-    if (lint.code !== 0) {
-      failures.push(commandFailure("lint", filePath, lint));
+    if (bucket.lintCheckPaths.length > 0) {
+      const lint = await runner(
+        [
+          localTool(root, "oxlint"),
+          ...bucket.workspace.lintArgs,
+          "-c",
+          bucket.workspace.lintConfig,
+          "--quiet",
+          "--format=unix",
+          ...bucket.lintCheckPaths,
+        ],
+        { cwd: root },
+      );
+      if (lint.code !== 0) {
+        failures.push(batchedCommandFailure("lint", bucket.lintCheckPaths, lint));
+      }
     }
   }
 
@@ -307,6 +343,13 @@ export async function runStopValidation(
   return {};
 }
 
+type BucketEntry = {
+  readonly workspace: Workspace;
+  readonly lintFixPaths: string[];
+  readonly lintCheckPaths: string[];
+  readonly formatPaths: string[];
+};
+
 function workspaceForPath(filePath: string): Workspace | null {
   const extension = path.extname(filePath).toLowerCase();
   if (!formatExtensions.has(extension) && !lintExtensions.has(extension)) {
@@ -330,55 +373,40 @@ function workspaceForPath(filePath: string): Workspace | null {
   return null;
 }
 
-async function maybeFormat(
-  root: string,
-  filePath: string,
-  workspace: Workspace,
-  runner: CommandRunner,
-): Promise<CommandResult> {
-  if (!formatExtensions.has(path.extname(filePath).toLowerCase())) {
-    return { code: 0, stdout: "", stderr: "" };
+function bucketByWorkspace(filePaths: readonly string[]): Map<Workspace, BucketEntry> {
+  const buckets = new Map<Workspace, BucketEntry>();
+  for (const filePath of filePaths) {
+    const workspace = workspaceForPath(filePath);
+    if (workspace === null) {
+      continue;
+    }
+    const extension = path.extname(filePath).toLowerCase();
+    let bucket = buckets.get(workspace);
+    if (bucket === undefined) {
+      bucket = { workspace, lintFixPaths: [], lintCheckPaths: [], formatPaths: [] };
+      buckets.set(workspace, bucket);
+    }
+    if (lintExtensions.has(extension)) {
+      bucket.lintFixPaths.push(filePath);
+      bucket.lintCheckPaths.push(filePath);
+    }
+    if (formatExtensions.has(extension)) {
+      bucket.formatPaths.push(filePath);
+    }
   }
-  return runner([localTool(root, "oxfmt"), "--write", "-c", workspace.formatConfig, filePath], {
-    cwd: root,
-  });
+  return buckets;
 }
 
-async function maybeLint(
-  root: string,
-  filePath: string,
-  workspace: Workspace,
-  runner: CommandRunner,
-): Promise<CommandResult> {
-  if (!lintExtensions.has(path.extname(filePath).toLowerCase())) {
-    return { code: 0, stdout: "", stderr: "" };
-  }
-
-  await runner(
-    [
-      localTool(root, "oxlint"),
-      ...workspace.lintArgs,
-      "-c",
-      workspace.lintConfig,
-      "--fix",
-      "--quiet",
-      filePath,
-    ],
-    { cwd: root },
-  );
-
-  return runner(
-    [
-      localTool(root, "oxlint"),
-      ...workspace.lintArgs,
-      "-c",
-      workspace.lintConfig,
-      "--quiet",
-      "--format=unix",
-      filePath,
-    ],
-    { cwd: root },
-  );
+function batchedCommandFailure(
+  label: string,
+  paths: readonly string[],
+  result: CommandResult,
+): string {
+  const summary =
+    paths.length === 1
+      ? paths[0]!
+      : `${paths.length} files: ${paths.slice(0, 3).join(", ")}${paths.length > 3 ? ", ..." : ""}`;
+  return `${label}: ${summary}\n${tail(commandOutput(result), 40)}`;
 }
 
 function localTool(root: string, name: string): string {
@@ -398,10 +426,6 @@ function generatedPathMessage(paths: readonly string[]): string {
   return `Generated files must not be edited directly: ${paths.join(
     ", ",
   )}. Edit CLAUDE.md, .claude/rules/*.md, or route files, then run the matching generator.`;
-}
-
-function commandFailure(label: string, filePath: string, result: CommandResult): string {
-  return `${label}: ${filePath}\n${tail(commandOutput(result), 40)}`;
 }
 
 function commandOutput(result: CommandResult): string {

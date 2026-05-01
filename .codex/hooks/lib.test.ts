@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
@@ -12,6 +12,16 @@ import {
   runStopValidation,
   type CommandResult,
 } from "./lib";
+
+async function makeTestRoot(): Promise<string> {
+  return mkdtemp(path.join(tmpdir(), "bun-forge-codex-hooks-"));
+}
+
+async function seedFile(root: string, relPath: string, content = ""): Promise<void> {
+  const absolute = path.join(root, relPath);
+  await mkdir(path.dirname(absolute), { recursive: true });
+  await writeFile(absolute, content);
+}
 
 describe("Codex hook path handling", () => {
   test("extracts file paths from apply_patch hunks", () => {
@@ -134,5 +144,151 @@ describe("Codex stop validation gate", () => {
 
     expect(result.blockReason).toBeUndefined();
     expect(calls).toEqual([]);
+  });
+});
+
+describe("Codex post-edit batching", () => {
+  test("batches multiple paths in the same workspace into single spawns", async () => {
+    const root = await makeTestRoot();
+    try {
+      await seedFile(root, "src/a.ts", "export const a = 1;\n");
+      await seedFile(root, "src/b.ts", "export const b = 2;\n");
+      await seedFile(root, "src/c.json", "{}\n");
+
+      const calls: string[][] = [];
+      const result = await runPostEditQuality(
+        {
+          cwd: root,
+          session_id: "batch-session",
+          turn_id: "single-workspace",
+          tool_input: {
+            file_path: "src/a.ts",
+            edits: [{ file_path: "src/b.ts" }, { file_path: "src/c.json" }],
+          },
+        },
+        async (command): Promise<CommandResult> => {
+          calls.push([...command]);
+          return { code: 0, stdout: "", stderr: "" };
+        },
+      );
+
+      expect(result.blockReason).toBeUndefined();
+      expect(calls.length).toBe(3);
+
+      const lintFix = calls.find((c) => c.includes("--fix"));
+      expect(lintFix).toBeDefined();
+      expect(lintFix).toContain("src/a.ts");
+      expect(lintFix).toContain("src/b.ts");
+      expect(lintFix).not.toContain("src/c.json");
+
+      const format = calls.find((c) => c.includes("--write"));
+      expect(format).toBeDefined();
+      expect(format).toContain("src/a.ts");
+      expect(format).toContain("src/b.ts");
+      expect(format).toContain("src/c.json");
+
+      const lintCheck = calls.find((c) => c.includes("--format=unix"));
+      expect(lintCheck).toBeDefined();
+      expect(lintCheck).toContain("src/a.ts");
+      expect(lintCheck).toContain("src/b.ts");
+      expect(lintCheck).not.toContain("src/c.json");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("preserves order: lint --fix before format before lint --check", async () => {
+    const root = await makeTestRoot();
+    try {
+      await seedFile(root, "src/a.ts", "export const a = 1;\n");
+
+      const calls: string[][] = [];
+      await runPostEditQuality(
+        {
+          cwd: root,
+          session_id: "order-session",
+          turn_id: "lint-first",
+          tool_input: { file_path: "src/a.ts" },
+        },
+        async (command): Promise<CommandResult> => {
+          calls.push([...command]);
+          return { code: 0, stdout: "", stderr: "" };
+        },
+      );
+
+      const lintFixIndex = calls.findIndex((c) => c.includes("--fix"));
+      const formatIndex = calls.findIndex((c) => c.includes("--write"));
+      const lintCheckIndex = calls.findIndex((c) => c.includes("--format=unix"));
+
+      expect(lintFixIndex).toBeGreaterThanOrEqual(0);
+      expect(formatIndex).toBeGreaterThan(lintFixIndex);
+      expect(lintCheckIndex).toBeGreaterThan(formatIndex);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("codex-hooks workspace lints without --fix and formats in --check mode", async () => {
+    const root = await makeTestRoot();
+    try {
+      await seedFile(root, ".codex/hooks/x.ts", "export const x = 1;\n");
+
+      const calls: string[][] = [];
+      await runPostEditQuality(
+        {
+          cwd: root,
+          session_id: "codex-ws-session",
+          turn_id: "codex-hooks",
+          tool_input: { file_path: ".codex/hooks/x.ts" },
+        },
+        async (command): Promise<CommandResult> => {
+          calls.push([...command]);
+          return { code: 0, stdout: "", stderr: "" };
+        },
+      );
+
+      expect(calls.find((c) => c.includes("--fix"))).toBeUndefined();
+      const format = calls.find((c) => c.includes("--check"));
+      expect(format).toBeDefined();
+      expect(format).toContain(".codex/hooks/x.ts");
+      expect(calls.find((c) => c.includes("--format=unix"))).toBeDefined();
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("issues separate spawns per workspace when paths span workspaces", async () => {
+    const root = await makeTestRoot();
+    try {
+      await seedFile(root, "src/a.ts", "export const a = 1;\n");
+      await seedFile(root, "templates/foo.json", "{}\n");
+
+      const calls: string[][] = [];
+      await runPostEditQuality(
+        {
+          cwd: root,
+          session_id: "cross-ws-session",
+          turn_id: "two-ws",
+          tool_input: {
+            file_path: "src/a.ts",
+            edits: [{ file_path: "templates/foo.json" }],
+          },
+        },
+        async (command): Promise<CommandResult> => {
+          calls.push([...command]);
+          return { code: 0, stdout: "", stderr: "" };
+        },
+      );
+
+      const formatCalls = calls.filter((c) => c.includes("--write"));
+      expect(formatCalls.length).toBe(2);
+
+      const lintCalls = calls.filter((c) => c.includes("--format=unix") || c.includes("--fix"));
+      for (const call of lintCalls) {
+        expect(call).not.toContain("templates/foo.json");
+      }
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });
