@@ -16,6 +16,7 @@ function makeOptions(overrides: Partial<InitOptions> = {}): InitOptions {
     projectName: toProjectName("forge-generator"),
     packageName: toPackageName("forge-generator"),
     binName: toBinName("forge-generator"),
+    backend: true,
     frontend: "none",
     ai: false,
     effect: false,
@@ -74,10 +75,23 @@ describe("templateFilesForContext", () => {
     expect(files).toEqual([
       ["package.json.tpl", "package.json"],
       ["tsconfig.json.tpl", "tsconfig.json"],
+      ["knip.jsonc.tpl", "knip.jsonc"],
       ["lefthook.yml.tpl", "lefthook.yml"],
       ["README.md.tpl", "README.md"],
       ["src/index.ts.tpl", "src/index.ts"],
       ["src/index.test.ts.tpl", "src/index.test.ts"],
+    ]);
+  });
+
+  test("omits backend starter templates for frontend-only projects", () => {
+    const files = templateFilesForContext(
+      buildTemplateContext(makeOptions({ backend: false, frontend: "tanstack" })),
+    );
+    expect(files).not.toContainEqual(["src/index.ts.tpl", "src/index.ts"]);
+    expect(files).not.toContainEqual(["src/index.test.ts.tpl", "src/index.test.ts"]);
+    expect(files).toContainEqual([
+      "apps/frontend/playwright.config.ts.tpl",
+      "apps/frontend/playwright.config.ts",
     ]);
   });
 
@@ -100,6 +114,10 @@ describe("templateFilesForContext", () => {
     expect(files).toContainEqual([
       "apps/frontend/src/routes/-index.test.tsx.tpl",
       "apps/frontend/src/routes/-index.test.tsx",
+    ]);
+    expect(files).toContainEqual([
+      "apps/frontend/e2e/home.spec.ts.tpl",
+      "apps/frontend/e2e/home.spec.ts",
     ]);
   });
 });
@@ -154,6 +172,16 @@ describe("generateProjectWithRuntime", () => {
       "writeTemplates",
       "finalizeProject",
     ]);
+  });
+
+  test("skips backend bootstrap for frontend-only projects", async () => {
+    const { runtime, calls } = createRuntime();
+    await generateProjectWithRuntime(
+      makeOptions({ backend: false, frontend: "tanstack" }),
+      runtime,
+    );
+    expect(calls).not.toContain("bootstrapBackendNative");
+    expect(calls).toContain("bootstrapFrontendNative");
   });
 
   test("skips frontend bootstrap for backend-only projects", async () => {

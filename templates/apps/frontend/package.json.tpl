@@ -22,8 +22,10 @@
     "react-dom": "19.2.4"
   },
   "devDependencies": {
+    "@playwright/test": "1.59.1",
     "@tanstack/router-plugin": "1.167.12",
     "@testing-library/dom": "10.4.1",
+    "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.0",
     "@types/node": "25.5.0",
     "@types/react": "19.2.14",
@@ -36,6 +38,6 @@
     "stylelint": "17.6.0",
     "typescript": "6.0.2",
     "vite": "8.0.3",
-    "vitest": "3.2.4"
+    "vitest": "4.1.5"
   }
 }

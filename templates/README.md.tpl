@@ -12,6 +12,7 @@ bun run lint:audit
 
 ## Options selected
 
+- Backend starter enabled: `__BACKEND_ENABLED__`
 - Frontend preset: `__FRONTEND_PRESET__`
 - AI tooling enabled: `__AI_ENABLED__`
 

@@ -7,6 +7,7 @@ describe("e2eContractScenariosFromArgv", () => {
       "none-ai",
       "none-effect",
       "tanstack-ai",
+      "tanstack-ai-frontend",
       "tanstack-ai-effect",
     ]);
   });

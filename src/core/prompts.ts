@@ -93,6 +93,17 @@ export async function collectOptionsWithRuntime(
   const destination = runtime.resolvePath(
     flags.destination ?? destinationArg ?? normalizedProjectName,
   );
+
+  const backend =
+    flags.backend ??
+    assertNotCancelled(
+      runtime,
+      await runtime.confirm({
+        message: "Generate a Bun backend starter?",
+        initialValue: true,
+      }),
+    );
+
   let frontend = flags.frontend;
   if (frontend === undefined) {
     const selectedFrontend = assertNotCancelled(
@@ -107,6 +118,10 @@ export async function collectOptionsWithRuntime(
       }),
     );
     frontend = isFrontendPreset(selectedFrontend) ? selectedFrontend : "none";
+  }
+
+  if (!backend && frontend === "none") {
+    throw new Error("Backend cannot be disabled without a frontend preset");
   }
 
   const ai =
@@ -128,6 +143,10 @@ export async function collectOptionsWithRuntime(
         initialValue: false,
       }),
     );
+
+  if (!backend && effect) {
+    throw new Error("Effect starter requires the backend preset");
+  }
 
   const install =
     flags.install ??
@@ -160,6 +179,7 @@ export async function collectOptionsWithRuntime(
         : toPackageName(normalizedProjectName),
     binName:
       flags.binName !== undefined ? toBinName(flags.binName) : toBinName(normalizedProjectName),
+    backend,
     frontend,
     ai,
     effect,
@@ -182,6 +202,16 @@ export function normalizeFlagOptions(
     throw new Error("Project name must not be empty");
   }
 
+  const backend = flags.backend ?? true;
+  const frontend = flags.frontend ?? "none";
+  if (!backend && frontend === "none") {
+    throw new Error("Backend cannot be disabled without a frontend preset");
+  }
+  const effect = flags.effect ?? false;
+  if (!backend && effect) {
+    throw new Error("Effect starter requires the backend preset");
+  }
+
   return {
     destination: resolve(flags.destination ?? destinationArg ?? projectName),
     projectName,
@@ -190,9 +220,10 @@ export function normalizeFlagOptions(
         ? toPackageName(flags.packageName)
         : toPackageName(projectName),
     binName: flags.binName !== undefined ? toBinName(flags.binName) : toBinName(projectName),
-    frontend: flags.frontend ?? "none",
+    backend,
+    frontend,
     ai: flags.ai ?? true,
-    effect: flags.effect ?? false,
+    effect,
     install: flags.install ?? true,
     gitInit: flags.gitInit ?? true,
     yes: flags.yes ?? false,

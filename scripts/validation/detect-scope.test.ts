@@ -11,6 +11,9 @@ describe("classifyFileWithFrontendWorkspace", () => {
   test("classifies backend, scripts, config, and frontend paths", () => {
     expect(classifyFileWithFrontendWorkspace("src/index.ts", false)).toBe("backend");
     expect(classifyFileWithFrontendWorkspace("scripts/setup/bootstrap.ts", false)).toBe("scripts");
+    expect(classifyFileWithFrontendWorkspace(".codex/hooks/post-edit-quality.ts", false)).toBe(
+      "scripts",
+    );
     expect(classifyFileWithFrontendWorkspace("package.json", false)).toBe("config");
     expect(classifyFileWithFrontendWorkspace("apps/frontend/src/main.tsx", true)).toBe("frontend");
   });

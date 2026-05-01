@@ -45,6 +45,8 @@ export async function smoke(scenario: SmokeScenario, config: ScenarioConfig): Pr
         "src/index.ts",
         dir,
         "--yes",
+        "--backend",
+        String(config.backend),
         "--frontend",
         config.frontend,
         "--ai",

@@ -10,6 +10,7 @@ function makeOptions(overrides: Partial<InitOptions> = {}): InitOptions {
     projectName: toProjectName("forge-install"),
     packageName: toPackageName("forge-install"),
     binName: toBinName("forge-install"),
+    backend: true,
     frontend: "none",
     ai: false,
     effect: false,

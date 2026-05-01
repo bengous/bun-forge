@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { CODE_PATTERN, classifyScopes, expandConfigScope, getChangedFiles } from "./detect-scope";
-import { resolveBin, resolveProjectRoot } from "./resolve-bin";
+import { resolveProjectRoot } from "./resolve-bin";
 
 function run(label: string, cmd: string[], cwd: string, errors: string[]): void {
   const result = Bun.spawnSync(cmd, {
@@ -29,16 +29,10 @@ async function main(): Promise<void> {
   }
 
   const scopes = expandConfigScope(classifyScopes(codeFiles));
-  const oxlint = resolveBin(projectRoot, "oxlint");
   const errors: string[] = [];
 
   if (scopes.has("backend") || scopes.has("scripts")) {
-    run(
-      "lint:errors",
-      [oxlint, "-c", ".oxlintrc.jsonc", "--quiet", "--format=unix", "src/", "scripts/"],
-      projectRoot,
-      errors,
-    );
+    run("lint:errors", ["bun", "run", "--silent", "lint:errors"], projectRoot, errors);
     run("format:check", ["bun", "run", "--silent", "format:check"], projectRoot, errors);
   }
   if (scopes.has("frontend")) {

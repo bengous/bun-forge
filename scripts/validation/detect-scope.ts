@@ -22,6 +22,10 @@ function hasFrontendWorkspace(): boolean {
   return existsSync("apps/frontend/package.json");
 }
 
+function hasBackendWorkspace(): boolean {
+  return existsSync("src/index.ts");
+}
+
 export function classifyFileWithFrontendWorkspace(
   filePath: string,
   frontendWorkspacePresent: boolean,
@@ -31,10 +35,13 @@ export function classifyFileWithFrontendWorkspace(
   if (normalized.startsWith("apps/frontend/") && frontendWorkspacePresent) {
     return "frontend";
   }
-  if (normalized.startsWith("src/")) {
+  if (normalized.startsWith("src/") && hasBackendWorkspace()) {
     return "backend";
   }
   if (normalized.startsWith("scripts/")) {
+    return "scripts";
+  }
+  if (normalized.startsWith(".codex/hooks/")) {
     return "scripts";
   }
 
@@ -56,7 +63,9 @@ export function expandConfigScopeWithFrontendWorkspace(
     return scopes;
   }
   const expanded = new Set(scopes);
-  expanded.add("backend");
+  if (hasBackendWorkspace()) {
+    expanded.add("backend");
+  }
   expanded.add("scripts");
   if (frontendWorkspacePresent) {
     expanded.add("frontend");

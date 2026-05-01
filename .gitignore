@@ -4,4 +4,6 @@ node_modules
 
 plans/
 .codex/
+!template-sources/ai/.codex/
+!template-sources/ai/.codex/**
 .omx/

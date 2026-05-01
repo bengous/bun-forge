@@ -39,6 +39,11 @@
     "copied": [
       ".mcp.json",
       ".codex/config.toml",
+      ".codex/hooks/guard-edit-paths.ts",
+      ".codex/hooks/lib.ts",
+      ".codex/hooks/lib.test.ts",
+      ".codex/hooks/post-edit-quality.ts",
+      ".codex/hooks/stop-validate.ts",
       ".claude/settings.json",
       ".claude/hooks/guard-destructive.ts",
       "scripts/validation/format-and-lint.ts",

@@ -4,7 +4,12 @@
   "ignore": [
     "**/*.test.ts",
     "**/*.e2e.test.ts",
-    ".claude/**"
+    "**/AGENTS.md",
+    "**/skills/**",
+    ".agents/**",
+    ".claude/**",
+    "template-sources/**",
+    "**/template-sources/**"
   ],
   "minLines": 20,
   "minTokens": 100,

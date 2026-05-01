@@ -64,6 +64,7 @@ describe("normalizeFlagOptions", () => {
       projectName: "my-app",
       packageName: "my-app",
       binName: "my-app",
+      backend: true,
       frontend: "none",
       ai: true,
       effect: false,
@@ -80,6 +81,7 @@ describe("normalizeFlagOptions", () => {
       projectName: "Chosen Name",
       packageName: "pkg-name",
       binName: "custom-bin",
+      backend: true,
       frontend: "tanstack",
       ai: false,
       install: false,
@@ -92,6 +94,7 @@ describe("normalizeFlagOptions", () => {
       projectName: "chosen-name",
       packageName: "pkg-name",
       binName: "custom-bin",
+      backend: true,
       frontend: "tanstack",
       ai: false,
       effect: false,
@@ -115,6 +118,25 @@ describe("normalizeFlagOptions", () => {
       }),
     ).toThrow("Project name must not be empty");
   });
+
+  test("rejects frontend-less projects without a backend", () => {
+    expect(() =>
+      normalizeFlagOptions("/tmp/forge", {
+        backend: false,
+        frontend: "none",
+      }),
+    ).toThrow("Backend cannot be disabled without a frontend preset");
+  });
+
+  test("rejects Effect without a backend starter", () => {
+    expect(() =>
+      normalizeFlagOptions("/tmp/forge", {
+        backend: false,
+        frontend: "tanstack",
+        effect: true,
+      }),
+    ).toThrow("Effect starter requires the backend preset");
+  });
 });
 
 describe("collectOptionsWithRuntime", () => {
@@ -126,7 +148,7 @@ describe("collectOptionsWithRuntime", () => {
         {
           texts: ["Forge App"],
           selects: ["tanstack"],
-          confirms: [true, true, false, true],
+          confirms: [true, true, true, false, true],
         },
         "/workspace",
       ),
@@ -137,6 +159,7 @@ describe("collectOptionsWithRuntime", () => {
       projectName: "Forge App",
       packageName: "forge-app",
       binName: "forge-app",
+      backend: true,
       frontend: "tanstack",
       ai: true,
       effect: true,
@@ -152,6 +175,7 @@ describe("collectOptionsWithRuntime", () => {
       {
         projectName: "starter",
         destination: "/repo/starter",
+        backend: true,
         frontend: "none",
         ai: false,
         effect: false,
@@ -166,6 +190,7 @@ describe("collectOptionsWithRuntime", () => {
       projectName: "starter",
       packageName: "starter",
       binName: "starter",
+      backend: true,
       frontend: "none",
       ai: false,
       effect: false,
@@ -195,7 +220,7 @@ describe("collectOptionsWithRuntime", () => {
       createPromptRuntime({
         texts: ["Forge App"],
         selects: ["none"],
-        confirms: [true, false, true, true],
+        confirms: [true, true, false, true, true],
       }),
     );
 

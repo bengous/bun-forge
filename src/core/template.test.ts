@@ -7,6 +7,7 @@ const backendContext: TemplateContext = {
   projectName: toProjectName("forge-backend"),
   packageName: toPackageName("forge-backend"),
   binName: toBinName("forge-backend"),
+  backend: true,
   frontend: "none",
   ai: false,
   effect: false,
@@ -17,6 +18,7 @@ const frontendAiContext: TemplateContext = {
   projectName: toProjectName("forge-frontend"),
   packageName: toPackageName("forge-frontend"),
   binName: toBinName("forge-frontend"),
+  backend: false,
   frontend: "tanstack",
   ai: true,
   effect: false,
@@ -27,6 +29,7 @@ const effectContext: TemplateContext = {
   projectName: toProjectName("forge-effect"),
   packageName: toPackageName("forge-effect"),
   binName: toBinName("forge-effect"),
+  backend: true,
   frontend: "none",
   ai: false,
   effect: true,
@@ -43,13 +46,17 @@ describe("templateValues", () => {
     expect(values["EFFECT_DEV_DEPENDENCIES"]).toBe("");
     expect(values["EFFECT_TSCONFIG_PLUGINS"]).toBe("");
     expect(values["FRONTEND_SCRIPTS"]).toBe("");
+    expect(values["BIN_BLOCK"]).toContain('"bin"');
   });
 
   test("includes optional script blocks when features are enabled", () => {
     const values = templateValues(frontendAiContext);
-    expect(values["WORKSPACES_BLOCK"]).toContain('"workspaces": ["apps/*"]');
+    expect(values["WORKSPACES_BLOCK"]).toContain('"workspaces": [');
+    expect(values["WORKSPACES_BLOCK"]).toContain('"apps/*"');
     expect(values["AI_SCRIPTS"]).toContain('"agents:check"');
     expect(values["FRONTEND_SCRIPTS"]).toContain('"validate:frontend"');
+    expect(values["BIN_BLOCK"]).toBe("");
+    expect(values["ROOT_LINT_PATHS"]).toBe("scripts/ .codex/hooks/");
   });
 
   test("includes Effect tokens when effect is enabled", () => {
@@ -72,6 +79,8 @@ describe("renderTemplate", () => {
     expect(rendered).toContain('"name": "forge-frontend"');
     expect(rendered).toContain('"agents:sync"');
     expect(rendered).toContain('"validate:frontend"');
+    expect(rendered).toContain('"dev": "bun run dev:frontend"');
+    expect(rendered).toContain('"test:hooks": "bun test ./.codex/hooks"');
     expect(rendered).not.toContain("__");
   });
 
@@ -94,6 +103,20 @@ describe("renderTemplate", () => {
     const rendered = renderTemplate("lefthook.yml.tpl", frontendAiContext);
     expect(rendered).toContain("frontend-oxc:");
     expect(rendered).toContain("apps/frontend/**/*.{ts,tsx}");
+    expect(rendered).toContain(".codex/hooks/**/*.ts");
+    expect(rendered).not.toContain("src/**/*.ts");
+  });
+
+  test("renders frontend-only tsconfig and Knip workspaces", () => {
+    const tsconfig = renderTemplate("tsconfig.json.tpl", frontendAiContext);
+    const knip = renderTemplate("knip.jsonc.tpl", frontendAiContext);
+
+    expect(tsconfig).toContain('"scripts/**/*.ts"');
+    expect(tsconfig).toContain('".codex/hooks/**/*.ts"');
+    expect(tsconfig).not.toContain('"src/**/*.ts"');
+    expect(knip).toContain('"apps/frontend"');
+    expect(knip).toContain('".codex/hooks/**/*.ts"');
+    expect(knip).not.toContain('"src/index.ts"');
   });
 
   test("renders package.json with Effect dependencies when enabled", () => {

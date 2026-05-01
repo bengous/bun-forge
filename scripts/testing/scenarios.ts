@@ -5,6 +5,7 @@ export type ScaffoldScenario =
   | "none-ai-effect"
   | "tanstack-plain"
   | "tanstack-ai"
+  | "tanstack-ai-frontend"
   | "tanstack-effect"
   | "tanstack-ai-effect";
 
@@ -15,22 +16,24 @@ export const ALL_SCAFFOLD_SCENARIOS = [
   "none-ai-effect",
   "tanstack-plain",
   "tanstack-ai",
+  "tanstack-ai-frontend",
   "tanstack-effect",
   "tanstack-ai-effect",
 ] as const satisfies readonly ScaffoldScenario[];
 
 export const SCAFFOLD_SCENARIO_CONFIG = {
-  "none-plain": { frontend: "none", ai: false, effect: false },
-  "none-ai": { frontend: "none", ai: true, effect: false },
-  "none-effect": { frontend: "none", ai: false, effect: true },
-  "none-ai-effect": { frontend: "none", ai: true, effect: true },
-  "tanstack-plain": { frontend: "tanstack", ai: false, effect: false },
-  "tanstack-ai": { frontend: "tanstack", ai: true, effect: false },
-  "tanstack-effect": { frontend: "tanstack", ai: false, effect: true },
-  "tanstack-ai-effect": { frontend: "tanstack", ai: true, effect: true },
+  "none-plain": { backend: true, frontend: "none", ai: false, effect: false },
+  "none-ai": { backend: true, frontend: "none", ai: true, effect: false },
+  "none-effect": { backend: true, frontend: "none", ai: false, effect: true },
+  "none-ai-effect": { backend: true, frontend: "none", ai: true, effect: true },
+  "tanstack-plain": { backend: true, frontend: "tanstack", ai: false, effect: false },
+  "tanstack-ai": { backend: true, frontend: "tanstack", ai: true, effect: false },
+  "tanstack-ai-frontend": { backend: false, frontend: "tanstack", ai: true, effect: false },
+  "tanstack-effect": { backend: true, frontend: "tanstack", ai: false, effect: true },
+  "tanstack-ai-effect": { backend: true, frontend: "tanstack", ai: true, effect: true },
 } as const satisfies Record<
   ScaffoldScenario,
-  { frontend: "none" | "tanstack"; ai: boolean; effect: boolean }
+  { backend: boolean; frontend: "none" | "tanstack"; ai: boolean; effect: boolean }
 >;
 
 export type ScenarioConfig = (typeof SCAFFOLD_SCENARIO_CONFIG)[ScaffoldScenario];

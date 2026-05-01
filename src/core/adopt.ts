@@ -224,6 +224,7 @@ function templateContext(options: AdoptOptions): TemplateContext {
     projectName: options.projectName,
     packageName: options.packageName,
     binName: options.binName,
+    backend: true,
     frontend: options.frontend,
     ai: options.ai,
     effect: options.effect,
@@ -618,6 +619,13 @@ export async function buildAdoptionPlan(
     await planTemplateFile(
       options.destination,
       context,
+      "knip.jsonc.tpl",
+      "knip.jsonc",
+      "adopt Bun Forge dead-code config",
+    ),
+    await planTemplateFile(
+      options.destination,
+      context,
       "lefthook.yml.tpl",
       "lefthook.yml",
       "adopt Bun Forge Git hooks",
@@ -680,7 +688,7 @@ export async function applyAdoptionPlan(
   }
 
   if (options.install) {
-    await runtime.finalizeProject({ ...options, ai: false, gitInit: false });
+    await runtime.finalizeProject({ ...options, backend: true, ai: false, gitInit: false });
   }
 
   return manifest;

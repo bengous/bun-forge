@@ -56,6 +56,7 @@ function makeOptions(overrides: Partial<InitOptions> = {}): InitOptions {
     projectName: toProjectName("forge-cli"),
     packageName: toExistingPackageName("forge-cli"),
     binName: toExistingBinName("forge-cli"),
+    backend: true,
     frontend: "none",
     ai: true,
     effect: false,
@@ -94,6 +95,7 @@ describe("buildProgram", () => {
     expect(optionNames).toEqual([
       "--version",
       "--name",
+      "--backend",
       "--frontend",
       "--ai",
       "--effect",
@@ -132,6 +134,15 @@ describe("formatCliError", () => {
   test("maps invalid frontend presets to a clean message", () => {
     expect(formatCliError(new Error("Expected frontend preset none|tanstack, got react"))).toBe(
       'Invalid frontend preset: expected none or tanstack, got "react".',
+    );
+  });
+
+  test("maps invalid project shapes to a clean message", () => {
+    expect(formatCliError(new Error("Backend cannot be disabled without a frontend preset"))).toBe(
+      "Invalid project shape: --backend false requires --frontend tanstack.",
+    );
+    expect(formatCliError(new Error("Effect starter requires the backend preset"))).toBe(
+      "Invalid project shape: --effect true requires --backend true.",
     );
   });
 

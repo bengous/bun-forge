@@ -4,6 +4,9 @@
   "ignore": [
     "**/*.test.ts",
     "**/*.e2e.test.ts",
+    "**/AGENTS.md",
+    "**/skills/**",
+    ".agents/**",
     ".claude/**"
   ],
   "minLines": 20,

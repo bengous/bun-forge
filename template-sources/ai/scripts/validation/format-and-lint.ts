@@ -5,6 +5,9 @@ import { resolveBin, resolveProjectRoot } from "./resolve-bin";
 export type HookInput = {
   tool_input: {
     file_path?: string;
+    edits?: Array<{
+      file_path?: string;
+    }>;
   };
 };
 
@@ -30,6 +33,10 @@ const SUMMARY_LINE = /^\d+ problems?$/;
 const PHANTOM_WARNING = /^:0:0:\s+\[Warning\]$/;
 
 export function parseFilePath(raw: string): string | null {
+  return parseFilePaths(raw)[0] ?? null;
+}
+
+export function parseFilePaths(raw: string): string[] {
   try {
     const parsed = JSON.parse(raw) as unknown;
     if (
@@ -37,16 +44,30 @@ export function parseFilePath(raw: string): string | null {
       parsed !== null &&
       "tool_input" in parsed &&
       typeof parsed["tool_input"] === "object" &&
-      parsed["tool_input"] !== null &&
-      "file_path" in parsed["tool_input"] &&
-      (typeof parsed["tool_input"]["file_path"] === "string" ||
-        parsed["tool_input"]["file_path"] === undefined)
+      parsed["tool_input"] !== null
     ) {
-      return parsed["tool_input"]["file_path"] ?? null;
+      const paths = new Set<string>();
+      const toolInput = parsed["tool_input"];
+      if ("file_path" in toolInput && typeof toolInput["file_path"] === "string") {
+        paths.add(toolInput["file_path"]);
+      }
+      if ("edits" in toolInput && Array.isArray(toolInput["edits"])) {
+        for (const edit of toolInput["edits"]) {
+          if (
+            typeof edit === "object" &&
+            edit !== null &&
+            "file_path" in edit &&
+            typeof edit["file_path"] === "string"
+          ) {
+            paths.add(edit["file_path"]);
+          }
+        }
+      }
+      return [...paths];
     }
-    return null;
+    return [];
   } catch {
-    return null;
+    return [];
   }
 }
 
@@ -57,7 +78,11 @@ export function resolveWorkspace(filePath: string): Workspace | null {
   }
 
   const normalized = filePath.replace(`${process.cwd()}/`, "").replace(/^\.\//, "");
-  if (normalized.startsWith("src/") || normalized.startsWith("scripts/")) {
+  if (
+    normalized.startsWith("src/") ||
+    normalized.startsWith("scripts/") ||
+    normalized.startsWith(".codex/hooks/")
+  ) {
     return ROOT_WORKSPACE;
   }
   if (normalized.startsWith("apps/frontend/")) {
@@ -86,76 +111,94 @@ if (import.meta.main) {
   const oxlint = resolveBin(projectRoot, "oxlint");
   const oxfmt = resolveBin(projectRoot, "oxfmt");
   const input = await Bun.stdin.text();
-  const filePath = parseFilePath(input);
-  const workspace = filePath !== null ? resolveWorkspace(filePath) : null;
+  const filePaths = parseFilePaths(input);
+  const failures: string[] = [];
+  let updatedToolOutput: string | null = null;
 
-  if (filePath === null || workspace === null) {
+  if (filePaths.length === 0) {
     process.exit(0);
   }
 
-  const beforeFormat = await readTextFile(filePath);
+  for (const filePath of filePaths) {
+    const workspace = resolveWorkspace(filePath);
+    if (workspace === null) {
+      continue;
+    }
 
-  Bun.spawnSync(
-    [oxlint, ...workspace.oxlintArgs, "-c", workspace.oxlintConfig, "--fix", "--quiet", filePath],
-    {
+    const beforeFormat = await readTextFile(filePath);
+
+    Bun.spawnSync(
+      [oxlint, ...workspace.oxlintArgs, "-c", workspace.oxlintConfig, "--fix", "--quiet", filePath],
+      {
+        stdout: "ignore",
+        stderr: "ignore",
+      },
+    );
+
+    Bun.spawnSync([oxfmt, "--write", "-c", workspace.oxfmtConfig, filePath], {
       stdout: "ignore",
       stderr: "ignore",
-    },
-  );
+    });
 
-  Bun.spawnSync([oxfmt, "--write", "-c", workspace.oxfmtConfig, filePath], {
-    stdout: "ignore",
-    stderr: "ignore",
-  });
+    const lint = Bun.spawnSync(
+      [
+        oxlint,
+        ...workspace.oxlintArgs,
+        "-c",
+        workspace.oxlintConfig,
+        "--quiet",
+        "--format=unix",
+        filePath,
+      ],
+      { stdout: "pipe", stderr: "pipe" },
+    );
 
-  const lint = Bun.spawnSync(
-    [
-      oxlint,
-      ...workspace.oxlintArgs,
-      "-c",
-      workspace.oxlintConfig,
-      "--quiet",
-      "--format=unix",
-      filePath,
-    ],
-    { stdout: "pipe", stderr: "pipe" },
-  );
-
-  if (lint.exitCode !== 0) {
-    const output = [lint.stderr.toString(), lint.stdout.toString()]
-      .filter(Boolean)
-      .join("\n")
-      .trim();
-    const lines = blockingLines(output);
-    if (lines.length > 0) {
-      const finalContent = await readTextFile(filePath);
-      const result: {
-        decision: "block";
-        reason: string;
-        hookSpecificOutput?: {
-          hookEventName: "PostToolUse";
-          updatedToolOutput: string;
-        };
-      } = { decision: "block", reason: lines.join("\n") };
-      if (beforeFormat !== null && finalContent !== null && finalContent !== beforeFormat) {
-        result.hookSpecificOutput = {
-          hookEventName: "PostToolUse",
-          updatedToolOutput: finalContent,
-        };
-      }
-      console.log(JSON.stringify(result));
-    }
-  } else {
     const finalContent = await readTextFile(filePath);
-    if (beforeFormat !== null && finalContent !== null && finalContent !== beforeFormat) {
-      console.log(
-        JSON.stringify({
-          hookSpecificOutput: {
-            hookEventName: "PostToolUse",
-            updatedToolOutput: finalContent,
-          },
-        }),
-      );
+    if (
+      filePaths.length === 1 &&
+      beforeFormat !== null &&
+      finalContent !== null &&
+      finalContent !== beforeFormat
+    ) {
+      updatedToolOutput = finalContent;
     }
+
+    if (lint.exitCode !== 0) {
+      const output = [lint.stderr.toString(), lint.stdout.toString()]
+        .filter(Boolean)
+        .join("\n")
+        .trim();
+      const lines = blockingLines(output);
+      if (lines.length > 0) {
+        failures.push(lines.join("\n"));
+      }
+    }
+  }
+
+  if (failures.length > 0) {
+    const result: {
+      decision: "block";
+      reason: string;
+      hookSpecificOutput?: {
+        hookEventName: "PostToolUse";
+        updatedToolOutput: string;
+      };
+    } = { decision: "block", reason: failures.join("\n") };
+    if (updatedToolOutput !== null) {
+      result.hookSpecificOutput = {
+        hookEventName: "PostToolUse",
+        updatedToolOutput,
+      };
+    }
+    console.log(JSON.stringify(result));
+  } else if (updatedToolOutput !== null) {
+    console.log(
+      JSON.stringify({
+        hookSpecificOutput: {
+          hookEventName: "PostToolUse",
+          updatedToolOutput,
+        },
+      }),
+    );
   }
 }

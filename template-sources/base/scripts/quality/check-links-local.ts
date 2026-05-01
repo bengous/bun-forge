@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
 
@@ -8,6 +8,7 @@ const processModule = process;
 void processModule;
 
 const DOC_EXTENSIONS = new Set([".md", ".html"]);
+const LINK_PATTERN = /\]\([^)]+\)|\bhref\s*=/i;
 
 function normalizePath(filePath: string): string {
   return filePath.replaceAll("\\", "/");
@@ -51,6 +52,10 @@ export function collectLinkCheckFiles(root = process.cwd()): string[] {
   return [...files].toSorted((left, right) => left.localeCompare(right));
 }
 
+export function filesContainLinks(files: readonly string[], root = process.cwd()): boolean {
+  return files.some((file) => LINK_PATTERN.test(readFileSync(join(root, file), "utf8")));
+}
+
 function main(): void {
   const files = collectLinkCheckFiles();
 
@@ -65,6 +70,10 @@ function main(): void {
   });
 
   if (versionCheck.exitCode !== 0) {
+    if (!filesContainLinks(files)) {
+      console.log("No links found in README/docs; skipping lychee.");
+      process.exit(0);
+    }
     console.error("Lychee is required for local checks. Run `mise install` from the repo root.");
     process.exit(1);
   }

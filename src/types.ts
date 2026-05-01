@@ -22,6 +22,7 @@ export type InitOptionsInput = {
   readonly projectName?: string;
   readonly packageName?: string;
   readonly binName?: string;
+  readonly backend?: boolean;
   readonly frontend?: FrontendPreset;
   readonly ai?: boolean;
   readonly effect?: boolean;
@@ -49,6 +50,7 @@ export type InitOptions = {
   readonly projectName: ProjectName;
   readonly packageName: PackageName;
   readonly binName: BinName;
+  readonly backend: boolean;
   readonly frontend: FrontendPreset;
   readonly ai: boolean;
   readonly effect: boolean;
@@ -75,6 +77,7 @@ export type TemplateContext = {
   readonly projectName: ProjectName;
   readonly packageName: PackageName;
   readonly binName: BinName;
+  readonly backend: boolean;
   readonly frontend: FrontendPreset;
   readonly ai: boolean;
   readonly effect: boolean;

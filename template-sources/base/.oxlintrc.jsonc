@@ -129,5 +129,5 @@
 		"unicorn/no-useless-iterator-to-array": "warn",
 		"eslint/object-shorthand": "warn"
 	},
-	"ignorePatterns": ["!src/**", "!scripts/**"]
+	"ignorePatterns": ["!src/**", "!scripts/**", "!.codex/hooks/**"]
 }

@@ -25,6 +25,7 @@ export function buildTemplateContext(options: InitOptions): TemplateContext {
     projectName: options.projectName,
     packageName: options.packageName,
     binName: options.binName,
+    backend: options.backend,
     frontend: options.frontend,
     ai: options.ai,
     effect: options.effect,
@@ -45,22 +46,24 @@ async function copyPreset(sourceDir: string, destination: string): Promise<void>
 }
 
 export function templateFilesForContext(context: TemplateContext): TemplateFile[] {
-  const indexTemplate: TemplateFile = context.effect
-    ? ["src/index.effect.ts.tpl", "src/index.ts"]
-    : ["src/index.ts.tpl", "src/index.ts"];
-
-  const indexTestTemplate: TemplateFile = context.effect
-    ? ["src/index.effect.test.ts.tpl", "src/index.test.ts"]
-    : ["src/index.test.ts.tpl", "src/index.test.ts"];
-
   const templateFiles: TemplateFile[] = [
     ["package.json.tpl", "package.json"],
     ["tsconfig.json.tpl", "tsconfig.json"],
+    ["knip.jsonc.tpl", "knip.jsonc"],
     ["lefthook.yml.tpl", "lefthook.yml"],
     ["README.md.tpl", "README.md"],
-    indexTemplate,
-    indexTestTemplate,
   ];
+
+  if (context.backend) {
+    templateFiles.push(
+      context.effect
+        ? ["src/index.effect.ts.tpl", "src/index.ts"]
+        : ["src/index.ts.tpl", "src/index.ts"],
+      context.effect
+        ? ["src/index.effect.test.ts.tpl", "src/index.test.ts"]
+        : ["src/index.test.ts.tpl", "src/index.test.ts"],
+    );
+  }
 
   if (context.ai) {
     templateFiles.push(
@@ -74,11 +77,14 @@ export function templateFilesForContext(context: TemplateContext): TemplateFile[
       ["apps/frontend/package.json.tpl", "apps/frontend/package.json"],
       ["apps/frontend/index.html.tpl", "apps/frontend/index.html"],
       ["apps/frontend/vite.config.ts.tpl", "apps/frontend/vite.config.ts"],
+      ["apps/frontend/playwright.config.ts.tpl", "apps/frontend/playwright.config.ts"],
       ["apps/frontend/src/main.tsx.tpl", "apps/frontend/src/main.tsx"],
       ["apps/frontend/src/routeTree.gen.ts.tpl", "apps/frontend/src/routeTree.gen.ts"],
       ["apps/frontend/src/routes/__root.tsx.tpl", "apps/frontend/src/routes/__root.tsx"],
       ["apps/frontend/src/routes/index.tsx.tpl", "apps/frontend/src/routes/index.tsx"],
       ["apps/frontend/src/routes/-index.test.tsx.tpl", "apps/frontend/src/routes/-index.test.tsx"],
+      ["apps/frontend/src/testing/setup.ts.tpl", "apps/frontend/src/testing/setup.ts"],
+      ["apps/frontend/e2e/home.spec.ts.tpl", "apps/frontend/e2e/home.spec.ts"],
       ["apps/frontend/src/styles.css.tpl", "apps/frontend/src/styles.css"],
     );
 
@@ -205,7 +211,9 @@ export async function generateProjectWithRuntime(
 ): Promise<void> {
   runtime.ensureDestinationIsSafe(options.destination);
   await runtime.mkdir(options.destination, { recursive: true });
-  await runtime.bootstrapBackendNative(options.destination);
+  if (options.backend) {
+    await runtime.bootstrapBackendNative(options.destination);
+  }
   if (options.frontend === "tanstack") {
     await runtime.bootstrapFrontendNative(options.destination);
   }

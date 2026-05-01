@@ -1,9 +1,9 @@
 ---
 paths:
-  - "src/**/*.ts"
+__PROJECT_CONVENTION_PATHS__
 ---
 
-## Backend Conventions
+## __PROJECT_CONVENTION_TITLE__
 
 - Runtime: Bun
 - Keep imports ESM-only

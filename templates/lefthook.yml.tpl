@@ -13,15 +13,15 @@ pre-commit:
     # `glob_matcher: doublestar` makes `**` match zero or more nested directories.
     root-oxc:
       glob:
-        - "src/**/*.ts"
         - "scripts/**/*.ts"
+__BACKEND_LEFTHOOK_GLOB____CODEX_LEFTHOOK_GLOB__
       run: ./node_modules/.bin/oxlint -c .oxlintrc.jsonc --fix --quiet --format=unix {staged_files} && ./node_modules/.bin/oxfmt --write -c .oxfmtrc.jsonc {staged_files}
       stage_fixed: true
 __FRONTEND_LEFTHOOK_COMMAND__
     typecheck:
       glob:
-        - "src/**/*.ts"
         - "scripts/**/*.ts"
+__BACKEND_LEFTHOOK_GLOB____CODEX_LEFTHOOK_GLOB__
 __FRONTEND_TYPECHECK_GLOB__      run: bun scripts/validation/typecheck-staged.ts
     gitleaks:
       run: gitleaks protect --staged --no-banner

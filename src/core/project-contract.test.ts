@@ -10,18 +10,20 @@ import { toBinName, toPackageName, toProjectName } from "./naming.ts";
 
 type Scenario = {
   readonly name: string;
+  readonly backend: boolean;
   readonly frontend: "none" | "tanstack";
   readonly ai: boolean;
   readonly effect: boolean;
 };
 
 const scenarios: readonly Scenario[] = [
-  { name: "none-plain", frontend: "none", ai: false, effect: false },
-  { name: "none-ai", frontend: "none", ai: true, effect: false },
-  { name: "none-effect", frontend: "none", ai: false, effect: true },
-  { name: "none-ai-effect", frontend: "none", ai: true, effect: true },
-  { name: "tanstack-plain", frontend: "tanstack", ai: false, effect: false },
-  { name: "tanstack-ai", frontend: "tanstack", ai: true, effect: false },
+  { name: "none-plain", backend: true, frontend: "none", ai: false, effect: false },
+  { name: "none-ai", backend: true, frontend: "none", ai: true, effect: false },
+  { name: "none-effect", backend: true, frontend: "none", ai: false, effect: true },
+  { name: "none-ai-effect", backend: true, frontend: "none", ai: true, effect: true },
+  { name: "tanstack-plain", backend: true, frontend: "tanstack", ai: false, effect: false },
+  { name: "tanstack-ai", backend: true, frontend: "tanstack", ai: true, effect: false },
+  { name: "tanstack-ai-frontend", backend: false, frontend: "tanstack", ai: true, effect: false },
 ];
 
 const tempDirs: string[] = [];
@@ -72,6 +74,7 @@ function makeOptions(destination: string, scenario: Scenario): InitOptions {
     projectName: toProjectName(`forge-${scenario.name}`),
     packageName: toPackageName(`forge-${scenario.name}`),
     binName: toBinName(`forge-${scenario.name}`),
+    backend: scenario.backend,
     frontend: scenario.frontend,
     ai: scenario.ai,
     effect: scenario.effect,
@@ -114,38 +117,54 @@ for (const scenario of scenarios) {
     const dependencies = objectField(packageJson, "dependencies");
     const devDependencies = objectField(packageJson, "devDependencies");
     const readme = await Bun.file(join(destination, "README.md")).text();
-    const backendEntry = await Bun.file(join(destination, "src/index.ts")).text();
     const lefthook = await Bun.file(join(destination, "lefthook.yml")).text();
 
     expect(readme).toContain(`# forge-${scenario.name}`);
     expect(readme).not.toContain("NATIVE BACKEND README");
     expect(readme).toContain("Hooks and validation");
     expect(readme).toContain("glob_matcher: doublestar");
-    expect(backendEntry).toContain(`export const projectName = "forge-${scenario.name}"`);
-    if (scenario.effect) {
-      expect(backendEntry).toContain("Context.Tag");
-      expect(backendEntry).toContain("BunRuntime.runMain");
-      expect(backendEntry).toContain("Effect.gen");
-    } else {
-      expect(backendEntry).toContain("export function createGreeting");
-      expect(backendEntry).toContain("console.log(createGreeting())");
-    }
     expectExists(destination, "bunfig.toml");
     expectExists(destination, "scripts/validation/validate.ts");
+    expectExists(destination, "knip.jsonc");
     expectExists(destination, "scripts/quality/check-links-local.ts");
     expect(lefthook).toContain("glob_matcher: doublestar");
     expect(lefthook).toContain("Keep these globs aligned with the repo surfaces they protect.");
     expect(lefthook).not.toContain('glob: "src/**/*.ts,scripts/**/*.ts"');
-    expect(lefthook).toContain('glob:\n        - "src/**/*.ts"');
 
     expect(packageJson["name"]).toBe(`forge-${scenario.name}`);
-    expect(packageScripts["test"]).toBe("bun test ./src");
     expect(packageScripts["check:links"]).toBe("bun scripts/quality/check-links-local.ts");
     expectMissing(destination, "index.ts");
     expectMissing(destination, "bun.lock");
     expectMissing(destination, "node_modules");
 
     const tsconfig = await Bun.file(join(destination, "tsconfig.json")).text();
+    if (scenario.backend) {
+      const backendEntry = await Bun.file(join(destination, "src/index.ts")).text();
+      expect(packageJson["bin"]).toBeDefined();
+      expect(packageScripts["test"]).toBe(
+        scenario.ai ? "bun test ./src && bun run test:hooks" : "bun test ./src",
+      );
+      expect(lefthook).toContain('- "src/**/*.ts"');
+      expect(backendEntry).toContain(`export const projectName = "forge-${scenario.name}"`);
+      if (scenario.effect) {
+        expect(backendEntry).toContain("Context.Tag");
+        expect(backendEntry).toContain("BunRuntime.runMain");
+        expect(backendEntry).toContain("Effect.gen");
+      } else {
+        expect(backendEntry).toContain("export function createGreeting");
+        expect(backendEntry).toContain("console.log(createGreeting())");
+      }
+    } else {
+      expect(packageJson["bin"]).toBeUndefined();
+      expect(packageScripts["dev"]).toBe("bun run dev:frontend");
+      expect(packageScripts["test"]).toBe("bun run test:unit && bun run test:hooks");
+      expect(packageScripts["test:unit"]).toBe("cd apps/frontend && bun run test");
+      expectMissing(destination, "src/index.ts");
+      expectMissing(destination, "src/index.test.ts");
+      expect(lefthook).not.toContain('- "src/**/*.ts"');
+      expect(tsconfig).not.toContain('"src/**/*.ts"');
+    }
+
     if (scenario.effect) {
       expect(dependencies["effect"]).toBeDefined();
       expect(dependencies["@effect/cli"]).toBeDefined();
@@ -169,10 +188,19 @@ for (const scenario of scenarios) {
       expect(claude).toContain("Opinionated Bun project bootstrapped");
       expectExists(destination, ".claude/rules/project-conventions.md");
       expectExists(destination, "AGENTS.md");
-      expectExists(destination, "src/AGENTS.md");
+      if (scenario.backend) {
+        expectExists(destination, "src/AGENTS.md");
+      } else {
+        expectMissing(destination, "src/AGENTS.md");
+      }
       expectExists(destination, ".agents/agents-md-manifest.json");
       expectExists(destination, ".mcp.json");
       expectExists(destination, ".codex/config.toml");
+      expectExists(destination, ".codex/hooks/guard-edit-paths.ts");
+      expectExists(destination, ".codex/hooks/post-edit-quality.ts");
+      expectExists(destination, ".codex/hooks/stop-validate.ts");
+      expectExists(destination, ".codex/hooks/lib.ts");
+      expectExists(destination, ".codex/hooks/lib.test.ts");
       expectExists(destination, "scripts/validation/format-and-lint.ts");
       expectExists(destination, "scripts/validation/validate-on-stop.ts");
       expect(projectConventions).toContain("Keep `lefthook.yml` globs aligned");
@@ -194,19 +222,26 @@ for (const scenario of scenarios) {
     if (scenario.frontend === "tanstack") {
       const frontendPackage = await readJsonObject(join(destination, "apps/frontend/package.json"));
       const frontendScripts = objectField(frontendPackage, "scripts");
+      const frontendDevDependencies = objectField(frontendPackage, "devDependencies");
       const frontendRoute = await Bun.file(
         join(destination, "apps/frontend/src/routes/index.tsx"),
       ).text();
 
       expect(packageJson["workspaces"]).toEqual(["apps/*"]);
       expect(packageScripts["validate:frontend"]).toContain("bun run --silent test");
+      expect(packageScripts["validate:frontend"]).toContain("bun run --silent test:e2e");
       expect(frontendScripts["test"]).toBe("vitest run --environment jsdom");
+      expect(frontendDevDependencies["@playwright/test"]).toBeDefined();
+      expect(frontendDevDependencies["@testing-library/jest-dom"]).toBeDefined();
       expect(frontendRoute).toContain(`forge-${scenario.name}`);
       expect(frontendRoute).not.toContain("native-index");
       expect(lefthook).toContain("frontend-oxc:");
       expect(lefthook).toContain('- "apps/frontend/**/*.{ts,tsx}"');
       expectExists(destination, "apps/frontend/src/routes/-index.test.tsx");
       expectExists(destination, "apps/frontend/src/routeTree.gen.ts");
+      expectExists(destination, "apps/frontend/src/testing/setup.ts");
+      expectExists(destination, "apps/frontend/playwright.config.ts");
+      expectExists(destination, "apps/frontend/e2e/home.spec.ts");
       expectMissing(destination, "apps/frontend/.cta.json");
       expectMissing(destination, "apps/frontend/.vscode");
       expectMissing(destination, "apps/frontend/README.md");

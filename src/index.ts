@@ -86,6 +86,14 @@ export function formatCliError(error: unknown): string {
       return `Invalid frontend preset: expected none or tanstack, got "${value}".`;
     }
 
+    if (error.message === "Backend cannot be disabled without a frontend preset") {
+      return "Invalid project shape: --backend false requires --frontend tanstack.";
+    }
+
+    if (error.message === "Effect starter requires the backend preset") {
+      return "Invalid project shape: --effect true requires --backend true.";
+    }
+
     if (error.message.startsWith("Destination is not empty: ")) {
       const destination = error.message.slice("Destination is not empty: ".length);
       return `Refusing to scaffold into a non-empty directory: ${destination}`;
@@ -115,6 +123,7 @@ export function buildProgram(runtime: CliRuntime = defaultCliRuntime): Command {
     })
     .argument("[destination]")
     .option("--name <projectName>", "override the generated project name")
+    .option("--backend <enabled>", "generate a Bun backend starter: true | false")
     .option("--frontend <preset>", "frontend preset: none | tanstack")
     .option("--ai <enabled>", "install Claude/AGENTS tooling: true | false")
     .option("--effect <enabled>", "install Effect runtime and tooling: true | false")
@@ -130,6 +139,9 @@ export function buildProgram(runtime: CliRuntime = defaultCliRuntime): Command {
           yes: flags["yes"] === true,
           ...(destination !== undefined ? { destination } : {}),
           ...(typeof flags["name"] === "string" ? { projectName: flags["name"] } : {}),
+          ...(typeof flags["backend"] === "string"
+            ? { backend: parseBoolean(flags["backend"]) }
+            : {}),
           ...(typeof flags["frontend"] === "string"
             ? { frontend: parseFrontendPreset(flags["frontend"]) }
             : {}),

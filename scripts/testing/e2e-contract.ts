@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import type { ScaffoldScenario, ScenarioConfig } from "./scenarios.ts";
+import type { ScaffoldScenario } from "./scenarios.ts";
 import { existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -14,6 +14,7 @@ const DEFAULT_E2E_CONTRACT_SCENARIOS = [
   "none-ai",
   "none-effect",
   "tanstack-ai",
+  "tanstack-ai-frontend",
   "tanstack-ai-effect",
 ] as const satisfies readonly E2eContractScenario[];
 
@@ -76,7 +77,12 @@ async function expectFileNotContains(
 
 async function assertGeneratedProject(
   root: string,
-  config: ScenarioConfig,
+  config: {
+    readonly backend: boolean;
+    readonly frontend: "none" | "tanstack";
+    readonly ai: boolean;
+    readonly effect: boolean;
+  },
   projectName: string,
 ): Promise<void> {
   const packageJson = await readJsonObject(join(root, "package.json"));
@@ -85,13 +91,11 @@ async function assertGeneratedProject(
 
   expectExists(root, "package.json");
   expectExists(root, "README.md");
-  expectExists(root, "src/index.ts");
-  expectExists(root, "src/index.test.ts");
   expectExists(root, "bunfig.toml");
   expectExists(root, "scripts/validation/validate.ts");
+  expectExists(root, "knip.jsonc");
 
   await expectFileContains(root, "README.md", `# ${projectName}`);
-  await expectFileContains(root, "src/index.ts", `export const projectName = "${projectName}"`);
   await expectFileContains(root, "README.md", "Hooks and validation");
   await expectFileContains(root, "README.md", "glob_matcher: doublestar");
   await expectFileContains(root, "lefthook.yml", "glob_matcher: doublestar");
@@ -109,22 +113,51 @@ async function assertGeneratedProject(
       `Expected root package name ${projectName}, got ${String(packageJson["name"])}`,
     );
   }
-  if (packageScripts["test"] !== "bun test ./src") {
-    throw new Error("Expected root test script to be `bun test ./src`");
-  }
-
   expectMissing(root, "index.ts");
   expectMissing(root, "bun.lock");
   expectMissing(root, "node_modules");
+
+  if (config.backend) {
+    expectExists(root, "src/index.ts");
+    expectExists(root, "src/index.test.ts");
+    await expectFileContains(root, "src/index.ts", `export const projectName = "${projectName}"`);
+    const expectedTestScript = config.ai
+      ? "bun test ./src && bun run test:hooks"
+      : "bun test ./src";
+    if (packageScripts["test"] !== expectedTestScript) {
+      throw new Error(`Expected root test script to be ${JSON.stringify(expectedTestScript)}`);
+    }
+  } else {
+    expectMissing(root, "src/index.ts");
+    expectMissing(root, "src/index.test.ts");
+    if (packageJson["bin"] !== undefined) {
+      throw new Error("Did not expect a root bin for frontend-only scenario");
+    }
+    if (packageScripts["dev"] !== "bun run dev:frontend") {
+      throw new Error("Expected frontend-only dev script to delegate to the frontend workspace");
+    }
+    if (packageScripts["test"] !== "bun run test:unit && bun run test:hooks") {
+      throw new Error("Expected frontend-only test script to run frontend unit tests and hooks");
+    }
+  }
 
   if (config.ai) {
     expectExists(root, "CLAUDE.md");
     expectExists(root, ".claude/rules/project-conventions.md");
     expectExists(root, "AGENTS.md");
-    expectExists(root, "src/AGENTS.md");
+    if (config.backend) {
+      expectExists(root, "src/AGENTS.md");
+    } else {
+      expectMissing(root, "src/AGENTS.md");
+    }
     expectExists(root, ".agents/agents-md-manifest.json");
     expectExists(root, ".mcp.json");
     expectExists(root, ".codex/config.toml");
+    expectExists(root, ".codex/hooks/guard-edit-paths.ts");
+    expectExists(root, ".codex/hooks/post-edit-quality.ts");
+    expectExists(root, ".codex/hooks/stop-validate.ts");
+    expectExists(root, ".codex/hooks/lib.ts");
+    expectExists(root, ".codex/hooks/lib.test.ts");
     expectExists(root, "scripts/validation/format-and-lint.ts");
     expectExists(root, "scripts/validation/validate-on-stop.ts");
     await expectFileContains(root, "CLAUDE.md", "Opinionated Bun project bootstrapped");
@@ -166,15 +199,19 @@ async function assertGeneratedProject(
     await expectFileContains(root, "package.json", '"effect:diagnose"');
     await expectFileContains(root, "package.json", '"effect:quickfixes"');
     await expectFileContains(root, "tsconfig.json", "@effect/language-service");
-    await expectFileContains(root, "src/index.ts", "BunRuntime");
-    await expectFileContains(root, "src/index.ts", "Effect.gen");
-    await expectFileContains(root, "src/index.ts", "Context.Tag");
+    if (config.backend) {
+      await expectFileContains(root, "src/index.ts", "BunRuntime");
+      await expectFileContains(root, "src/index.ts", "Effect.gen");
+      await expectFileContains(root, "src/index.ts", "Context.Tag");
+    }
   } else {
     await expectFileNotContains(root, "package.json", '"effect"');
     await expectFileNotContains(root, "package.json", '"@effect/language-service"');
     await expectFileNotContains(root, "package.json", '"effect:diagnose"');
     await expectFileNotContains(root, "tsconfig.json", "plugins");
-    await expectFileContains(root, "src/index.ts", "createGreeting");
+    if (config.backend) {
+      await expectFileContains(root, "src/index.ts", "createGreeting");
+    }
   }
 
   if (config.frontend === "tanstack") {
@@ -185,6 +222,9 @@ async function assertGeneratedProject(
     expectExists(root, "apps/frontend/src/routes/index.tsx");
     expectExists(root, "apps/frontend/src/routes/-index.test.tsx");
     expectExists(root, "apps/frontend/src/routeTree.gen.ts");
+    expectExists(root, "apps/frontend/src/testing/setup.ts");
+    expectExists(root, "apps/frontend/playwright.config.ts");
+    expectExists(root, "apps/frontend/e2e/home.spec.ts");
 
     await expectFileContains(root, "apps/frontend/src/routes/index.tsx", projectName);
     await expectFileContains(root, "apps/frontend/src/routes/index.tsx", "normalized by bun-forge");
@@ -205,6 +245,9 @@ async function assertGeneratedProject(
     }
     if (typeof packageScripts["validate:frontend"] !== "string") {
       throw new TypeError("Expected validate:frontend script for TanStack scenario");
+    }
+    if (!packageScripts["validate:frontend"].includes("test:e2e")) {
+      throw new Error("Expected validate:frontend to include Playwright e2e");
     }
     if (frontendScripts["test"] !== "vitest run --environment jsdom") {
       throw new Error("Expected frontend test script to use Vitest + jsdom");
@@ -230,6 +273,7 @@ async function assertGeneratedProject(
 }
 
 export async function e2eContract(
+  backend: boolean,
   frontend: "none" | "tanstack",
   ai: boolean,
   effect: boolean,
@@ -248,6 +292,8 @@ export async function e2eContract(
         "--yes",
         "--name",
         projectName,
+        "--backend",
+        String(backend),
         "--frontend",
         frontend,
         "--ai",
@@ -262,7 +308,7 @@ export async function e2eContract(
       process.cwd(),
     );
 
-    await assertGeneratedProject(dir, { frontend, ai, effect }, projectName);
+    await assertGeneratedProject(dir, { backend, frontend, ai, effect }, projectName);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -271,6 +317,6 @@ export async function e2eContract(
 if (import.meta.main) {
   for (const scenario of e2eContractScenariosFromArgv(process.argv)) {
     const config = SCAFFOLD_SCENARIO_CONFIG[scenario];
-    await e2eContract(config.frontend, config.ai, config.effect, scenario);
+    await e2eContract(config.backend, config.frontend, config.ai, config.effect, scenario);
   }
 }

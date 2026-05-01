@@ -21,5 +21,5 @@
     "allowUnreachableCode": false,
     "allowUnusedLabels": false__EFFECT_TSCONFIG_PLUGINS__
   },
-  "include": ["src/**/*.ts", "scripts/**/*.ts"]
+  "include": [__TSCONFIG_INCLUDE__]
 }

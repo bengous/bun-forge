@@ -10,6 +10,7 @@ describe("smokeScenariosFromArgv", () => {
       "none-ai-effect",
       "tanstack-plain",
       "tanstack-ai",
+      "tanstack-ai-frontend",
       "tanstack-effect",
       "tanstack-ai-effect",
     ]);
