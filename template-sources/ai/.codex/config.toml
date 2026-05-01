@@ -2,6 +2,15 @@
 codex_hooks = true
 
 [[hooks.PreToolUse]]
+matcher = "^Bash$"
+
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = 'bun "$(git rev-parse --show-toplevel)/.codex/hooks/guard-destructive.ts"'
+timeout = 10
+statusMessage = "Checking destructive commands"
+
+[[hooks.PreToolUse]]
 matcher = "^(apply_patch|Edit|Write)$"
 
 [[hooks.PreToolUse.hooks]]

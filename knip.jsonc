@@ -21,6 +21,8 @@
     "template-sources/base/scripts/validation/validate-push.ts",
     "template-sources/base/scripts/validation/validate.ts",
     "template-sources/frontend-tanstack/apps/frontend/.dependency-cruiser.cjs",
+    "template-sources/ai/.codex/hooks/guard-destructive.ts",
+    "template-sources/ai/.codex/hooks/guard-destructive.test.ts",
     "template-sources/ai/.codex/hooks/guard-edit-paths.ts",
     "template-sources/ai/.codex/hooks/lib.ts",
     "template-sources/ai/.codex/hooks/lib.test.ts",

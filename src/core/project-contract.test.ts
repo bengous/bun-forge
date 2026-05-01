@@ -196,6 +196,9 @@ for (const scenario of scenarios) {
       expectExists(destination, ".agents/agents-md-manifest.json");
       expectExists(destination, ".mcp.json");
       expectExists(destination, ".codex/config.toml");
+      expectMissing(destination, ".codex/hooks.json");
+      expectExists(destination, ".codex/hooks/guard-destructive.ts");
+      expectExists(destination, ".codex/hooks/guard-destructive.test.ts");
       expectExists(destination, ".codex/hooks/guard-edit-paths.ts");
       expectExists(destination, ".codex/hooks/post-edit-quality.ts");
       expectExists(destination, ".codex/hooks/stop-validate.ts");
@@ -203,6 +206,17 @@ for (const scenario of scenarios) {
       expectExists(destination, ".codex/hooks/lib.test.ts");
       expectExists(destination, "scripts/validation/format-and-lint.ts");
       expectExists(destination, "scripts/validation/validate-on-stop.ts");
+      const codexConfig = await Bun.file(join(destination, ".codex/config.toml")).text();
+      const claudeSettings = await Bun.file(join(destination, ".claude/settings.json")).text();
+      const dependencyCruiser = await Bun.file(join(destination, ".dependency-cruiser.cjs")).text();
+      expect(codexConfig).toContain("git rev-parse --show-toplevel");
+      expect(codexConfig).toContain(".codex/hooks/guard-destructive.ts");
+      expect(codexConfig).not.toContain("CLAUDE_PROJECT_DIR");
+      expect(codexConfig).not.toContain("hooks.json");
+      expect(claudeSettings).toContain("$CLAUDE_PROJECT_DIR");
+      expect(claudeSettings).not.toContain(".codex/");
+      expect(dependencyCruiser).toContain("^\\\\.codex/hooks/guard-destructive\\\\.ts$");
+      expect(dependencyCruiser).not.toContain('"^\\\\.codex/hooks/",');
       expect(projectConventions).toContain("Keep `lefthook.yml` globs aligned");
       expect(projectConventions).toContain(
         "If the repo layout changes, update Lefthook and validation scripts in the same change",

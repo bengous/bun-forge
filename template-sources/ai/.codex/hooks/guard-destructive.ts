@@ -22,47 +22,53 @@ export const BLOCKED_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
 ];
 
 export function stripStringLiterals(cmd: string): string {
-  let stripped = cmd.replace(/<<-?\s*'?(\w+)'?.*?\n[\s\S]*?\n\s*\1/g, "");
-  stripped = stripped.replace(/"(?:[^"\\]|\\.)*"/g, '""');
-  stripped = stripped.replace(/'[^']*'/g, "''");
+  let stripped = cmd.replaceAll(/<<-?\s*'?(\w+)'?.*?\n[\s\S]*?\n\s*\1/g, "");
+  stripped = stripped.replaceAll(/"(?:[^"\\]|\\.)*"/g, '""');
+  stripped = stripped.replaceAll(/'[^']*'/g, "''");
   return stripped;
 }
 
-// Best-effort tokeniser for the simple `rm …` shape. We ignore heredocs
-// (already stripped), quoted strings (already blanked to ""/''), and
-// variable expansion (out of scope — documented non-goal).
 function tokenise(cmd: string): string[] {
   return cmd.trim().split(/\s+/).filter(Boolean);
 }
 
-// Detect dangerous `rm` invocations regardless of flag order or bundling.
-// Matches: -rf, -fr, -Rf, -fR, -Rvf, -r -f, --recursive --force, …
-// Also matches recursive deletion targeting `/` even without -f.
 export function checkRm(tokens: readonly string[]): string | null {
-  if (tokens[0] !== "rm") return null;
+  if (tokens[0] !== "rm") {
+    return null;
+  }
 
   let shortLetters = "";
   const longFlags = new Set<string>();
   const positional: string[] = [];
-  for (const t of tokens.slice(1)) {
-    if (t.startsWith("--")) longFlags.add(t);
-    else if (/^-[a-zA-Z]+$/.test(t)) shortLetters += t.slice(1);
-    else positional.push(t);
+  for (const token of tokens.slice(1)) {
+    if (token.startsWith("--")) {
+      longFlags.add(token);
+    } else if (/^-[a-zA-Z]+$/.test(token)) {
+      shortLetters += token.slice(1);
+    } else {
+      positional.push(token);
+    }
   }
 
   const recursive = /[rR]/.test(shortLetters) || longFlags.has("--recursive");
   const force = shortLetters.includes("f") || longFlags.has("--force");
-  const absoluteTarget = positional.some((p) => p.startsWith("/"));
+  const absoluteTarget = positional.some((value) => value.startsWith("/"));
 
-  if (recursive && force) return "rm recursive + force";
-  if (recursive && absoluteTarget) return "rm recursive on absolute path";
+  if (recursive && force) {
+    return "rm recursive + force";
+  }
+  if (recursive && absoluteTarget) {
+    return "rm recursive on absolute path";
+  }
   return null;
 }
 
 export function checkCommand(cmd: string): string | null {
   const sanitized = stripStringLiterals(cmd);
   const rmMatch = checkRm(tokenise(sanitized));
-  if (rmMatch) return rmMatch;
+  if (rmMatch !== null) {
+    return rmMatch;
+  }
   for (const [pattern, label] of BLOCKED_PATTERNS) {
     if (pattern.test(sanitized)) {
       return label;
@@ -96,17 +102,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 if (import.meta.main) {
   const input = await Bun.stdin.text();
-  const cmd = parseHookInput(input);
-  if (!cmd) process.exit(0);
+  const command = parseHookInput(input);
+  if (command === null) {
+    process.exit(0);
+  }
 
-  const match = checkCommand(cmd);
-  if (match) {
+  const match = checkCommand(command);
+  if (match !== null) {
     console.log(
       JSON.stringify({
         hookSpecificOutput: {
           hookEventName: "PreToolUse",
           permissionDecision: "deny",
-          permissionDecisionReason: `Destructive command blocked: ${match}\nCommand: ${cmd}`,
+          permissionDecisionReason: `Destructive command blocked: ${match}\nCommand: ${command}`,
         },
       }),
     );

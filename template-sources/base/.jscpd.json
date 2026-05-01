@@ -6,8 +6,8 @@
     "**/*.e2e.test.ts",
     "**/AGENTS.md",
     "**/skills/**",
-    ".agents/**",
-    ".claude/**"
+    "**/.agents/**",
+    "**/.claude/**"
   ],
   "minLines": 20,
   "minTokens": 100,

@@ -153,6 +153,9 @@ async function assertGeneratedProject(
     expectExists(root, ".agents/agents-md-manifest.json");
     expectExists(root, ".mcp.json");
     expectExists(root, ".codex/config.toml");
+    expectMissing(root, ".codex/hooks.json");
+    expectExists(root, ".codex/hooks/guard-destructive.ts");
+    expectExists(root, ".codex/hooks/guard-destructive.test.ts");
     expectExists(root, ".codex/hooks/guard-edit-paths.ts");
     expectExists(root, ".codex/hooks/post-edit-quality.ts");
     expectExists(root, ".codex/hooks/stop-validate.ts");
@@ -171,6 +174,18 @@ async function assertGeneratedProject(
       ".claude/rules/project-conventions.md",
       "If the repo layout changes, update Lefthook and validation scripts in the same change",
     );
+    await expectFileContains(root, ".codex/config.toml", "git rev-parse --show-toplevel");
+    await expectFileContains(root, ".codex/config.toml", ".codex/hooks/guard-destructive.ts");
+    await expectFileNotContains(root, ".codex/config.toml", "CLAUDE_PROJECT_DIR");
+    await expectFileNotContains(root, ".codex/config.toml", "hooks.json");
+    await expectFileContains(root, ".claude/settings.json", "$CLAUDE_PROJECT_DIR");
+    await expectFileNotContains(root, ".claude/settings.json", ".codex/");
+    await expectFileContains(
+      root,
+      ".dependency-cruiser.cjs",
+      "^\\\\.codex/hooks/guard-destructive\\\\.ts$",
+    );
+    await expectFileNotContains(root, ".dependency-cruiser.cjs", '"^\\\\.codex/hooks/",');
 
     if (typeof packageScripts["agents:sync"] !== "string") {
       throw new TypeError("Expected agents:sync script for AI scenario");

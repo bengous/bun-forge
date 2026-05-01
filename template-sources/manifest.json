@@ -39,6 +39,8 @@
     "copied": [
       ".mcp.json",
       ".codex/config.toml",
+      ".codex/hooks/guard-destructive.ts",
+      ".codex/hooks/guard-destructive.test.ts",
       ".codex/hooks/guard-edit-paths.ts",
       ".codex/hooks/lib.ts",
       ".codex/hooks/lib.test.ts",
