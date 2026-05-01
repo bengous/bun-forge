@@ -1,7 +1,13 @@
 import type { FrontendPreset, InitOptions, TemplateContext } from "../types.ts";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { isJsonObject, parseJsonObject } from "./json.ts";
+import { TEMPLATE_SOURCES_DIR } from "./paths.ts";
 import { PRESETS } from "./presets.ts";
 
-export type PresetName = "base" | "frontend-tanstack" | "ai" | "effect";
+const PRESET_NAMES = ["base", "frontend-tanstack", "ai", "effect"] as const;
+
+export type PresetName = (typeof PRESET_NAMES)[number];
 
 export type ProjectShapeInput = {
   readonly backend: boolean;
@@ -67,57 +73,6 @@ const FRONTEND_CLEANUP_PATHS = [
   "apps/frontend/src/router.tsx",
   "apps/frontend/src/routes/about.tsx",
 ] as const;
-
-const PRESET_COPY_PATHS: Record<PresetName, readonly string[]> = {
-  base: [
-    "bunfig.toml",
-    ".editorconfig",
-    ".gitattributes",
-    ".gitleaks.toml",
-    ".lycheeignore",
-    ".oxlintrc.jsonc",
-    ".oxfmtrc.jsonc",
-    ".dependency-cruiser.cjs",
-    ".jscpd.json",
-    "mise.toml",
-    "scripts/validation/detect-scope.ts",
-    "scripts/validation/resolve-bin.ts",
-    "scripts/validation/typecheck-staged.ts",
-    "scripts/validation/validate-push.ts",
-    "scripts/validation/validate.ts",
-    "scripts/setup/bootstrap-git-config.ts",
-    "scripts/setup/bootstrap-prepare.ts",
-    "scripts/quality/audit-oxlint-rules.ts",
-    "scripts/quality/check-links-local.ts",
-  ],
-  "frontend-tanstack": [
-    "apps/frontend/.oxlintrc.jsonc",
-    "apps/frontend/.oxfmtrc.jsonc",
-    "apps/frontend/.dependency-cruiser.cjs",
-    "apps/frontend/.stylelintrc.json",
-    "apps/frontend/tsconfig.json",
-    "apps/frontend/tsconfig.app.json",
-    "apps/frontend/tsconfig.node.json",
-  ],
-  ai: [
-    ".mcp.json",
-    ".codex/config.toml",
-    ".codex/hooks/guard-destructive.ts",
-    ".codex/hooks/guard-destructive.test.ts",
-    ".codex/hooks/guard-edit-paths.ts",
-    ".codex/hooks/lib.ts",
-    ".codex/hooks/lib.test.ts",
-    ".codex/hooks/post-edit-quality.ts",
-    ".codex/hooks/stop-validate.ts",
-    ".claude/settings.json",
-    ".claude/hooks/guard-destructive.ts",
-    ".claude/hooks/guard-destructive.test.ts",
-    "scripts/validation/format-and-lint.ts",
-    "scripts/validation/validate-on-stop.ts",
-    "scripts/agents/sync-agents-md.ts",
-  ],
-  effect: [".gitkeep"],
-};
 
 const BASE_TEMPLATE_RENDER_SPECS: readonly TemplateRenderSpec[] = [
   { templateName: "package.json.tpl", relativePath: "package.json" },
@@ -199,6 +154,59 @@ const FRONTEND_AI_TEMPLATE_RENDER_SPECS: readonly TemplateRenderSpec[] = [
   },
 ];
 
+type PresetCopyManifest = Record<PresetName, readonly string[]>;
+
+function isPresetName(value: string): value is PresetName {
+  return PRESET_NAMES.some((presetName) => presetName === value);
+}
+
+function readManifestCopiedPaths(
+  manifest: Record<string, unknown>,
+  label: string,
+  presetName: PresetName,
+): readonly string[] {
+  const entry = manifest[presetName];
+  if (!isJsonObject(entry)) {
+    throw new TypeError(`${label} must define object entry "${presetName}"`);
+  }
+
+  const copied = entry["copied"];
+  if (!Array.isArray(copied)) {
+    throw new TypeError(`${label} entry "${presetName}.copied" must be a string array`);
+  }
+
+  const paths: string[] = [];
+  for (const [index, path] of copied.entries()) {
+    if (typeof path !== "string") {
+      throw new TypeError(`${label} entry "${presetName}.copied[${index}]" must be a string`);
+    }
+    paths.push(path);
+  }
+  return paths;
+}
+
+export function parsePresetCopyManifest(raw: string, label: string): PresetCopyManifest {
+  const manifest = parseJsonObject(raw, label);
+
+  for (const key of Object.keys(manifest)) {
+    if (!isPresetName(key)) {
+      throw new TypeError(`${label} contains unknown preset "${key}"`);
+    }
+  }
+
+  return {
+    base: readManifestCopiedPaths(manifest, label, "base"),
+    "frontend-tanstack": readManifestCopiedPaths(manifest, label, "frontend-tanstack"),
+    ai: readManifestCopiedPaths(manifest, label, "ai"),
+    effect: readManifestCopiedPaths(manifest, label, "effect"),
+  };
+}
+
+const PRESET_COPY_MANIFEST = parsePresetCopyManifest(
+  readFileSync(join(TEMPLATE_SOURCES_DIR, "manifest.json"), "utf8"),
+  "template-sources/manifest.json",
+);
+
 function presetSourceDir(name: PresetName): string {
   const preset = PRESETS.find((candidate) => candidate.name === name);
   if (preset === undefined) {
@@ -268,7 +276,7 @@ function presetCopySpecsForShape(shape: ProjectShape): PresetCopySpec[] {
   return presetNamesForShape(shape).map((name) => ({
     name,
     sourceDir: presetSourceDir(name),
-    relativePaths: PRESET_COPY_PATHS[name],
+    relativePaths: PRESET_COPY_MANIFEST[name],
   }));
 }
 

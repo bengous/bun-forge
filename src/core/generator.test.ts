@@ -1,7 +1,11 @@
 import type { InitOptions } from "../types.ts";
 import type { GenerationRuntime } from "./generator.ts";
 import { describe, expect, test } from "bun:test";
-import { describeGeneratedProject, resolveProjectShape } from "./generated-project-contract.ts";
+import {
+  describeGeneratedProject,
+  parsePresetCopyManifest,
+  resolveProjectShape,
+} from "./generated-project-contract.ts";
 import {
   buildTemplateContext,
   cleanupPathsForOptions,
@@ -9,7 +13,6 @@ import {
   generateProjectWithRuntime,
   templateFilesForContext,
 } from "./generator.ts";
-import { objectField, readJsonObject, stringArray } from "./json.ts";
 import { toBinName, toPackageName, toProjectName } from "./naming.ts";
 
 function makeOptions(overrides: Partial<InitOptions> = {}): InitOptions {
@@ -139,16 +142,98 @@ describe("describeGeneratedProject", () => {
     });
   });
 
-  test("keeps copied preset specs aligned with the template source manifest", async () => {
-    const manifest = await readJsonObject("template-sources/manifest.json");
+  test("uses the template source manifest for copied preset specs", () => {
     const description = describeGeneratedProject(
       makeOptions({ frontend: "tanstack", ai: true, effect: true }),
     );
 
-    for (const spec of description.presetCopySpecs) {
-      const manifestEntry = objectField(manifest, spec.name);
-      expect(spec.relativePaths).toEqual(stringArray(manifestEntry["copied"]));
-    }
+    expect(description.presetCopySpecs.map((spec) => [spec.name, spec.relativePaths])).toEqual([
+      [
+        "base",
+        [
+          "bunfig.toml",
+          ".editorconfig",
+          ".gitattributes",
+          ".gitleaks.toml",
+          ".lycheeignore",
+          ".oxlintrc.jsonc",
+          ".oxfmtrc.jsonc",
+          ".dependency-cruiser.cjs",
+          ".jscpd.json",
+          "mise.toml",
+          "scripts/validation/detect-scope.ts",
+          "scripts/validation/resolve-bin.ts",
+          "scripts/validation/typecheck-staged.ts",
+          "scripts/validation/validate-push.ts",
+          "scripts/validation/validate.ts",
+          "scripts/setup/bootstrap-git-config.ts",
+          "scripts/setup/bootstrap-prepare.ts",
+          "scripts/quality/audit-oxlint-rules.ts",
+          "scripts/quality/check-links-local.ts",
+        ],
+      ],
+      [
+        "frontend-tanstack",
+        [
+          "apps/frontend/.oxlintrc.jsonc",
+          "apps/frontend/.oxfmtrc.jsonc",
+          "apps/frontend/.dependency-cruiser.cjs",
+          "apps/frontend/.stylelintrc.json",
+          "apps/frontend/tsconfig.json",
+          "apps/frontend/tsconfig.app.json",
+          "apps/frontend/tsconfig.node.json",
+        ],
+      ],
+      [
+        "ai",
+        [
+          ".mcp.json",
+          ".codex/config.toml",
+          ".codex/hooks/guard-destructive.ts",
+          ".codex/hooks/guard-destructive.test.ts",
+          ".codex/hooks/guard-edit-paths.ts",
+          ".codex/hooks/lib.ts",
+          ".codex/hooks/lib.test.ts",
+          ".codex/hooks/post-edit-quality.ts",
+          ".codex/hooks/stop-validate.ts",
+          ".claude/settings.json",
+          ".claude/hooks/guard-destructive.ts",
+          ".claude/hooks/guard-destructive.test.ts",
+          "scripts/validation/format-and-lint.ts",
+          "scripts/validation/validate-on-stop.ts",
+          "scripts/agents/sync-agents-md.ts",
+        ],
+      ],
+      ["effect", [".gitkeep"]],
+    ]);
+    expect(description.presetCopySpecs.map((spec) => spec.sourceDir.endsWith(spec.name))).toEqual([
+      true,
+      true,
+      true,
+      true,
+    ]);
+  });
+
+  test("rejects invalid template source manifests", () => {
+    const validEntries = {
+      base: { copied: [] },
+      "frontend-tanstack": { copied: [] },
+      ai: { copied: [] },
+      effect: { copied: [] },
+    };
+
+    expect(() =>
+      parsePresetCopyManifest(JSON.stringify({ ...validEntries, extra: { copied: [] } }), "test"),
+    ).toThrow('test contains unknown preset "extra"');
+    expect(() =>
+      parsePresetCopyManifest(JSON.stringify({ ...validEntries, ai: {} }), "test"),
+    ).toThrow('test entry "ai.copied" must be a string array');
+    expect(() =>
+      parsePresetCopyManifest(
+        JSON.stringify({ ...validEntries, effect: { copied: [".gitkeep", false] } }),
+        "test",
+      ),
+    ).toThrow('test entry "effect.copied[1]" must be a string');
   });
 });
 
