@@ -2,93 +2,133 @@
 
 Opinionated Bun project scaffolder.
 
-Configuring TypeScript, linting, formatting, testing, hooks, and architecture validation to work together is tedious. bun-forge handles the wiring. One command sets up a TypeScript project with all of it configured and ready.
+bun-forge starts from native ecosystem bootstraps, then normalizes the result into a Bun/TypeScript project with linting, formatting, tests, git hooks, validation scripts, and optional AI tooling.
 
 ## Quick start
 
-```bash
-bunx bun-forge my-app
-```
-
-Answer a few prompts (project name, frontend, AI tooling). To skip prompts and use defaults:
+Install from npm:
 
 ```bash
-bunx bun-forge my-app --yes
+bunx bun-forge@0.1.0 my-app --yes
 ```
 
-## What you get
+Omit `--yes` to answer prompts:
 
-Every generated project ships with:
+```bash
+bunx bun-forge@0.1.0 my-app
+```
 
-| Category | Tool | Purpose |
-|----------|------|---------|
-| Runtime | Bun | Runtime, package manager, test runner |
-| Language | TypeScript (strict) | Type safety with strict mode enabled |
-| Linting | OXLint | 242 rules across 5 plugins (ESLint, TypeScript, Unicorn, OXC, Import) |
-| Formatting | OXFmt | Fast, opinionated code formatter |
-| Testing | bun:test | Native Bun test runner |
-| Git hooks | Lefthook | Format, lint, and type-check on commit; validate on push |
-| Secrets | gitleaks | Detect leaked credentials before they reach the repo |
-| Architecture | dependency-cruiser | Enforce module boundaries and import rules |
-| Dead code | knip | Find unused exports, dependencies, and files |
-| Duplicates | jscpd | Detect copy-pasted code |
-| Tool versions | mise | Pin and manage tool versions across the team |
+## Project shapes
 
-## Presets
+The default project is a Bun backend with AI tooling, install/bootstrap enabled, and git initialized.
 
-bun-forge combines two independent options into four project shapes:
+| Option | Values | Default | Effect |
+|--------|--------|---------|--------|
+| `--backend` | `true` \| `false` | `true` | Generate a Bun backend starter |
+| `--frontend` | `none` \| `tanstack` | `none` | Add a React 19 + TanStack Router frontend in `apps/frontend/` |
+| `--ai` | `true` \| `false` | `true` | Add Claude/Codex hooks, rules, MCP config, and generated `AGENTS.md` files |
+| `--effect` | `true` \| `false` | `false` | Use an Effect backend starter and Effect tooling |
+| `--install` | `true` \| `false` | `true` | Run `bun install`, project `prepare`, and `mise install` when available |
+| `--git-init` | `true` \| `false` | `true` | Initialize a git repository |
 
-### Frontend
+`--backend false` requires `--frontend tanstack`. `--effect true` requires the backend starter.
 
-| Value | What it adds |
-|-------|-------------|
-| `none` (default) | Backend-only Bun project |
-| `tanstack` | React 19 + TanStack Router with file-based routing, Vite, Vitest, Testing Library, StyleLint. Lives in an `apps/frontend/` workspace |
+Examples:
 
-### AI tooling
+```bash
+bunx bun-forge@0.1.0 api --backend true --frontend none --ai false --yes
+bunx bun-forge@0.1.0 web --frontend tanstack --effect true --yes
+bunx bun-forge@0.1.0 frontend-only --backend false --frontend tanstack --install false --yes
+```
 
-| Value | What it adds |
-|-------|-------------|
-| `true` (default) | CLAUDE.md, .claude/ hooks and rules, MCP server config, Codex config, AGENTS.md |
-| `false` | No AI tooling |
+## Adopt an existing project
+
+`adopt` plans Bun Forge tooling for an existing Bun/TypeScript project. It is dry-run by default.
+
+```bash
+bunx bun-forge@0.1.0 adopt . --yes
+```
+
+Apply the plan:
+
+```bash
+bunx bun-forge@0.1.0 adopt . --apply --yes
+```
+
+Run install/bootstrap after applying:
+
+```bash
+bunx bun-forge@0.1.0 adopt . --apply --install true --yes
+```
+
+Rollback a previous adoption run:
+
+```bash
+bunx bun-forge@0.1.0 adopt . --rollback <runId> --yes
+```
+
+Adoption options:
+
+| Flag | Values | Default | Effect |
+|------|--------|---------|--------|
+| `--name` | string | destination package name | Override project/package naming |
+| `--frontend` | `none` \| `tanstack` | `none` | Include frontend-related Bun Forge files |
+| `--ai` | `true` \| `false` | `true` | Include Claude/Codex/AGENTS tooling |
+| `--effect` | `true` \| `false` | `false` | Include Effect backend files |
+| `--install` | `true` \| `false` | `false` | Run install/bootstrap after apply |
+| `--apply` | flag | off | Write the adoption plan |
+| `--rollback` | run id | unset | Restore files from a previous adoption backup |
+| `--yes` | flag | off | Skip prompts and use defaults |
 
 ## CLI usage
 
+```text
+bun-forge [options] [command] [destination]
 ```
-bun-forge [destination] [options]
+
+Root options:
+
+```text
+--name <projectName>
+--backend <enabled>
+--frontend <preset>
+--ai <enabled>
+--effect <enabled>
+--install <enabled>
+--git-init <enabled>
+--yes
 ```
 
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `--name` | string | derived from destination | Project name |
-| `--frontend` | `none` \| `tanstack` | `none` | Frontend preset |
-| `--ai` | boolean | `true` | Include AI tooling |
-| `--install` | boolean | `true` | Run `bun install`, `bun run prepare`, and `mise install` |
-| `--git-init` | boolean | `true` | Initialize a git repository |
-| `--yes` | flag | — | Skip prompts, use defaults |
+Subcommands:
 
-## Scripts in generated projects
+```text
+adopt [options] [destination]
+```
 
-| Command | What it does |
-|---------|-------------|
+## Generated project scripts
+
+Generated projects include the root scripts needed for local development and validation.
+
+| Command | Purpose |
+|---------|---------|
 | `bun run dev` | Run the project |
 | `bun run test` | Run tests |
 | `bun run lint` | Lint with OXLint |
 | `bun run format` | Format with OXFmt |
-| `bun run autofix` | Lint fix + format in one pass |
+| `bun run autofix` | Lint fix + format |
 | `bun run typecheck` | Type-check with TypeScript |
-| `bun run validate` | Run the full validation suite (lint, format, types, tests, architecture) |
-| `bun run lint:arch` | Check module architecture |
-| `bun run lint:dead` | Find dead code |
+| `bun run validate` | Run the validation suite |
+| `bun run lint:arch` | Check module boundaries |
+| `bun run lint:dead` | Find unused files, exports, and dependencies |
 | `bun run lint:dupes` | Find duplicated code |
 
-Frontend projects add `bun run validate:frontend` and per-scope scripts inside `apps/frontend/`.
+Frontend projects also include frontend-specific validation scripts under `apps/frontend/`.
 
 ## Contributing
 
 ```bash
 bun install
+bun run repo:prepare
 bun run dev -- /tmp/my-app --yes
-bun run typecheck
-bun test
+bun run validate
 ```

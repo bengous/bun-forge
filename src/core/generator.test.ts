@@ -168,6 +168,7 @@ describe("templateFilesForContext", () => {
       ["knip.jsonc.tpl", "knip.jsonc"],
       ["lefthook.yml.tpl", "lefthook.yml"],
       ["README.md.tpl", "README.md"],
+      [".gitignore.tpl", ".gitignore"],
       ["src/index.ts.tpl", "src/index.ts"],
       ["src/index.test.ts.tpl", "src/index.test.ts"],
     ]);
@@ -183,6 +184,7 @@ describe("templateFilesForContext", () => {
       "apps/frontend/playwright.config.ts.tpl",
       "apps/frontend/playwright.config.ts",
     ]);
+    expect(files).toContainEqual(["apps/frontend/.gitignore.tpl", "apps/frontend/.gitignore"]);
   });
 
   test("uses Effect starter templates when effect is enabled", () => {

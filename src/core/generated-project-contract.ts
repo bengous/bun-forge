@@ -73,7 +73,6 @@ const PRESET_COPY_PATHS: Record<PresetName, readonly string[]> = {
     "bunfig.toml",
     ".editorconfig",
     ".gitattributes",
-    ".gitignore",
     ".gitleaks.toml",
     ".lycheeignore",
     ".oxlintrc.jsonc",
@@ -95,7 +94,6 @@ const PRESET_COPY_PATHS: Record<PresetName, readonly string[]> = {
     "apps/frontend/.oxlintrc.jsonc",
     "apps/frontend/.oxfmtrc.jsonc",
     "apps/frontend/.dependency-cruiser.cjs",
-    "apps/frontend/.gitignore",
     "apps/frontend/.stylelintrc.json",
     "apps/frontend/tsconfig.json",
     "apps/frontend/tsconfig.app.json",
@@ -127,6 +125,7 @@ const BASE_TEMPLATE_RENDER_SPECS: readonly TemplateRenderSpec[] = [
   { templateName: "knip.jsonc.tpl", relativePath: "knip.jsonc" },
   { templateName: "lefthook.yml.tpl", relativePath: "lefthook.yml" },
   { templateName: "README.md.tpl", relativePath: "README.md" },
+  { templateName: ".gitignore.tpl", relativePath: ".gitignore" },
 ];
 
 const BACKEND_TEMPLATE_RENDER_SPECS: readonly TemplateRenderSpec[] = [
@@ -149,6 +148,7 @@ const AI_TEMPLATE_RENDER_SPECS: readonly TemplateRenderSpec[] = [
 
 const FRONTEND_TEMPLATE_RENDER_SPECS: readonly TemplateRenderSpec[] = [
   { templateName: "apps/frontend/package.json.tpl", relativePath: "apps/frontend/package.json" },
+  { templateName: "apps/frontend/.gitignore.tpl", relativePath: "apps/frontend/.gitignore" },
   { templateName: "apps/frontend/index.html.tpl", relativePath: "apps/frontend/index.html" },
   {
     templateName: "apps/frontend/vite.config.ts.tpl",

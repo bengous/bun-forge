@@ -1,11 +1,31 @@
 {
   "name": "bun-forge",
   "version": "0.1.0",
+  "description": "Opinionated Bun project scaffolder.",
   "type": "module",
-  "private": true,
+  "private": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bengous/bun-forge.git"
+  },
+  "bugs": {
+    "url": "https://github.com/bengous/bun-forge/issues"
+  },
+  "homepage": "https://github.com/bengous/bun-forge#readme",
   "bin": {
     "bun-forge": "./src/index.ts"
   },
+  "engines": {
+    "bun": ">=1.3.13"
+  },
+  "files": [
+    "src/**/*.ts",
+    "!src/**/*.test.ts",
+    "templates/**/*",
+    "!templates/AGENTS.md",
+    "template-sources/**/*",
+    "!template-sources/AGENTS.md"
+  ],
   "scripts": {
     "dev": "bun run src/index.ts",
     "lint": "oxlint -c .oxlintrc.jsonc --format=unix src/ scripts/ .codex/hooks/ .claude/hooks/",
@@ -27,7 +47,7 @@
     "lint:audit": "bun scripts/quality/audit-oxlint-rules.ts",
     "check:links": "bun scripts/quality/check-links-local.ts",
     "repo:bootstrap": "bun scripts/setup/bootstrap-git-config.ts",
-    "prepare": "bun scripts/setup/bootstrap-prepare.ts",
+    "repo:prepare": "bun scripts/setup/bootstrap-prepare.ts",
     "validate": "bun scripts/validation/validate.ts",
     "validate:scale": "bun run --silent validate && bun run --silent lint:dead && bun run --silent lint:dupes && bun run --silent check:links && bun run --silent test:e2e-contract && bun run --silent test:smoke"
   },
