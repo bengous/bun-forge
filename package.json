@@ -42,6 +42,8 @@
     "test:smoke": "bun scripts/testing/smoke.ts",
     "test:e2e-contract": "bun scripts/testing/e2e-contract.ts",
     "test:adopt-vex": "bun scripts/testing/adopt-vex.ts",
+    "guard-destructive:sync": "bun scripts/sync/sync-guard-destructive.ts --write",
+    "guard-destructive:check": "bun scripts/sync/sync-guard-destructive.ts --check",
     "agents:sync": "bun scripts/agents/sync-agents-md.ts --write",
     "agents:check": "bun scripts/agents/sync-agents-md.ts --check",
     "lint:audit": "bun scripts/quality/audit-oxlint-rules.ts",

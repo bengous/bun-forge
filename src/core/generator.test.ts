@@ -189,6 +189,8 @@ describe("describeGeneratedProject", () => {
         [
           ".mcp.json",
           ".codex/config.toml",
+          ".codex/hooks/guard-destructive-core.ts",
+          ".codex/hooks/guard-destructive-core.test.ts",
           ".codex/hooks/guard-destructive.ts",
           ".codex/hooks/guard-destructive.test.ts",
           ".codex/hooks/guard-edit-paths.ts",
@@ -197,6 +199,8 @@ describe("describeGeneratedProject", () => {
           ".codex/hooks/post-edit-quality.ts",
           ".codex/hooks/stop-validate.ts",
           ".claude/settings.json",
+          ".claude/hooks/guard-destructive-core.ts",
+          ".claude/hooks/guard-destructive-core.test.ts",
           ".claude/hooks/guard-destructive.ts",
           ".claude/hooks/guard-destructive.test.ts",
           "scripts/validation/format-and-lint.ts",

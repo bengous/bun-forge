@@ -271,6 +271,20 @@ async function assertAiContract(
   await assertFileContains(root, ".codex/config.toml", ".codex/hooks/guard-destructive.ts");
   await assertFileExcludes(root, ".codex/config.toml", "CLAUDE_PROJECT_DIR");
   await assertFileExcludes(root, ".codex/config.toml", "hooks.json");
+  assertPathExists(root, ".codex/hooks/guard-destructive-core.ts");
+  assertPathExists(root, ".codex/hooks/guard-destructive-core.test.ts");
+  assertPathExists(root, ".claude/hooks/guard-destructive-core.ts");
+  assertPathExists(root, ".claude/hooks/guard-destructive-core.test.ts");
+  await assertFileContains(
+    root,
+    ".codex/hooks/guard-destructive.ts",
+    "./guard-destructive-core.ts",
+  );
+  await assertFileContains(
+    root,
+    ".claude/hooks/guard-destructive.ts",
+    "./guard-destructive-core.ts",
+  );
   await assertFileContains(root, ".codex/hooks/lib.ts", "stop_hook_active");
   await assertFileContains(root, ".claude/settings.json", "$CLAUDE_PROJECT_DIR");
   await assertFileExcludes(root, ".claude/settings.json", ".codex/");

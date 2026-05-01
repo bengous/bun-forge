@@ -31,4 +31,6 @@ paths:
 
 **Manifest discipline**: When the copied preset surface changes, keep `template-sources/manifest.json` aligned with reality.
 
+**Destructive guard sync**: After editing any `guard-destructive*.ts`, run `bun run guard-destructive:sync` then `bun run guard-destructive:check`.
+
 **Product bias**: Treat copied presets as owned product defaults. Review them in terms of the generated-project contract, not in terms of historical provenance.

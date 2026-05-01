@@ -1,30 +1,64 @@
 import { describe, expect, test } from "bun:test";
-import { checkCommand, checkMergeGuard, checkRm, parseHookInput } from "./guard-destructive";
 
-describe("Codex destructive command guard", () => {
-  test("blocks recursive forced rm in any flag order", () => {
-    expect(checkRm(["rm", "-rf", "dist"])).toBe("rm recursive + force");
-    expect(checkRm(["rm", "-fr", "dist"])).toBe("rm recursive + force");
-    expect(checkRm(["rm", "--force", "--recursive", "dist"])).toBe("rm recursive + force");
+const SCRIPT_PATH = `${import.meta.dir}/guard-destructive.ts`;
+
+async function runGuard(command: string): Promise<{
+  readonly exitCode: number;
+  readonly stdout: string;
+  readonly stderr: string;
+}> {
+  const proc = Bun.spawn([process.execPath, SCRIPT_PATH], {
+    stdin: "pipe",
+    stdout: "pipe",
+    stderr: "pipe",
   });
 
-  test("blocks known destructive git commands", () => {
-    expect(checkCommand("git reset --hard HEAD")).toBe("git reset --hard");
-    expect(checkCommand("git push --force")).toBe("git push --force");
+  await proc.stdin.write(JSON.stringify({ tool_input: { command } }));
+  await proc.stdin.end();
+
+  const [stdout, stderr, exitCode] = await Promise.all([
+    Bun.readableStreamToText(proc.stdout),
+    Bun.readableStreamToText(proc.stderr),
+    proc.exited,
+  ]);
+
+  return { exitCode, stdout, stderr };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function parseHookOutput(stdout: string): Record<string, unknown> {
+  const parsed: unknown = JSON.parse(stdout);
+  if (!isRecord(parsed)) {
+    throw new Error("hook output must be an object");
+  }
+  const hookOutput = parsed["hookSpecificOutput"];
+  if (!isRecord(hookOutput)) {
+    throw new Error("hook output must include hookSpecificOutput");
+  }
+  return hookOutput;
+}
+
+describe("destructive command guard wrapper", () => {
+  test("denies destructive commands using the PreToolUse envelope", async () => {
+    const result = await runGuard("git push --force");
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
+
+    const hookOutput = parseHookOutput(result.stdout);
+    expect(hookOutput["hookEventName"]).toBe("PreToolUse");
+    expect(hookOutput["permissionDecision"]).toBe("deny");
+    expect(hookOutput["permissionDecisionReason"]).toBe(
+      "Destructive command blocked: git push --force\nCommand: git push --force",
+    );
   });
 
-  test("does not match commands inside string literals", () => {
-    expect(checkCommand('printf "git reset --hard HEAD"')).toBeNull();
-  });
-
-  test("blocks non fast-forward merge", () => {
-    expect(checkMergeGuard("git merge feature/test")).toContain("git merge without --ff-only");
-    expect(checkMergeGuard("git merge --ff-only feature/test")).toBeNull();
-  });
-
-  test("parses hook input defensively", () => {
-    expect(parseHookInput('{"tool_input":{"command":"git status"}}')).toBe("git status");
-    expect(parseHookInput("{}")).toBeNull();
-    expect(parseHookInput("{")).toBeNull();
+  test("allows non-destructive commands without output", async () => {
+    const result = await runGuard("git status");
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toBe("");
   });
 });

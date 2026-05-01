@@ -2,6 +2,7 @@
 
 const DEFAULT_STEPS = [
   "agents:check",
+  "guard-destructive:check",
   "format:check",
   "lint:errors",
   "lint:arch",
