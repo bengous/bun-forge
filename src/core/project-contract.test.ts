@@ -174,6 +174,7 @@ for (const scenario of scenarios) {
     }
 
     if (scenario.effect) {
+      expectExists(destination, ".gitkeep");
       expect(dependencies["effect"]).toBeDefined();
       expect(dependencies["@effect/cli"]).toBeDefined();
       expect(dependencies["@effect/platform"]).toBeDefined();

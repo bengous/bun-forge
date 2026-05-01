@@ -1,6 +1,7 @@
 import type { InitOptions } from "../types.ts";
 import type { GenerationRuntime } from "./generator.ts";
 import { describe, expect, test } from "bun:test";
+import { describeGeneratedProject, resolveProjectShape } from "./generated-project-contract.ts";
 import {
   buildTemplateContext,
   cleanupPathsForOptions,
@@ -8,6 +9,7 @@ import {
   generateProjectWithRuntime,
   templateFilesForContext,
 } from "./generator.ts";
+import { objectField, readJsonObject, stringArray } from "./json.ts";
 import { toBinName, toPackageName, toProjectName } from "./naming.ts";
 
 function makeOptions(overrides: Partial<InitOptions> = {}): InitOptions {
@@ -61,6 +63,94 @@ function createRuntime(overrides: Partial<GenerationRuntime> = {}) {
 
   return { runtime, calls };
 }
+
+describe("resolveProjectShape", () => {
+  test("derives workspace shape from the frontend preset", () => {
+    expect(resolveProjectShape(makeOptions()).hasWorkspaces).toBe(false);
+    expect(resolveProjectShape(makeOptions({ frontend: "tanstack" })).hasWorkspaces).toBe(true);
+  });
+
+  test("rejects impossible generated project shapes", () => {
+    expect(() => resolveProjectShape(makeOptions({ backend: false, frontend: "none" }))).toThrow(
+      "Backend cannot be disabled without a frontend preset",
+    );
+    expect(() =>
+      resolveProjectShape(makeOptions({ backend: false, frontend: "tanstack", effect: true })),
+    ).toThrow("Effect starter requires the backend preset");
+  });
+});
+
+describe("describeGeneratedProject", () => {
+  test("describes native bootstrap flags and cleanup paths", () => {
+    const description = describeGeneratedProject(makeOptions({ frontend: "tanstack" }));
+
+    expect(description.nativeBootstrapFlags).toEqual({ backend: true, frontend: true });
+    expect(description.cleanupPaths).toContain("index.ts");
+    expect(description.cleanupPaths).toContain("apps/frontend/src/routes/about.tsx");
+  });
+
+  test("describes preset, template, and finalized generated file ownership", () => {
+    const description = describeGeneratedProject(
+      makeOptions({ frontend: "tanstack", ai: true, effect: true }),
+    );
+
+    expect(description.presetCopySpecs.map((spec) => spec.name)).toEqual([
+      "base",
+      "frontend-tanstack",
+      "ai",
+      "effect",
+    ]);
+    expect(description.templateContext).toEqual(
+      buildTemplateContext(
+        makeOptions({
+          frontend: "tanstack",
+          ai: true,
+          effect: true,
+        }),
+      ),
+    );
+    expect(description.generatedFileSpecs).toContainEqual({
+      owner: "preset",
+      presetName: "ai",
+      relativePath: ".codex/hooks/lib.ts",
+    });
+    expect(description.generatedFileSpecs).toContainEqual({
+      owner: "preset",
+      presetName: "ai",
+      relativePath: ".claude/hooks/guard-destructive.test.ts",
+    });
+    expect(description.generatedFileSpecs).toContainEqual({
+      owner: "preset",
+      presetName: "effect",
+      relativePath: ".gitkeep",
+    });
+    expect(description.generatedFileSpecs).toContainEqual({
+      owner: "template",
+      templateName: ".claude/rules/frontend-conventions.md.tpl",
+      relativePath: ".claude/rules/frontend-conventions.md",
+    });
+    expect(description.generatedFileSpecs).toContainEqual({
+      owner: "finalize",
+      relativePath: "AGENTS.md",
+    });
+    expect(description.generatedFileSpecs).toContainEqual({
+      owner: "finalize",
+      relativePath: "apps/frontend/src/AGENTS.md",
+    });
+  });
+
+  test("keeps copied preset specs aligned with the template source manifest", async () => {
+    const manifest = await readJsonObject("template-sources/manifest.json");
+    const description = describeGeneratedProject(
+      makeOptions({ frontend: "tanstack", ai: true, effect: true }),
+    );
+
+    for (const spec of description.presetCopySpecs) {
+      const manifestEntry = objectField(manifest, spec.name);
+      expect(spec.relativePaths).toEqual(stringArray(manifestEntry["copied"]));
+    }
+  });
+});
 
 describe("buildTemplateContext", () => {
   test("enables workspaces only for the TanStack preset", () => {
