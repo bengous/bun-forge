@@ -15,11 +15,15 @@ export const BLOCKED_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
   [/git\s+reset\s+--hard\b/, "git reset --hard"],
   [/git\s+clean\s+-f/, "git clean -f"],
   [/git\s+checkout\s+\.$/, "git checkout ."],
+  [/git\s+checkout\s+--\s+\.$/, "git checkout -- ."],
   [/git\s+restore\s+\.$/, "git restore ."],
   [/git\s+branch\s+-D\b/, "git branch -D"],
   [/git\s+stash\s+drop\b/, "git stash drop"],
   [/git\s+stash\s+clear\b/, "git stash clear"],
 ];
+
+const MERGE_HINT =
+  "git merge without --ff-only (use `git rebase` then `git merge --ff-only` for linear history)";
 
 export function stripStringLiterals(cmd: string): string {
   let stripped = cmd.replace(/<<-?\s*'?(\w+)'?.*?\n[\s\S]*?\n\s*\1/g, "");
@@ -71,6 +75,17 @@ export function checkCommand(cmd: string): string | null {
   return null;
 }
 
+export function checkMergeGuard(cmd: string): string | null {
+  const sanitized = stripStringLiterals(cmd);
+  if (!/git\s+merge\b/.test(sanitized)) {
+    return null;
+  }
+  if (/--ff-only/.test(sanitized)) {
+    return null;
+  }
+  return MERGE_HINT;
+}
+
 export function parseHookInput(raw: string): string | null {
   try {
     const parsed: unknown = JSON.parse(raw);
@@ -99,7 +114,7 @@ if (import.meta.main) {
   const cmd = parseHookInput(input);
   if (!cmd) process.exit(0);
 
-  const match = checkCommand(cmd);
+  const match = checkCommand(cmd) ?? checkMergeGuard(cmd);
   if (match) {
     console.log(
       JSON.stringify({

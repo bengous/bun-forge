@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 
 export type Scope = "backend" | "frontend" | "scripts" | "config";
 
-export const CODE_PATTERN = /\.(ts|tsx|js|mjs|css|json|jsonc)$/;
+export const CODE_PATTERN = /\.(ts|tsx|js|mjs|cjs|css|html|json|jsonc|md|mdx|toml|ya?ml)$/;
 
 const CONFIG_FILES = new Set([
   "tsconfig.json",
@@ -15,6 +15,7 @@ const CONFIG_FILES = new Set([
   "lefthook.yml",
   ".dependency-cruiser.cjs",
   ".jscpd.json",
+  "knip.jsonc",
   "mise.toml",
 ]);
 
@@ -40,6 +41,19 @@ export function classifyFile(filePath: string): Scope | null {
   }
   if (normalized.startsWith(".codex/hooks/")) {
     return "scripts";
+  }
+  if (normalized.startsWith(".claude/hooks/")) {
+    return "scripts";
+  }
+  if (
+    normalized === ".codex/config.toml" ||
+    normalized === ".claude/settings.json" ||
+    normalized === ".agents/agents-md-manifest.json" ||
+    normalized === "CLAUDE.md" ||
+    normalized === "AGENTS.md" ||
+    normalized.startsWith(".claude/rules/")
+  ) {
+    return "config";
   }
 
   const basename = normalized.includes("/")

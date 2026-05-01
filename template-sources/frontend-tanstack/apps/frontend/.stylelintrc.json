@@ -4,8 +4,5 @@
     "color-no-invalid-hex": true,
     "declaration-block-no-duplicate-properties": true
   },
-  "ignoreFiles": [
-    "dist/**",
-    "src/routeTree.gen.ts"
-  ]
+  "ignoreFiles": ["dist/**", "src/routeTree.gen.ts"]
 }

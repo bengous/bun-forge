@@ -56,7 +56,7 @@ describe("templateValues", () => {
     expect(values["AI_SCRIPTS"]).toContain('"agents:check"');
     expect(values["FRONTEND_SCRIPTS"]).toContain('"validate:frontend"');
     expect(values["BIN_BLOCK"]).toBe("");
-    expect(values["ROOT_LINT_PATHS"]).toBe("scripts/ .codex/hooks/");
+    expect(values["ROOT_LINT_PATHS"]).toBe("scripts/ .codex/hooks/ .claude/hooks/");
   });
 
   test("includes Effect tokens when effect is enabled", () => {
@@ -80,7 +80,7 @@ describe("renderTemplate", () => {
     expect(rendered).toContain('"agents:sync"');
     expect(rendered).toContain('"validate:frontend"');
     expect(rendered).toContain('"dev": "bun run dev:frontend"');
-    expect(rendered).toContain('"test:hooks": "bun test ./.codex/hooks"');
+    expect(rendered).toContain('"test:hooks": "bun test ./.codex/hooks ./.claude/hooks"');
     expect(rendered).not.toContain("__");
   });
 
@@ -104,6 +104,7 @@ describe("renderTemplate", () => {
     expect(rendered).toContain("frontend-oxc:");
     expect(rendered).toContain("apps/frontend/**/*.{ts,tsx}");
     expect(rendered).toContain(".codex/hooks/**/*.ts");
+    expect(rendered).toContain(".claude/hooks/**/*.ts");
     expect(rendered).not.toContain("src/**/*.ts");
   });
 
@@ -113,9 +114,11 @@ describe("renderTemplate", () => {
 
     expect(tsconfig).toContain('"scripts/**/*.ts"');
     expect(tsconfig).toContain('".codex/hooks/**/*.ts"');
+    expect(tsconfig).toContain('".claude/hooks/**/*.ts"');
     expect(tsconfig).not.toContain('"src/**/*.ts"');
     expect(knip).toContain('"apps/frontend"');
     expect(knip).toContain('".codex/hooks/**/*.ts"');
+    expect(knip).toContain('".claude/hooks/**/*.ts"');
     expect(knip).not.toContain('"src/index.ts"');
   });
 

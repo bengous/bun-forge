@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { checkCommand, parseHookInput } from "./guard-destructive";
+import { checkCommand, checkMergeGuard, parseHookInput } from "./guard-destructive";
 
 describe("Codex destructive command guard", () => {
   test("extracts Bash commands from valid hook input", () => {
@@ -17,6 +17,12 @@ describe("Codex destructive command guard", () => {
   test("blocks destructive commands", () => {
     expect(checkCommand("rm -rf dist")).toBe("rm recursive + force");
     expect(checkCommand("git reset --hard HEAD")).toBe("git reset --hard");
+    expect(checkCommand("git checkout -- .")).toBe("git checkout -- .");
+  });
+
+  test("blocks non fast-forward merge", () => {
+    expect(checkMergeGuard("git merge feature/test")).toContain("git merge without --ff-only");
+    expect(checkMergeGuard("git merge --ff-only feature/test")).toBeNull();
   });
 
   test("ignores destructive text inside string literals", () => {

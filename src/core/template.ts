@@ -15,19 +15,21 @@ export function templateValues(context: TemplateContext): Record<string, string>
   const rootLintPaths = [
     ...(context.backend ? ["src/"] : []),
     "scripts/",
-    ...(context.ai ? [".codex/hooks/"] : []),
+    ...(context.ai ? [".codex/hooks/", ".claude/hooks/"] : []),
   ].join(" ");
 
   const rootArchPaths = [
     ...(context.backend ? ["src"] : []),
     "scripts",
-    ...(context.ai ? ["./.codex/hooks"] : []),
+    ...(context.ai ? ["./.codex/hooks", "./.claude/hooks"] : []),
   ].join(" ");
 
   const rootFormatGlobs = [
     ...(context.backend ? ["'src/**/*.{ts,tsx,js,jsx,mjs}'"] : []),
     "'scripts/**/*.{ts,tsx,js,jsx,mjs}'",
-    ...(context.ai ? ["'.codex/hooks/**/*.{ts,tsx,js,jsx,mjs}'"] : []),
+    ...(context.ai
+      ? ["'.codex/hooks/**/*.{ts,tsx,js,jsx,mjs}'", "'.claude/hooks/**/*.{ts,tsx,js,jsx,mjs}'"]
+      : []),
   ].join(" ");
 
   const devCommand = context.backend ? "bun run src/index.ts" : "bun run dev:frontend";
@@ -43,7 +45,9 @@ export function templateValues(context: TemplateContext): Record<string, string>
   const frontendUnitTestScript =
     context.frontend === "tanstack" ? '    "test:unit": "cd apps/frontend && bun run test",\n' : "";
 
-  const testHooksScript = context.ai ? '    "test:hooks": "bun test ./.codex/hooks",\n' : "";
+  const testHooksScript = context.ai
+    ? '    "test:hooks": "bun test ./.codex/hooks ./.claude/hooks",\n'
+    : "";
 
   const aiScripts = context.ai
     ? '    "agents:sync": "bun scripts/agents/sync-agents-md.ts --write",\n    "agents:check": "bun scripts/agents/sync-agents-md.ts --check",\n'
@@ -78,12 +82,13 @@ export function templateValues(context: TemplateContext): Record<string, string>
 
   const backendLefthookGlob = context.backend ? '        - "src/**/*.ts"\n' : "";
   const codexLefthookGlob = context.ai ? '        - ".codex/hooks/**/*.ts"\n' : "";
+  const claudeLefthookGlob = context.ai ? '        - ".claude/hooks/**/*.ts"\n' : "";
 
   const tsconfigPlugins = context.effect ? effectTsconfigPlugins : "";
   const tsconfigInclude = [
     ...(context.backend ? ['"src/**/*.ts"'] : []),
     '"scripts/**/*.ts"',
-    ...(context.ai ? ['".codex/hooks/**/*.ts"'] : []),
+    ...(context.ai ? ['".codex/hooks/**/*.ts"', '".claude/hooks/**/*.ts"'] : []),
   ].join(", ");
 
   const knipRootEntry = [
@@ -139,7 +144,7 @@ export function templateValues(context: TemplateContext): Record<string, string>
     FRONTEND_LEFTHOOK_COMMAND: frontendLefthookCommand,
     FRONTEND_TYPECHECK_GLOB: frontendTypecheckGlob,
     BACKEND_LEFTHOOK_GLOB: backendLefthookGlob,
-    CODEX_LEFTHOOK_GLOB: codexLefthookGlob,
+    CODEX_LEFTHOOK_GLOB: `${codexLefthookGlob}${claudeLefthookGlob}`,
     KNIP_ROOT_ENTRY: knipRootEntry,
     KNIP_ROOT_PROJECT: knipRootProject,
     KNIP_FRONTEND_WORKSPACE: knipFrontendWorkspace,

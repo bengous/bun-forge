@@ -15,12 +15,30 @@ pre-commit:
       glob:
         - "src/**/*.ts"
         - "scripts/**/*.ts"
+        - ".claude/hooks/**/*.ts"
       run: ./node_modules/.bin/oxlint -c .oxlintrc.jsonc --fix --quiet --format=unix {staged_files} && ./node_modules/.bin/oxfmt --write -c .oxfmtrc.jsonc {staged_files}
       stage_fixed: true
+    codex-hooks-check:
+      glob:
+        - ".codex/hooks/**/*.ts"
+      run: ./node_modules/.bin/oxlint -c .oxlintrc.jsonc --quiet --format=unix {staged_files} && ./node_modules/.bin/oxfmt --check -c .oxfmtrc.jsonc {staged_files}
+    product-format:
+      glob:
+        - "templates/**/*.{ts,tsx,js,jsx,mjs,cjs,json,jsonc,yml,yaml,toml,html,css}"
+        - "template-sources/**/*.{ts,tsx,js,jsx,mjs,cjs,json,jsonc,yml,yaml,toml,html,css}"
+      run: ./node_modules/.bin/oxfmt --write -c .oxfmtrc.jsonc {staged_files}
+      stage_fixed: true
+    product-contract:
+      glob:
+        - "templates/**/*"
+        - "template-sources/**/*"
+      run: bun run --silent test:project-contract
     typecheck:
       glob:
         - "src/**/*.ts"
         - "scripts/**/*.ts"
+        - ".codex/hooks/**/*.ts"
+        - ".claude/hooks/**/*.ts"
       run: bun scripts/validation/typecheck-staged.ts
     gitleaks:
       run: gitleaks protect --staged --no-banner

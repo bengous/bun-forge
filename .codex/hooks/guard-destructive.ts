@@ -26,9 +26,9 @@ const MERGE_HINT =
   "git merge without --ff-only (use `git rebase` then `git merge --ff-only` for linear history)";
 
 export function stripStringLiterals(cmd: string): string {
-  let stripped = cmd.replaceAll(/<<-?\s*'?(\w+)'?.*?\n[\s\S]*?\n\s*\1/g, "");
-  stripped = stripped.replaceAll(/"(?:[^"\\]|\\.)*"/g, '""');
-  stripped = stripped.replaceAll(/'[^']*'/g, "''");
+  let stripped = cmd.replace(/<<-?\s*'?(\w+)'?.*?\n[\s\S]*?\n\s*\1/g, "");
+  stripped = stripped.replace(/"(?:[^"\\]|\\.)*"/g, '""');
+  stripped = stripped.replace(/'[^']*'/g, "''");
   return stripped;
 }
 

@@ -33,6 +33,11 @@ async function main(): Promise<void> {
     await run("test", "test");
   }
 
+  if (scopes.has("product")) {
+    await run("format:check", "format:check");
+    await run("test:project-contract", "test:project-contract");
+  }
+
   if (errors.length > 0) {
     console.error(`Push validation failed:\n\n${errors.join("\n\n")}`);
     process.exit(1);

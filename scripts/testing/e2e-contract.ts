@@ -6,6 +6,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { objectField, readJsonObject } from "../../src/core/json.ts";
+import { runCommand } from "./run-command.ts";
 import { parseScenariosFromArgv, SCAFFOLD_SCENARIO_CONFIG } from "./scenarios.ts";
 
 export type E2eContractScenario = ScaffoldScenario;
@@ -17,25 +18,6 @@ const DEFAULT_E2E_CONTRACT_SCENARIOS = [
   "tanstack-ai-frontend",
   "tanstack-ai-effect",
 ] as const satisfies readonly E2eContractScenario[];
-
-async function run(command: string[], cwd: string): Promise<void> {
-  const proc = Bun.spawn(command, {
-    cwd,
-    stdin: "ignore",
-    stdout: "inherit",
-    stderr: "inherit",
-    env: {
-      ...process.env,
-      BUN_TMPDIR: process.env["BUN_TMPDIR"] ?? "/tmp",
-      BUN_INSTALL: process.env["BUN_INSTALL"] ?? "/tmp/bun-install",
-    },
-    ...(process.platform === "win32" ? { windowsHide: true } : {}),
-  });
-  const exitCode = await proc.exited;
-  if (exitCode !== 0) {
-    throw new Error(`${command.join(" ")} failed with exit code ${exitCode}`);
-  }
-}
 
 export function e2eContractScenariosFromArgv(argv: readonly string[]): E2eContractScenario[] {
   return parseScenariosFromArgv(argv, DEFAULT_E2E_CONTRACT_SCENARIOS);
@@ -161,6 +143,8 @@ async function assertGeneratedProject(
     expectExists(root, ".codex/hooks/stop-validate.ts");
     expectExists(root, ".codex/hooks/lib.ts");
     expectExists(root, ".codex/hooks/lib.test.ts");
+    expectExists(root, ".claude/hooks/guard-destructive.ts");
+    expectExists(root, ".claude/hooks/guard-destructive.test.ts");
     expectExists(root, "scripts/validation/format-and-lint.ts");
     expectExists(root, "scripts/validation/validate-on-stop.ts");
     await expectFileContains(root, "CLAUDE.md", "Opinionated Bun project bootstrapped");
@@ -180,10 +164,19 @@ async function assertGeneratedProject(
     await expectFileNotContains(root, ".codex/config.toml", "hooks.json");
     await expectFileContains(root, ".claude/settings.json", "$CLAUDE_PROJECT_DIR");
     await expectFileNotContains(root, ".claude/settings.json", ".codex/");
+    await expectFileContains(root, "lefthook.yml", '- ".codex/hooks/**/*.ts"');
+    await expectFileContains(root, "lefthook.yml", '- ".claude/hooks/**/*.ts"');
+    await expectFileContains(root, "tsconfig.json", '".codex/hooks/**/*.ts"');
+    await expectFileContains(root, "tsconfig.json", '".claude/hooks/**/*.ts"');
     await expectFileContains(
       root,
       ".dependency-cruiser.cjs",
-      "^\\\\.codex/hooks/guard-destructive\\\\.ts$",
+      "^\\\\.codex/hooks/(guard-destructive|guard-edit-paths|post-edit-quality|stop-validate)\\\\.ts$",
+    );
+    await expectFileContains(
+      root,
+      ".dependency-cruiser.cjs",
+      "^\\\\.claude/hooks/guard-destructive\\\\.ts$",
     );
     await expectFileNotContains(root, ".dependency-cruiser.cjs", '"^\\\\.codex/hooks/",');
 
@@ -192,6 +185,9 @@ async function assertGeneratedProject(
     }
     if (typeof packageScripts["agents:check"] !== "string") {
       throw new TypeError("Expected agents:check script for AI scenario");
+    }
+    if (packageScripts["test:hooks"] !== "bun test ./.codex/hooks ./.claude/hooks") {
+      throw new Error("Expected test:hooks to run Codex and Claude hook tests");
     }
   } else {
     expectMissing(root, "CLAUDE.md");
@@ -239,7 +235,9 @@ async function assertGeneratedProject(
     expectExists(root, "apps/frontend/src/routeTree.gen.ts");
     expectExists(root, "apps/frontend/src/testing/setup.ts");
     expectExists(root, "apps/frontend/playwright.config.ts");
+    await expectFileContains(root, "apps/frontend/playwright.config.ts", "--strictPort");
     expectExists(root, "apps/frontend/e2e/home.spec.ts");
+    await expectFileContains(root, "apps/frontend/e2e/home.spec.ts", "page.getByRole");
 
     await expectFileContains(root, "apps/frontend/src/routes/index.tsx", projectName);
     await expectFileContains(root, "apps/frontend/src/routes/index.tsx", "normalized by bun-forge");
@@ -320,7 +318,7 @@ export async function e2eContract(
   const projectName = `forge-e2e-${scenario}`;
 
   try {
-    await run(
+    await runCommand(
       [
         "bun",
         "run",
@@ -342,7 +340,7 @@ export async function e2eContract(
         "--install",
         "false",
       ],
-      process.cwd(),
+      { cwd: process.cwd() },
     );
 
     await assertGeneratedProject(dir, { backend, frontend, ai, effect }, projectName);

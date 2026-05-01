@@ -2,7 +2,4 @@
 # Uses built-in rules by default. Add allowlists here as needed.
 
 [allowlist]
-paths = [
-  '''\.lock$''',
-  '''node_modules/''',
-]
+paths = ['''\.lock$''', '''node_modules/''']

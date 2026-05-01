@@ -15,6 +15,8 @@ type Workspace = {
   readonly oxlintConfig: string;
   readonly oxlintArgs: ReadonlyArray<string>;
   readonly oxfmtConfig: string;
+  readonly lintFix: boolean;
+  readonly formatMode: "write" | "check";
 };
 
 const LINTABLE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".mjs"]);
@@ -22,11 +24,22 @@ const ROOT_WORKSPACE: Workspace = {
   oxlintConfig: ".oxlintrc.jsonc",
   oxlintArgs: [],
   oxfmtConfig: ".oxfmtrc.jsonc",
+  lintFix: true,
+  formatMode: "write",
+};
+const CODEX_HOOK_WORKSPACE: Workspace = {
+  oxlintConfig: ".oxlintrc.jsonc",
+  oxlintArgs: [],
+  oxfmtConfig: ".oxfmtrc.jsonc",
+  lintFix: false,
+  formatMode: "check",
 };
 const FRONTEND_WORKSPACE: Workspace = {
   oxlintConfig: "apps/frontend/.oxlintrc.jsonc",
   oxlintArgs: ["--type-aware"],
   oxfmtConfig: "apps/frontend/.oxfmtrc.jsonc",
+  lintFix: true,
+  formatMode: "write",
 };
 
 const SUMMARY_LINE = /^\d+ problems?$/;
@@ -39,13 +52,7 @@ export function parseFilePath(raw: string): string | null {
 export function parseFilePaths(raw: string): string[] {
   try {
     const parsed = JSON.parse(raw) as unknown;
-    if (
-      typeof parsed === "object" &&
-      parsed !== null &&
-      "tool_input" in parsed &&
-      typeof parsed["tool_input"] === "object" &&
-      parsed["tool_input"] !== null
-    ) {
+    if (isRecord(parsed) && isRecord(parsed["tool_input"])) {
       const paths = new Set<string>();
       const toolInput = parsed["tool_input"];
       if ("file_path" in toolInput && typeof toolInput["file_path"] === "string") {
@@ -53,12 +60,7 @@ export function parseFilePaths(raw: string): string[] {
       }
       if ("edits" in toolInput && Array.isArray(toolInput["edits"])) {
         for (const edit of toolInput["edits"]) {
-          if (
-            typeof edit === "object" &&
-            edit !== null &&
-            "file_path" in edit &&
-            typeof edit["file_path"] === "string"
-          ) {
+          if (isRecord(edit) && typeof edit["file_path"] === "string") {
             paths.add(edit["file_path"]);
           }
         }
@@ -81,9 +83,12 @@ export function resolveWorkspace(filePath: string): Workspace | null {
   if (
     normalized.startsWith("src/") ||
     normalized.startsWith("scripts/") ||
-    normalized.startsWith(".codex/hooks/")
+    normalized.startsWith(".claude/hooks/")
   ) {
     return ROOT_WORKSPACE;
+  }
+  if (normalized.startsWith(".codex/hooks/")) {
+    return CODEX_HOOK_WORKSPACE;
   }
   if (normalized.startsWith("apps/frontend/")) {
     return FRONTEND_WORKSPACE;
@@ -104,6 +109,10 @@ async function readTextFile(filePath: string): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 if (import.meta.main) {
@@ -127,18 +136,45 @@ if (import.meta.main) {
 
     const beforeFormat = await readTextFile(filePath);
 
-    Bun.spawnSync(
-      [oxlint, ...workspace.oxlintArgs, "-c", workspace.oxlintConfig, "--fix", "--quiet", filePath],
+    if (workspace.lintFix) {
+      Bun.spawnSync(
+        [
+          oxlint,
+          ...workspace.oxlintArgs,
+          "-c",
+          workspace.oxlintConfig,
+          "--fix",
+          "--quiet",
+          filePath,
+        ],
+        {
+          stdout: "ignore",
+          stderr: "ignore",
+        },
+      );
+    }
+
+    const format = Bun.spawnSync(
+      [
+        oxfmt,
+        workspace.formatMode === "write" ? "--write" : "--check",
+        "-c",
+        workspace.oxfmtConfig,
+        filePath,
+      ],
       {
-        stdout: "ignore",
-        stderr: "ignore",
+        stdout: "pipe",
+        stderr: "pipe",
       },
     );
-
-    Bun.spawnSync([oxfmt, "--write", "-c", workspace.oxfmtConfig, filePath], {
-      stdout: "ignore",
-      stderr: "ignore",
-    });
+    if (format.exitCode !== 0) {
+      const output = [format.stderr.toString(), format.stdout.toString()]
+        .filter(Boolean)
+        .join("\n")
+        .trim();
+      failures.push(output || `format: ${filePath} exited with code ${format.exitCode}`);
+      continue;
+    }
 
     const lint = Bun.spawnSync(
       [

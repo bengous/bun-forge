@@ -1,9 +1,9 @@
 import { $ } from "bun";
 import { existsSync } from "node:fs";
 
-export type Scope = "backend" | "frontend" | "scripts" | "config";
+export type Scope = "backend" | "frontend" | "scripts" | "config" | "product";
 
-export const CODE_PATTERN = /\.(ts|tsx|js|mjs|css|json|jsonc)$/;
+export const CODE_PATTERN = /\.(ts|tsx|js|mjs|cjs|css|html|json|jsonc|md|mdx|toml|ya?ml|tpl)$/;
 
 const CONFIG_FILES = new Set([
   "tsconfig.json",
@@ -15,6 +15,7 @@ const CONFIG_FILES = new Set([
   "lefthook.yml",
   ".dependency-cruiser.cjs",
   ".jscpd.json",
+  "knip.jsonc",
   "mise.toml",
 ]);
 
@@ -44,6 +45,22 @@ export function classifyFileWithFrontendWorkspace(
   if (normalized.startsWith(".codex/hooks/")) {
     return "scripts";
   }
+  if (normalized.startsWith(".claude/hooks/")) {
+    return "scripts";
+  }
+  if (normalized.startsWith("templates/") || normalized.startsWith("template-sources/")) {
+    return "product";
+  }
+  if (
+    normalized === ".codex/config.toml" ||
+    normalized === ".claude/settings.json" ||
+    normalized === ".agents/agents-md-manifest.json" ||
+    normalized === "CLAUDE.md" ||
+    normalized === "AGENTS.md" ||
+    normalized.startsWith(".claude/rules/")
+  ) {
+    return "config";
+  }
 
   const basename = normalized.includes("/")
     ? normalized.slice(normalized.lastIndexOf("/") + 1)
@@ -67,6 +84,7 @@ export function expandConfigScopeWithFrontendWorkspace(
     expanded.add("backend");
   }
   expanded.add("scripts");
+  expanded.add("product");
   if (frontendWorkspacePresent) {
     expanded.add("frontend");
   }

@@ -109,6 +109,14 @@ function expectMissing(root: string, relativePath: string): void {
   expect(existsSync(join(root, relativePath))).toBe(false);
 }
 
+async function expectFileContains(
+  root: string,
+  relativePath: string,
+  expected: string,
+): Promise<void> {
+  expect(await Bun.file(join(root, relativePath)).text()).toContain(expected);
+}
+
 for (const scenario of scenarios) {
   test(`generated project contract: ${scenario.name}`, async () => {
     const destination = await generateScenario(scenario);
@@ -204,6 +212,8 @@ for (const scenario of scenarios) {
       expectExists(destination, ".codex/hooks/stop-validate.ts");
       expectExists(destination, ".codex/hooks/lib.ts");
       expectExists(destination, ".codex/hooks/lib.test.ts");
+      expectExists(destination, ".claude/hooks/guard-destructive.ts");
+      expectExists(destination, ".claude/hooks/guard-destructive.test.ts");
       expectExists(destination, "scripts/validation/format-and-lint.ts");
       expectExists(destination, "scripts/validation/validate-on-stop.ts");
       const codexConfig = await Bun.file(join(destination, ".codex/config.toml")).text();
@@ -215,7 +225,15 @@ for (const scenario of scenarios) {
       expect(codexConfig).not.toContain("hooks.json");
       expect(claudeSettings).toContain("$CLAUDE_PROJECT_DIR");
       expect(claudeSettings).not.toContain(".codex/");
-      expect(dependencyCruiser).toContain("^\\\\.codex/hooks/guard-destructive\\\\.ts$");
+      expect(lefthook).toContain('- ".codex/hooks/**/*.ts"');
+      expect(lefthook).toContain('- ".claude/hooks/**/*.ts"');
+      expect(tsconfig).toContain('".codex/hooks/**/*.ts"');
+      expect(tsconfig).toContain('".claude/hooks/**/*.ts"');
+      expect(packageScripts["test:hooks"]).toBe("bun test ./.codex/hooks ./.claude/hooks");
+      expect(dependencyCruiser).toContain(
+        "^\\\\.codex/hooks/(guard-destructive|guard-edit-paths|post-edit-quality|stop-validate)\\\\.ts$",
+      );
+      expect(dependencyCruiser).toContain("^\\\\.claude/hooks/guard-destructive\\\\.ts$");
       expect(dependencyCruiser).not.toContain('"^\\\\.codex/hooks/",');
       expect(projectConventions).toContain("Keep `lefthook.yml` globs aligned");
       expect(projectConventions).toContain(
@@ -266,7 +284,9 @@ for (const scenario of scenarios) {
       expectExists(destination, "apps/frontend/src/routeTree.gen.ts");
       expectExists(destination, "apps/frontend/src/testing/setup.ts");
       expectExists(destination, "apps/frontend/playwright.config.ts");
+      await expectFileContains(destination, "apps/frontend/playwright.config.ts", "--strictPort");
       expectExists(destination, "apps/frontend/e2e/home.spec.ts");
+      await expectFileContains(destination, "apps/frontend/e2e/home.spec.ts", "page.getByRole");
       expectMissing(destination, "apps/frontend/.cta.json");
       expectMissing(destination, "apps/frontend/.vscode");
       expectMissing(destination, "apps/frontend/README.md");

@@ -3,7 +3,9 @@ node_modules
 .mise/
 
 plans/
-.codex/
-!template-sources/ai/.codex/
-!template-sources/ai/.codex/**
+.codex/prompts/
+.codex/skills/
+.codex/agents/
+.codex/hooks.json
+.codex/.hooks/
 .omx/

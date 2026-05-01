@@ -4,6 +4,7 @@ import type { ScaffoldScenario, ScenarioConfig } from "./scenarios.ts";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { runCommand } from "./run-command.ts";
 import {
   ALL_SCAFFOLD_SCENARIOS,
   parseScenariosFromArgv,
@@ -12,25 +13,6 @@ import {
 
 export type SmokeScenario = ScaffoldScenario;
 
-async function run(command: string[], cwd: string): Promise<void> {
-  const proc = Bun.spawn(command, {
-    cwd,
-    stdin: "ignore",
-    stdout: "inherit",
-    stderr: "inherit",
-    env: {
-      ...process.env,
-      BUN_TMPDIR: process.env["BUN_TMPDIR"] ?? "/tmp",
-      BUN_INSTALL: process.env["BUN_INSTALL"] ?? "/tmp/bun-install",
-    },
-    ...(process.platform === "win32" ? { windowsHide: true } : {}),
-  });
-  const exitCode = await proc.exited;
-  if (exitCode !== 0) {
-    throw new Error(`${command.join(" ")} failed with exit code ${exitCode}`);
-  }
-}
-
 export function smokeScenariosFromArgv(argv: readonly string[]): SmokeScenario[] {
   return parseScenariosFromArgv(argv, ALL_SCAFFOLD_SCENARIOS);
 }
@@ -38,7 +20,7 @@ export function smokeScenariosFromArgv(argv: readonly string[]): SmokeScenario[]
 export async function smoke(scenario: SmokeScenario, config: ScenarioConfig): Promise<void> {
   const dir = await mkdtemp(join(tmpdir(), `bun-forge-${scenario}-`));
   try {
-    await run(
+    await runCommand(
       [
         "bun",
         "run",
@@ -58,10 +40,10 @@ export async function smoke(scenario: SmokeScenario, config: ScenarioConfig): Pr
         "--install",
         "false",
       ],
-      process.cwd(),
+      { cwd: process.cwd() },
     );
-    await run(["bun", "install"], dir);
-    await run(["bun", "run", "validate"], dir);
+    await runCommand(["bun", "install"], { cwd: dir });
+    await runCommand(["bun", "run", "validate"], { cwd: dir });
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

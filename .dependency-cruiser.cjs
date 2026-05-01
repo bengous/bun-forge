@@ -5,7 +5,8 @@ const ORPHAN_EXCEPTIONS = [
   "(^|/)\\.[^/]+\\.(js|cjs|mjs|ts|json)$",
   "^src/index\\.ts$",
   "^scripts/",
-  "^\\.codex/hooks/guard-destructive\\.ts$",
+  "^\\.codex/hooks/(guard-destructive|guard-edit-paths|post-edit-quality|stop-validate)\\.ts$",
+  "^\\.claude/hooks/guard-destructive\\.ts$",
 ].join("|");
 
 module.exports = {

@@ -48,6 +48,7 @@
       ".codex/hooks/stop-validate.ts",
       ".claude/settings.json",
       ".claude/hooks/guard-destructive.ts",
+      ".claude/hooks/guard-destructive.test.ts",
       "scripts/validation/format-and-lint.ts",
       "scripts/validation/validate-on-stop.ts",
       "scripts/agents/sync-agents-md.ts"
