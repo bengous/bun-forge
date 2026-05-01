@@ -87,5 +87,4 @@ export type TemplateContext = {
 export type Preset = {
   readonly name: string;
   readonly sourceDir: string;
-  readonly enabled: (options: InitOptions) => boolean;
 };
