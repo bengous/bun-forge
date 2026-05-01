@@ -217,12 +217,14 @@ for (const scenario of scenarios) {
       expectExists(destination, "scripts/validation/format-and-lint.ts");
       expectExists(destination, "scripts/validation/validate-on-stop.ts");
       const codexConfig = await Bun.file(join(destination, ".codex/config.toml")).text();
+      const codexHookLib = await Bun.file(join(destination, ".codex/hooks/lib.ts")).text();
       const claudeSettings = await Bun.file(join(destination, ".claude/settings.json")).text();
       const dependencyCruiser = await Bun.file(join(destination, ".dependency-cruiser.cjs")).text();
       expect(codexConfig).toContain("git rev-parse --show-toplevel");
       expect(codexConfig).toContain(".codex/hooks/guard-destructive.ts");
       expect(codexConfig).not.toContain("CLAUDE_PROJECT_DIR");
       expect(codexConfig).not.toContain("hooks.json");
+      expect(codexHookLib).toContain("stop_hook_active");
       expect(claudeSettings).toContain("$CLAUDE_PROJECT_DIR");
       expect(claudeSettings).not.toContain(".codex/");
       expect(lefthook).toContain('- ".codex/hooks/**/*.ts"');

@@ -307,6 +307,9 @@ export async function runPostEditQuality(
   if (failures.length > 0) {
     return { blockReason: `Codex post-edit quality gate failed:\n${failures.join("\n\n")}` };
   }
+  // TODO(Codex): when PostToolUse supports updated file output for edits,
+  // report autofixed content through that channel instead of relying only on
+  // filesystem mutation. Avoid echoing whole files into context meanwhile.
   return {};
 }
 

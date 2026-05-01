@@ -7,9 +7,24 @@ import {
   extractTouchedPaths,
   forbiddenTouchedPaths,
   normalizeProjectPath,
+  parseHookInput,
   runPostEditQuality,
+  runStopValidation,
   type CommandResult,
 } from "./lib";
+
+describe("Codex hook input parsing", () => {
+  test("preserves stop_hook_active when it is boolean", () => {
+    expect(parseHookInput({ stop_hook_active: true })).toEqual({ stop_hook_active: true });
+    expect(parseHookInput({ stop_hook_active: false })).toEqual({ stop_hook_active: false });
+  });
+
+  test("ignores non-boolean stop_hook_active values", () => {
+    expect(parseHookInput({ stop_hook_active: "true" })).toEqual({});
+    expect(parseHookInput({ stop_hook_active: 1 })).toEqual({});
+    expect(parseHookInput({ stop_hook_active: null })).toEqual({});
+  });
+});
 
 describe("Codex hook path handling", () => {
   test("extracts file paths from apply_patch hunks", () => {
@@ -78,6 +93,22 @@ describe("Codex post-edit quality gate", () => {
     );
 
     expect(result.blockReason).toContain("Generated files must not be edited directly");
+    expect(calls).toEqual([]);
+  });
+});
+
+describe("Codex stop validation", () => {
+  test("skips the validation runner when stop_hook_active is true", async () => {
+    const calls: string[] = [];
+    const result = await runStopValidation(
+      { cwd: process.cwd(), stop_hook_active: true },
+      async (command): Promise<CommandResult> => {
+        calls.push(command.join(" "));
+        return { code: 1, stdout: "", stderr: "should not run" };
+      },
+    );
+
+    expect(result).toEqual({});
     expect(calls).toEqual([]);
   });
 });

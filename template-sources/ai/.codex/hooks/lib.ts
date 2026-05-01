@@ -7,6 +7,7 @@ export type HookInput = {
   readonly session_id?: string;
   readonly turn_id?: string;
   readonly cwd?: string;
+  readonly stop_hook_active?: boolean;
   readonly tool_input?: Record<string, unknown>;
 };
 
@@ -89,12 +90,14 @@ export function parseHookInput(value: unknown): HookInput {
   const sessionId = valueAsString(value["session_id"]);
   const turnId = valueAsString(value["turn_id"]);
   const cwd = valueAsString(value["cwd"]);
+  const stopHookActive = value["stop_hook_active"];
   const toolInput = value["tool_input"];
 
   return {
     ...(sessionId === undefined ? {} : { session_id: sessionId }),
     ...(turnId === undefined ? {} : { turn_id: turnId }),
     ...(cwd === undefined ? {} : { cwd }),
+    ...(typeof stopHookActive === "boolean" ? { stop_hook_active: stopHookActive } : {}),
     ...(isRecord(toolInput) ? { tool_input: toolInput } : {}),
   };
 }
@@ -259,6 +262,9 @@ export async function runPostEditQuality(
   if (failures.length > 0) {
     return { blockReason: `Codex post-edit quality gate failed:\n${failures.join("\n\n")}` };
   }
+  // TODO(Codex): when PostToolUse supports updated file output for edits,
+  // report autofixed content through that channel instead of relying only on
+  // filesystem mutation. Avoid echoing whole files into context meanwhile.
   return {};
 }
 
@@ -266,6 +272,10 @@ export async function runStopValidation(
   input: HookInput,
   runner: CommandRunner = defaultRunCommand,
 ): Promise<HookResult> {
+  if (input.stop_hook_active === true) {
+    return {};
+  }
+
   const root = repoRoot(input);
   const forbidden = forbiddenTouchedPaths(await readTouchedPaths(input));
   if (forbidden.length > 0) {
