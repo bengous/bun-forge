@@ -45,5 +45,11 @@
 		"unicorn/no-useless-iterator-to-array": "warn",
 		"eslint/object-shorthand": "warn"
 	},
-	"ignorePatterns": ["!src/**", "!vite.config.ts", "src/routeTree.gen.ts"]
+	"overrides": [{
+		"files": ["vite.config.ts", "playwright.config.ts"],
+		"rules": {
+			"import/no-default-export": "off"
+		}
+	}],
+	"ignorePatterns": ["!src/**", "!e2e/**", "!vite.config.ts", "!playwright.config.ts", "src/routeTree.gen.ts"]
 }

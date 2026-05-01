@@ -267,6 +267,28 @@ async function assertGeneratedProject(
     if (frontendScripts["test"] !== "vitest run --environment jsdom") {
       throw new Error("Expected frontend test script to use Vitest + jsdom");
     }
+    if (
+      frontendScripts["lint"] !==
+      "oxlint --type-aware -c .oxlintrc.jsonc --format=unix src/ e2e/ vite.config.ts playwright.config.ts"
+    ) {
+      throw new Error("Expected frontend lint script to cover source, e2e, and config files");
+    }
+    if (
+      frontendScripts["format:check"] !==
+      "oxfmt --check -c .oxfmtrc.jsonc src/ e2e/ vite.config.ts playwright.config.ts"
+    ) {
+      throw new Error("Expected frontend format check to cover source, e2e, and config files");
+    }
+    await expectFileContains(
+      root,
+      "apps/frontend/.oxlintrc.jsonc",
+      '"files": ["vite.config.ts", "playwright.config.ts"]',
+    );
+    await expectFileContains(
+      root,
+      "apps/frontend/.oxlintrc.jsonc",
+      '"import/no-default-export": "off"',
+    );
 
     if (config.ai) {
       expectExists(root, "apps/frontend/src/AGENTS.md");

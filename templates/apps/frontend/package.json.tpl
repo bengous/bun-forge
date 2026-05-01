@@ -8,12 +8,12 @@
     "build": "vite build && tsc -b --pretty false",
     "test": "vitest run --environment jsdom",
     "typecheck": "tsc -b --pretty false",
-    "lint": "oxlint --type-aware -c .oxlintrc.jsonc --format=unix src/",
-    "lint:errors": "oxlint --type-aware -c .oxlintrc.jsonc --quiet --format=unix src/",
-    "format": "oxfmt --write -c .oxfmtrc.jsonc src/",
-    "format:check": "oxfmt --check -c .oxfmtrc.jsonc src/",
+    "lint": "oxlint --type-aware -c .oxlintrc.jsonc --format=unix src/ e2e/ vite.config.ts playwright.config.ts",
+    "lint:errors": "oxlint --type-aware -c .oxlintrc.jsonc --quiet --format=unix src/ e2e/ vite.config.ts playwright.config.ts",
+    "format": "oxfmt --write -c .oxfmtrc.jsonc src/ e2e/ vite.config.ts playwright.config.ts",
+    "format:check": "oxfmt --check -c .oxfmtrc.jsonc src/ e2e/ vite.config.ts playwright.config.ts",
     "lint:css": "stylelint \"src/**/*.css\"",
-    "autofix": "oxlint --type-aware -c .oxlintrc.jsonc --fix src/ && oxfmt --write -c .oxfmtrc.jsonc src/",
+    "autofix": "oxlint --type-aware -c .oxlintrc.jsonc --fix src/ e2e/ vite.config.ts playwright.config.ts && oxfmt --write -c .oxfmtrc.jsonc src/ e2e/ vite.config.ts playwright.config.ts",
     "preview": "vite preview"
   },
   "dependencies": {

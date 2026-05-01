@@ -244,6 +244,12 @@ for (const scenario of scenarios) {
       expect(packageJson["workspaces"]).toEqual(["apps/*"]);
       expect(packageScripts["validate:frontend"]).toContain("bun run --silent test");
       expect(packageScripts["validate:frontend"]).toContain("bun run --silent test:e2e");
+      expect(frontendScripts["lint"]).toBe(
+        "oxlint --type-aware -c .oxlintrc.jsonc --format=unix src/ e2e/ vite.config.ts playwright.config.ts",
+      );
+      expect(frontendScripts["format:check"]).toBe(
+        "oxfmt --check -c .oxfmtrc.jsonc src/ e2e/ vite.config.ts playwright.config.ts",
+      );
       expect(frontendScripts["test"]).toBe("vitest run --environment jsdom");
       expect(frontendDevDependencies["@playwright/test"]).toBeDefined();
       expect(frontendDevDependencies["@testing-library/jest-dom"]).toBeDefined();
@@ -251,6 +257,11 @@ for (const scenario of scenarios) {
       expect(frontendRoute).not.toContain("native-index");
       expect(lefthook).toContain("frontend-oxc:");
       expect(lefthook).toContain('- "apps/frontend/**/*.{ts,tsx}"');
+      const frontendOxlint = await Bun.file(
+        join(destination, "apps/frontend/.oxlintrc.jsonc"),
+      ).text();
+      expect(frontendOxlint).toContain('"files": ["vite.config.ts", "playwright.config.ts"]');
+      expect(frontendOxlint).toContain('"import/no-default-export": "off"');
       expectExists(destination, "apps/frontend/src/routes/-index.test.tsx");
       expectExists(destination, "apps/frontend/src/routeTree.gen.ts");
       expectExists(destination, "apps/frontend/src/testing/setup.ts");
