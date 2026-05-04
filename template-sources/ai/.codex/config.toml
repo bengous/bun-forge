@@ -11,7 +11,7 @@ timeout = 10
 statusMessage = "Checking destructive commands"
 
 [[hooks.PreToolUse]]
-matcher = "^(apply_patch|Edit|Write)$"
+matcher = "^(apply_patch|Edit|Write|MultiEdit)$"
 
 [[hooks.PreToolUse.hooks]]
 type = "command"
@@ -20,12 +20,12 @@ timeout = 10
 statusMessage = "Checking edited paths"
 
 [[hooks.PostToolUse]]
-matcher = "^(apply_patch|Edit|Write)$"
+matcher = "^(apply_patch|Edit|Write|MultiEdit)$"
 
 [[hooks.PostToolUse.hooks]]
 type = "command"
 command = 'bun "$(git rev-parse --show-toplevel)/.codex/hooks/post-edit-quality.ts"'
-timeout = 45
+timeout = 90
 statusMessage = "Formatting and linting edited files"
 
 [[hooks.Stop]]
@@ -33,5 +33,5 @@ statusMessage = "Formatting and linting edited files"
 [[hooks.Stop.hooks]]
 type = "command"
 command = 'bun "$(git rev-parse --show-toplevel)/.codex/hooks/stop-validate.ts"'
-timeout = 180
+timeout = 240
 statusMessage = "Running Codex validation"

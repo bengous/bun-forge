@@ -269,8 +269,18 @@ async function assertAiContract(
   );
   await assertFileContains(root, ".codex/config.toml", "git rev-parse --show-toplevel");
   await assertFileContains(root, ".codex/config.toml", ".codex/hooks/guard-destructive.ts");
+  await assertFileContains(
+    root,
+    ".codex/config.toml",
+    'matcher = "^(apply_patch|Edit|Write|MultiEdit)$"',
+  );
+  await assertFileContains(root, ".codex/config.toml", "timeout = 90");
+  await assertFileContains(root, ".codex/config.toml", "timeout = 240");
   await assertFileExcludes(root, ".codex/config.toml", "CLAUDE_PROJECT_DIR");
   await assertFileExcludes(root, ".codex/config.toml", "hooks.json");
+  await assertFileExcludes(root, ".codex/config.toml", 'matcher = "^(apply_patch|Edit|Write)$"');
+  await assertFileExcludes(root, ".codex/config.toml", "timeout = 45");
+  await assertFileExcludes(root, ".codex/config.toml", "timeout = 180");
   assertPathExists(root, ".codex/hooks/guard-destructive-core.ts");
   assertPathExists(root, ".codex/hooks/guard-destructive-core.test.ts");
   assertPathExists(root, ".claude/hooks/guard-destructive-core.ts");
