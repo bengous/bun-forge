@@ -321,6 +321,7 @@ async function assertAiContract(
   assertPathExists(root, ".agents/agents-md-manifest.json");
   assertPathExists(root, ".mcp.json");
   assertPathExists(root, ".codex/config.toml");
+  await assertFileContains(root, ".codex/config.toml", "hooks = true");
   assertPathMissing(root, ".codex/hooks.json");
   assertPathExists(root, ".codex/hooks/guard-destructive.ts");
   assertPathExists(root, ".codex/hooks/guard-destructive.test.ts");
