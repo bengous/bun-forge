@@ -2,6 +2,7 @@ import type { InitOptions } from "../types.ts";
 import type { GenerationRuntime } from "./generator.ts";
 import { describe, expect, test } from "bun:test";
 import {
+  buildGeneratedProjectContract,
   describeGeneratedProject,
   parsePresetCopyManifest,
   resolveProjectShape,
@@ -369,6 +370,18 @@ describe("generateProjectWithRuntime", () => {
     const { runtime, calls } = createRuntime();
     await generateProjectWithRuntime(makeOptions(), runtime);
     expect(calls).not.toContain("bootstrapFrontendNative");
+  });
+
+  test("passes the generated project contract into template writing", async () => {
+    const options = makeOptions({ frontend: "tanstack", ai: true, effect: true });
+    const expectedContract = buildGeneratedProjectContract(options);
+    const { runtime } = createRuntime({
+      writeTemplates: async (_destination: string, contract: unknown) => {
+        expect(contract).toEqual(expectedContract);
+      },
+    });
+
+    await generateProjectWithRuntime(options, runtime);
   });
 
   test("stops on the first failing stage", async () => {

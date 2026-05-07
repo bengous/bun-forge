@@ -4,7 +4,7 @@ import type { ScaffoldScenario, ScenarioConfig } from "./scenarios.ts";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describeGeneratedProject } from "../../src/core/generated-project-contract.ts";
+import { buildGeneratedProjectContract } from "../../src/core/generated-project-contract.ts";
 import { toBinName, toPackageName, toProjectName } from "../../src/core/naming.ts";
 import { assertGeneratedProjectContract } from "./generated-project-contract-runner.ts";
 import { runCommand } from "./run-command.ts";
@@ -59,7 +59,7 @@ export async function e2eContract(
 
     await assertGeneratedProjectContract(
       dir,
-      describeGeneratedProject({
+      buildGeneratedProjectContract({
         destination: dir,
         projectName: toProjectName(projectName),
         packageName: toPackageName(projectName),

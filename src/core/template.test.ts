@@ -67,7 +67,7 @@ describe("templateValues", () => {
     expect(values["EFFECT_DEPENDENCIES_BLOCK"]).toContain('"@effect/cli"');
     expect(values["EFFECT_DEPENDENCIES_BLOCK"]).toContain('"@effect/platform"');
     expect(values["EFFECT_DEPENDENCIES_BLOCK"]).toContain('"@effect/platform-bun"');
-    expect(values["EFFECT_DEV_DEPENDENCIES"]).toContain('"@effect/language-service"');
+    expect(values["ROOT_DEV_DEPENDENCIES"]).toContain('"@effect/language-service"');
     expect(values["EFFECT_TSCONFIG_PLUGINS"]).toContain("@effect/language-service");
     expect(values["EFFECT_TSCONFIG_PLUGINS"]).toContain("diagnosticSeverity");
   });

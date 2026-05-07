@@ -1,16 +1,17 @@
 import type { InitOptions, TemplateContext } from "../types.ts";
-import type { PresetCopySpec } from "./generated-project-contract.ts";
+import type { GeneratedProjectContract, PresetCopySpec } from "./generated-project-contract.ts";
 import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { ensureDestinationIsSafe } from "./conflicts.ts";
 import { ensureParentDir } from "./filesystem.ts";
 import {
+  buildGeneratedProjectContract,
   describeGeneratedProject,
   templateRenderSpecsForShape,
 } from "./generated-project-contract.ts";
 import { bunInstallEnv, finalizeProject, runCommand } from "./install.ts";
 import { PRESETS } from "./presets.ts";
-import { renderTemplate } from "./template.ts";
+import { renderTemplateFromContract } from "./template.ts";
 
 export type TemplateFile = readonly [templateName: string, relativePath: string];
 
@@ -44,11 +45,16 @@ export function templateFilesForContext(context: TemplateContext): TemplateFile[
   return templateRenderSpecsForShape(context).map((spec) => [spec.templateName, spec.relativePath]);
 }
 
-async function writeTemplates(destination: string, context: TemplateContext): Promise<void> {
-  const templateFiles = templateFilesForContext(context);
+async function writeTemplates(
+  destination: string,
+  contract: GeneratedProjectContract,
+): Promise<void> {
+  const templateFiles = contract.templateRenderSpecs.map(
+    (spec) => [spec.templateName, spec.relativePath] as const,
+  );
   await Promise.all(
     templateFiles.map(async ([templateName, relativePath]) => {
-      const rendered = renderTemplate(templateName, context);
+      const rendered = renderTemplateFromContract(templateName, contract);
       const destinationPath = join(destination, relativePath);
       await ensureParentDir(destinationPath);
       await Bun.write(destinationPath, rendered);
@@ -133,19 +139,19 @@ export async function generateProjectWithRuntime(
   options: InitOptions,
   runtime: GenerationRuntime = defaultGenerationRuntime,
 ): Promise<void> {
-  const description = describeGeneratedProject(options);
+  const contract = buildGeneratedProjectContract(options);
 
   runtime.ensureDestinationIsSafe(options.destination);
   await runtime.mkdir(options.destination, { recursive: true });
-  if (description.nativeBootstrapFlags.backend) {
+  if (contract.nativeBootstrapFlags.backend) {
     await runtime.bootstrapBackendNative(options.destination);
   }
-  if (description.nativeBootstrapFlags.frontend) {
+  if (contract.nativeBootstrapFlags.frontend) {
     await runtime.bootstrapFrontendNative(options.destination);
   }
   await runtime.cleanupNativeScaffold(options);
   await runtime.copyEnabledPresets(options);
-  await runtime.writeTemplates(options.destination, description.templateContext);
+  await runtime.writeTemplates(options.destination, contract);
   await runtime.finalizeProject(options);
 }
 

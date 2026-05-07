@@ -1,8 +1,8 @@
-import type { GeneratedProjectDescription } from "../../src/core/generated-project-contract.ts";
+import type { GeneratedProjectContract } from "../../src/core/generated-project-contract.ts";
 import type { JsonObject } from "../../src/core/json.ts";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { objectField, readJsonObject } from "../../src/core/json.ts";
+import { isJsonObject, objectField, readJsonObject } from "../../src/core/json.ts";
 
 function assertPathExists(root: string, relativePath: string): void {
   if (!existsSync(join(root, relativePath))) {
@@ -50,13 +50,44 @@ function assertObjectHasKey(source: JsonObject, key: string, label: string): voi
   }
 }
 
-function assertDependencyVersion(
+function sortedKeys(source: JsonObject | Readonly<Record<string, string>>): string[] {
+  return Object.keys(source).toSorted();
+}
+
+function assertJsonRecordExact(
   source: JsonObject,
-  packageName: string,
-  expectedVersion: string,
+  expected: Readonly<Record<string, string>>,
   label: string,
 ): void {
-  assertEqual(source[packageName], expectedVersion, `${label} ${packageName}`);
+  const actualKeys = sortedKeys(source);
+  const expectedKeys = sortedKeys(expected);
+  assertEqual(JSON.stringify(actualKeys), JSON.stringify(expectedKeys), `${label} keys`);
+
+  for (const [key, value] of Object.entries(expected)) {
+    assertEqual(source[key], value, `${label} ${key}`);
+  }
+}
+
+function assertOptionalJsonRecordExact(
+  source: unknown,
+  expected: Readonly<Record<string, string>> | undefined,
+  label: string,
+): void {
+  if (expected === undefined) {
+    assertUndefined(source, label);
+    return;
+  }
+  if (!isJsonObject(source)) {
+    throw new TypeError(`Expected ${label} to be an object`);
+  }
+  assertJsonRecordExact(source, expected, label);
+}
+
+function assertStringArrayExact(actual: unknown, expected: readonly string[], label: string): void {
+  if (!Array.isArray(actual)) {
+    throw new TypeError(`Expected ${label} to be an array`);
+  }
+  assertEqual(JSON.stringify(actual), JSON.stringify(expected), label);
 }
 
 async function assertFileContains(
@@ -81,14 +112,14 @@ async function assertFileExcludes(
   }
 }
 
-function assertGeneratedFileSet(root: string, description: GeneratedProjectDescription): void {
-  const generatedPaths = new Set(description.generatedFileSpecs.map((spec) => spec.relativePath));
+function assertGeneratedFileSet(root: string, contract: GeneratedProjectContract): void {
+  const generatedPaths = new Set(contract.generatedFileSpecs.map((spec) => spec.relativePath));
 
-  for (const spec of description.generatedFileSpecs) {
+  for (const spec of contract.generatedFileSpecs) {
     assertPathExists(root, spec.relativePath);
   }
 
-  for (const relativePath of description.cleanupPaths) {
+  for (const relativePath of contract.cleanupPaths) {
     if (generatedPaths.has(relativePath)) {
       continue;
     }
@@ -98,12 +129,12 @@ function assertGeneratedFileSet(root: string, description: GeneratedProjectDescr
 
 async function assertRootContract(
   root: string,
-  description: GeneratedProjectDescription,
+  contract: GeneratedProjectContract,
   packageJson: JsonObject,
   packageScripts: JsonObject,
 ): Promise<void> {
-  const projectName = description.templateContext.projectName;
-  const packageName = description.templateContext.packageName;
+  const projectName = contract.templateContext.projectName;
+  const packageName = contract.templateContext.packageName;
   const lefthook = await Bun.file(join(root, "lefthook.yml")).text();
   const devDependencies = objectField(packageJson, "devDependencies");
 
@@ -128,26 +159,30 @@ async function assertRootContract(
   }
 
   assertEqual(packageJson["name"], packageName, "root package name");
-  assertDependencyVersion(devDependencies, "@types/bun", "1.3.13", "root devDependencies");
-  assertDependencyVersion(devDependencies, "dependency-cruiser", "17.4.0", "root devDependencies");
-  assertDependencyVersion(devDependencies, "jscpd", "4.0.9", "root devDependencies");
-  assertDependencyVersion(devDependencies, "knip", "6.12.0", "root devDependencies");
-  assertDependencyVersion(devDependencies, "lefthook", "2.1.6", "root devDependencies");
-  assertDependencyVersion(devDependencies, "oxfmt", "0.48.0", "root devDependencies");
-  assertDependencyVersion(devDependencies, "oxlint", "1.63.0", "root devDependencies");
-  assertDependencyVersion(
+  assertEqual(packageJson["version"], contract.packageJson.version, "root package version");
+  assertEqual(packageJson["type"], contract.packageJson.type, "root package type");
+  assertEqual(packageJson["private"], contract.packageJson.private, "root package private");
+  assertOptionalJsonRecordExact(packageJson["bin"], contract.packageJson.bin, "root bin");
+  if (contract.packageJson.workspaces === undefined) {
+    assertUndefined(packageJson["workspaces"], "workspaces");
+  } else {
+    assertStringArrayExact(
+      packageJson["workspaces"],
+      contract.packageJson.workspaces,
+      "workspaces",
+    );
+  }
+  assertOptionalJsonRecordExact(
+    packageJson["dependencies"],
+    contract.packageJson.dependencies,
+    "root dependencies",
+  );
+  assertJsonRecordExact(
     devDependencies,
-    "oxlint-plugin-complexity",
-    "2.1.2",
+    contract.packageJson.devDependencies,
     "root devDependencies",
   );
-  assertDependencyVersion(devDependencies, "oxlint-tsgolint", "0.22.1", "root devDependencies");
-  assertDependencyVersion(devDependencies, "typescript", "6.0.3", "root devDependencies");
-  assertEqual(
-    packageScripts["check:links"],
-    "bun scripts/quality/check-links-local.ts",
-    "check:links script",
-  );
+  assertJsonRecordExact(packageScripts, contract.packageJson.scripts, "root scripts");
   assertPathMissing(root, "index.ts");
   assertPathMissing(root, "bun.lock");
   assertPathMissing(root, "node_modules");
@@ -155,12 +190,12 @@ async function assertRootContract(
 
 async function assertBackendContract(
   root: string,
-  description: GeneratedProjectDescription,
+  contract: GeneratedProjectContract,
   packageJson: JsonObject,
   packageScripts: JsonObject,
 ): Promise<void> {
-  const { ai, backend, effect } = description.shape;
-  const projectName = description.templateContext.projectName;
+  const { backend, effect } = contract.shape;
+  const projectName = contract.templateContext.projectName;
   const tsconfig = await Bun.file(join(root, "tsconfig.json")).text();
   const lefthook = await Bun.file(join(root, "lefthook.yml")).text();
 
@@ -168,11 +203,7 @@ async function assertBackendContract(
     assertPathExists(root, "src/index.ts");
     assertPathExists(root, "src/index.test.ts");
     assertDefined(packageJson["bin"], "root bin");
-    assertEqual(
-      packageScripts["test"],
-      ai ? "bun test ./src && bun run test:hooks" : "bun test ./src",
-      "root test script",
-    );
+    assertEqual(packageScripts["test"], contract.packageJson.scripts["test"], "root test script");
     if (!lefthook.includes('- "src/**/*.ts"')) {
       throw new Error('Expected Lefthook to include the backend "src/**/*.ts" glob');
     }
@@ -190,13 +221,21 @@ async function assertBackendContract(
   }
 
   assertUndefined(packageJson["bin"], "root bin");
-  assertEqual(packageScripts["dev"], "bun run dev:frontend", "frontend-only dev script");
+  assertEqual(
+    packageScripts["dev"],
+    contract.packageJson.scripts["dev"],
+    "frontend-only dev script",
+  );
   assertEqual(
     packageScripts["test"],
-    "bun run test:unit && bun run test:hooks",
+    contract.packageJson.scripts["test"],
     "frontend-only test script",
   );
-  assertEqual(packageScripts["test:unit"], "cd apps/frontend && bun run test", "test:unit script");
+  assertEqual(
+    packageScripts["test:unit"],
+    contract.packageJson.scripts["test:unit"],
+    "test:unit script",
+  );
   assertPathMissing(root, "src/index.ts");
   assertPathMissing(root, "src/index.test.ts");
   if (lefthook.includes('- "src/**/*.ts"')) {
@@ -209,7 +248,7 @@ async function assertBackendContract(
 
 async function assertEffectContract(
   root: string,
-  description: GeneratedProjectDescription,
+  contract: GeneratedProjectContract,
   packageJson: JsonObject,
   packageScripts: JsonObject,
 ): Promise<void> {
@@ -217,23 +256,19 @@ async function assertEffectContract(
   const devDependencies = objectField(packageJson, "devDependencies");
   const tsconfig = await Bun.file(join(root, "tsconfig.json")).text();
 
-  if (description.shape.effect) {
+  if (contract.shape.effect) {
     assertPathExists(root, ".gitkeep");
     assertObjectHasKey(dependencies, "effect", "dependencies");
     assertObjectHasKey(dependencies, "@effect/cli", "dependencies");
     assertObjectHasKey(dependencies, "@effect/platform", "dependencies");
     assertObjectHasKey(dependencies, "@effect/platform-bun", "dependencies");
     assertObjectHasKey(devDependencies, "@effect/language-service", "devDependencies");
-    assertDependencyVersion(dependencies, "effect", "3.21.2", "dependencies");
-    assertDependencyVersion(dependencies, "@effect/cli", "0.75.1", "dependencies");
-    assertDependencyVersion(dependencies, "@effect/platform", "0.96.1", "dependencies");
-    assertDependencyVersion(dependencies, "@effect/platform-bun", "0.89.0", "dependencies");
-    assertDependencyVersion(
-      devDependencies,
-      "@effect/language-service",
-      "0.85.1",
-      "devDependencies",
+    assertOptionalJsonRecordExact(
+      packageJson["dependencies"],
+      contract.packageJson.dependencies,
+      "dependencies",
     );
+    assertJsonRecordExact(devDependencies, contract.packageJson.devDependencies, "devDependencies");
     assertDefined(packageScripts["effect:diagnose"], "effect:diagnose script");
     assertDefined(packageScripts["effect:quickfixes"], "effect:quickfixes script");
     if (!tsconfig.includes("@effect/language-service")) {
@@ -251,10 +286,10 @@ async function assertEffectContract(
 
 async function assertAiContract(
   root: string,
-  description: GeneratedProjectDescription,
+  contract: GeneratedProjectContract,
   packageScripts: JsonObject,
 ): Promise<void> {
-  const { ai, backend } = description.shape;
+  const { ai, backend } = contract.shape;
 
   if (!ai) {
     assertPathMissing(root, "CLAUDE.md");
@@ -353,19 +388,19 @@ async function assertAiContract(
   assertDefined(packageScripts["agents:check"], "agents:check script");
   assertEqual(
     packageScripts["test:hooks"],
-    "bun test ./.codex/hooks ./.claude/hooks",
+    contract.packageJson.scripts["test:hooks"],
     "test:hooks script",
   );
 }
 
 async function assertFrontendContract(
   root: string,
-  description: GeneratedProjectDescription,
+  contract: GeneratedProjectContract,
   packageJson: JsonObject,
   packageScripts: JsonObject,
 ): Promise<void> {
-  const { ai, frontend } = description.shape;
-  const projectName = description.templateContext.projectName;
+  const { ai, frontend } = contract.shape;
+  const projectName = contract.templateContext.projectName;
 
   if (frontend !== "tanstack") {
     assertPathMissing(root, "apps/frontend");
@@ -378,7 +413,6 @@ async function assertFrontendContract(
 
   const frontendPackage = await readJsonObject(join(root, "apps/frontend/package.json"));
   const frontendScripts = objectField(frontendPackage, "scripts");
-  const frontendDependencies = objectField(frontendPackage, "dependencies");
   const frontendDevDependencies = objectField(frontendPackage, "devDependencies");
   const workspaces = packageJson["workspaces"];
 
@@ -421,108 +455,39 @@ async function assertFrontendContract(
     '"import/no-default-export": "off"',
   );
 
+  if (!contract.frontend.enabled) {
+    throw new Error("Expected frontend contract to be enabled for TanStack scenario");
+  }
+
+  assertEqual(frontendPackage["name"], contract.frontend.packageJson.name, "frontend package name");
   assertEqual(
-    frontendScripts["lint"],
-    "oxlint --type-aware -c .oxlintrc.jsonc --format=unix src/ e2e/ vite.config.ts playwright.config.ts",
-    "frontend lint script",
+    frontendPackage["version"],
+    contract.frontend.packageJson.version,
+    "frontend package version",
   );
+  assertEqual(frontendPackage["type"], contract.frontend.packageJson.type, "frontend package type");
   assertEqual(
-    frontendScripts["format:check"],
-    "oxfmt --check -c .oxfmtrc.jsonc src/ e2e/ vite.config.ts playwright.config.ts",
-    "frontend format:check script",
+    frontendPackage["private"],
+    contract.frontend.packageJson.private,
+    "frontend package private",
   );
-  assertEqual(frontendScripts["test"], "vitest run --environment jsdom", "frontend test script");
+  assertJsonRecordExact(frontendScripts, contract.frontend.packageJson.scripts, "frontend scripts");
   assertObjectHasKey(frontendDevDependencies, "@playwright/test", "frontend devDependencies");
   assertObjectHasKey(
     frontendDevDependencies,
     "@testing-library/jest-dom",
     "frontend devDependencies",
   );
-  assertDependencyVersion(
-    frontendDependencies,
-    "@tanstack/react-router",
-    "1.169.2",
+  assertOptionalJsonRecordExact(
+    frontendPackage["dependencies"],
+    contract.frontend.packageJson.dependencies,
     "frontend dependencies",
   );
-  assertDependencyVersion(frontendDependencies, "react", "19.2.6", "frontend dependencies");
-  assertDependencyVersion(frontendDependencies, "react-dom", "19.2.6", "frontend dependencies");
-  assertDependencyVersion(
+  assertJsonRecordExact(
     frontendDevDependencies,
-    "@playwright/test",
-    "1.59.1",
+    contract.frontend.packageJson.devDependencies,
     "frontend devDependencies",
   );
-  assertDependencyVersion(
-    frontendDevDependencies,
-    "@tanstack/router-plugin",
-    "1.167.35",
-    "frontend devDependencies",
-  );
-  assertDependencyVersion(
-    frontendDevDependencies,
-    "@testing-library/dom",
-    "10.4.1",
-    "frontend devDependencies",
-  );
-  assertDependencyVersion(
-    frontendDevDependencies,
-    "@testing-library/jest-dom",
-    "6.9.1",
-    "frontend devDependencies",
-  );
-  assertDependencyVersion(
-    frontendDevDependencies,
-    "@testing-library/react",
-    "16.3.2",
-    "frontend devDependencies",
-  );
-  assertDependencyVersion(
-    frontendDevDependencies,
-    "@types/node",
-    "25.6.0",
-    "frontend devDependencies",
-  );
-  assertDependencyVersion(
-    frontendDevDependencies,
-    "@types/react",
-    "19.2.14",
-    "frontend devDependencies",
-  );
-  assertDependencyVersion(
-    frontendDevDependencies,
-    "@types/react-dom",
-    "19.2.3",
-    "frontend devDependencies",
-  );
-  assertDependencyVersion(
-    frontendDevDependencies,
-    "@vitejs/plugin-react",
-    "6.0.1",
-    "frontend devDependencies",
-  );
-  assertDependencyVersion(frontendDevDependencies, "jsdom", "29.1.1", "frontend devDependencies");
-  assertDependencyVersion(frontendDevDependencies, "oxfmt", "0.48.0", "frontend devDependencies");
-  assertDependencyVersion(frontendDevDependencies, "oxlint", "1.63.0", "frontend devDependencies");
-  assertDependencyVersion(
-    frontendDevDependencies,
-    "oxlint-tsgolint",
-    "0.22.1",
-    "frontend devDependencies",
-  );
-  assertDependencyVersion(
-    frontendDevDependencies,
-    "typescript",
-    "6.0.3",
-    "frontend devDependencies",
-  );
-  assertDependencyVersion(
-    frontendDevDependencies,
-    "stylelint",
-    "17.11.0",
-    "frontend devDependencies",
-  );
-  assertDependencyVersion(frontendDevDependencies, "vite", "8.0.11", "frontend devDependencies");
-  assertDependencyVersion(frontendDevDependencies, "vitest", "4.1.5", "frontend devDependencies");
 
   assertPathMissing(root, "apps/frontend/.cta.json");
   assertPathMissing(root, "apps/frontend/.vscode");
@@ -542,16 +507,16 @@ async function assertFrontendContract(
 
 export async function assertGeneratedProjectContract(
   root: string,
-  description: GeneratedProjectDescription,
+  contract: GeneratedProjectContract,
 ): Promise<void> {
-  assertGeneratedFileSet(root, description);
+  assertGeneratedFileSet(root, contract);
 
   const packageJson = await readJsonObject(join(root, "package.json"));
   const packageScripts = objectField(packageJson, "scripts");
 
-  await assertRootContract(root, description, packageJson, packageScripts);
-  await assertBackendContract(root, description, packageJson, packageScripts);
-  await assertEffectContract(root, description, packageJson, packageScripts);
-  await assertAiContract(root, description, packageScripts);
-  await assertFrontendContract(root, description, packageJson, packageScripts);
+  await assertRootContract(root, contract, packageJson, packageScripts);
+  await assertBackendContract(root, contract, packageJson, packageScripts);
+  await assertEffectContract(root, contract, packageJson, packageScripts);
+  await assertAiContract(root, contract, packageScripts);
+  await assertFrontendContract(root, contract, packageJson, packageScripts);
 }

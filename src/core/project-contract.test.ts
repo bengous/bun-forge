@@ -5,8 +5,9 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { assertGeneratedProjectContract } from "../../scripts/testing/generated-project-contract-runner.ts";
-import { describeGeneratedProject } from "./generated-project-contract.ts";
+import { buildGeneratedProjectContract } from "./generated-project-contract.ts";
 import { defaultGenerationRuntime, generateProjectWithRuntime } from "./generator.ts";
+import { objectField, readJsonObject } from "./json.ts";
 import { toBinName, toPackageName, toProjectName } from "./naming.ts";
 
 type Scenario = {
@@ -102,10 +103,89 @@ async function generateScenario(scenario: Scenario): Promise<string> {
   return destination;
 }
 
+async function expectContractRejects(
+  destination: string,
+  scenario: Scenario,
+  expectedMessage: string,
+): Promise<void> {
+  try {
+    await assertGeneratedProjectContract(
+      destination,
+      buildGeneratedProjectContract(makeOptions(destination, scenario)),
+    );
+    throw new Error(`Expected generated project contract to reject ${expectedMessage}`);
+  } catch (error) {
+    expect(error).toBeInstanceOf(Error);
+    expect(String(error)).toContain(expectedMessage);
+  }
+}
+
+test("generated project contract rejects extra root package scripts", async () => {
+  const scenario: Scenario = {
+    name: "none-plain",
+    backend: true,
+    frontend: "none",
+    ai: false,
+    effect: false,
+  };
+  const destination = await generateScenario(scenario);
+  const packagePath = join(destination, "package.json");
+  const packageJson = await readJsonObject(packagePath);
+  const scripts = objectField(packageJson, "scripts");
+
+  await Bun.write(
+    packagePath,
+    JSON.stringify(
+      {
+        ...packageJson,
+        scripts: {
+          ...scripts,
+          unexpected: "bun unexpected",
+        },
+      },
+      null,
+      2,
+    ),
+  );
+
+  await expectContractRejects(destination, scenario, "root scripts");
+});
+
+test("generated project contract rejects extra frontend package dependencies", async () => {
+  const scenario: Scenario = {
+    name: "tanstack-plain",
+    backend: true,
+    frontend: "tanstack",
+    ai: false,
+    effect: false,
+  };
+  const destination = await generateScenario(scenario);
+  const packagePath = join(destination, "apps/frontend/package.json");
+  const packageJson = await readJsonObject(packagePath);
+  const dependencies = objectField(packageJson, "dependencies");
+
+  await Bun.write(
+    packagePath,
+    JSON.stringify(
+      {
+        ...packageJson,
+        dependencies: {
+          ...dependencies,
+          unexpected: "1.0.0",
+        },
+      },
+      null,
+      2,
+    ),
+  );
+
+  await expectContractRejects(destination, scenario, "frontend dependencies");
+});
+
 for (const scenario of scenarios) {
   test(`generated project contract: ${scenario.name}`, async () => {
     const destination = await generateScenario(scenario);
-    const description = describeGeneratedProject(makeOptions(destination, scenario));
+    const description = buildGeneratedProjectContract(makeOptions(destination, scenario));
 
     await assertGeneratedProjectContract(destination, description);
     expect(await Bun.file(join(destination, "README.md")).text()).not.toContain(

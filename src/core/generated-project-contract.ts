@@ -62,6 +62,53 @@ export type GeneratedProjectDescription = {
   readonly generatedFileSpecs: readonly GeneratedFileSpec[];
 };
 
+export type PackageJsonContract = {
+  readonly name: string;
+  readonly version: string;
+  readonly type: "module";
+  readonly private: true;
+  readonly bin?: Readonly<Record<string, string>>;
+  readonly workspaces?: readonly string[];
+  readonly scripts: Readonly<Record<string, string>>;
+  readonly dependencies?: Readonly<Record<string, string>>;
+  readonly devDependencies: Readonly<Record<string, string>>;
+};
+
+export type RootToolingContract = {
+  readonly lintPaths: readonly string[];
+  readonly archPaths: readonly string[];
+  readonly formatGlobs: readonly string[];
+  readonly tsconfigInclude: readonly string[];
+  readonly knipRootEntry: readonly string[];
+  readonly knipRootProject: readonly string[];
+  readonly lefthookRootGlobs: readonly string[];
+  readonly lefthookTypecheckGlobs: readonly string[];
+};
+
+export type FrontendContract =
+  | {
+      readonly enabled: false;
+    }
+  | {
+      readonly enabled: true;
+      readonly packageJson: PackageJsonContract;
+      readonly knipWorkspace: {
+        readonly entry: readonly string[];
+        readonly project: readonly string[];
+      };
+      readonly lintPaths: readonly string[];
+      readonly archPaths: readonly string[];
+      readonly formatPaths: readonly string[];
+      readonly cssGlob: string;
+      readonly lefthookGlob: string;
+    };
+
+export type GeneratedProjectContract = GeneratedProjectDescription & {
+  readonly packageJson: PackageJsonContract;
+  readonly rootTooling: RootToolingContract;
+  readonly frontend: FrontendContract;
+};
+
 const BASE_CLEANUP_PATHS = ["CLAUDE.md", "index.ts", "bun.lock", "node_modules"] as const;
 
 const FRONTEND_CLEANUP_PATHS = [
@@ -349,11 +396,238 @@ function generatedFileSpecsForDescription(
   ];
 }
 
-export function describeGeneratedProject(options: InitOptions): GeneratedProjectDescription {
+function packageJsonContractForContext(
+  context: TemplateContext,
+  rootTooling: RootToolingContract,
+): PackageJsonContract {
+  const lintPaths = rootTooling.lintPaths.join(" ");
+  const archPaths = rootTooling.archPaths.join(" ");
+  const formatGlobs = rootTooling.formatGlobs.join(" ");
+  const scripts: Record<string, string> = {
+    dev: context.backend ? "bun run src/index.ts" : "bun run dev:frontend",
+    typecheck: "tsc --noEmit --pretty false",
+    lint: `oxlint -c .oxlintrc.jsonc --format=unix ${lintPaths}`,
+    "lint:errors": `oxlint -c .oxlintrc.jsonc --quiet --format=unix ${lintPaths}`,
+    "lint:arch": `dependency-cruiser --config .dependency-cruiser.cjs --output-type err ${archPaths}`,
+    "lint:dead": "knip --include files,dependencies,unlisted,binaries --reporter compact",
+    "lint:dupes": "jscpd --config .jscpd.json",
+    format: `oxfmt --write -c .oxfmtrc.jsonc ${formatGlobs}`,
+    "format:check": `oxfmt --check -c .oxfmtrc.jsonc ${formatGlobs}`,
+    autofix: `oxlint -c .oxlintrc.jsonc --fix ${lintPaths} && oxfmt --write -c .oxfmtrc.jsonc ${formatGlobs}`,
+    test: context.backend
+      ? context.ai
+        ? "bun test ./src && bun run test:hooks"
+        : "bun test ./src"
+      : context.ai
+        ? "bun run test:unit && bun run test:hooks"
+        : "bun run test:unit",
+    "lint:audit": "bun scripts/quality/audit-oxlint-rules.ts",
+    "check:links": "bun scripts/quality/check-links-local.ts",
+    "repo:bootstrap": "bun scripts/setup/bootstrap-git-config.ts",
+    prepare: "bun scripts/setup/bootstrap-prepare.ts",
+    validate: "bun scripts/validation/validate.ts",
+    "validate:scale":
+      "bun run --silent validate && bun run --silent lint:dead && bun run --silent lint:arch && bun run --silent lint:dupes && bun run --silent check:links",
+  };
+
+  if (context.frontend === "tanstack") {
+    scripts["test:unit"] = "cd apps/frontend && bun run test";
+    scripts["dev:frontend"] = "cd apps/frontend && bun run dev";
+    scripts["typecheck:frontend"] = "cd apps/frontend && bun run typecheck";
+    scripts["lint:frontend"] = "cd apps/frontend && bun run lint";
+    scripts["format:check:frontend"] = "cd apps/frontend && bun run format:check";
+    scripts["lint:arch:frontend"] =
+      "cd apps/frontend && dependency-cruiser --config .dependency-cruiser.cjs --output-type err src e2e playwright.config.ts vite.config.ts";
+    scripts["lint:css:frontend"] = "cd apps/frontend && bun run lint:css";
+    scripts["build:frontend"] = "cd apps/frontend && bun run build";
+    scripts["test:e2e"] = "cd apps/frontend && bunx playwright test";
+    scripts["validate:frontend"] =
+      "bun run --silent typecheck:frontend && cd apps/frontend && bun run --silent test && cd ../.. && bun run --silent lint:frontend && bun run --silent format:check:frontend && bun run --silent lint:arch:frontend && bun run --silent lint:css:frontend && bun run --silent build:frontend && bun run --silent test:e2e";
+  }
+
+  if (context.ai) {
+    scripts["test:hooks"] = "bun test ./.codex/hooks ./.claude/hooks";
+    scripts["agents:sync"] = "bun scripts/agents/sync-agents-md.ts --write";
+    scripts["agents:check"] = "bun scripts/agents/sync-agents-md.ts --check";
+  }
+
+  if (context.effect) {
+    scripts["effect:diagnose"] = "effect-language-service diagnostics --project tsconfig.json";
+    scripts["effect:quickfixes"] = "effect-language-service quickfixes --project tsconfig.json";
+  }
+
+  return {
+    name: context.packageName,
+    version: "0.1.0",
+    type: "module",
+    private: true,
+    ...(context.backend ? { bin: { [context.binName]: "./src/index.ts" } } : {}),
+    ...(context.hasWorkspaces ? { workspaces: ["apps/*"] } : {}),
+    scripts,
+    ...(context.effect
+      ? {
+          dependencies: {
+            "@effect/cli": "0.75.1",
+            "@effect/platform": "0.96.1",
+            "@effect/platform-bun": "0.89.0",
+            effect: "3.21.2",
+          },
+        }
+      : {}),
+    devDependencies: {
+      ...(context.effect ? { "@effect/language-service": "0.85.1" } : {}),
+      "@types/bun": "1.3.13",
+      "dependency-cruiser": "17.4.0",
+      jscpd: "4.0.9",
+      knip: "6.12.0",
+      lefthook: "2.1.6",
+      oxfmt: "0.48.0",
+      oxlint: "1.63.0",
+      "oxlint-plugin-complexity": "2.1.2",
+      "oxlint-tsgolint": "0.22.1",
+      typescript: "6.0.3",
+    },
+  };
+}
+
+function rootToolingContractForContext(context: TemplateContext): RootToolingContract {
+  const lintPaths = [
+    ...(context.backend ? ["src/"] : []),
+    "scripts/",
+    ...(context.ai ? [".codex/hooks/", ".claude/hooks/"] : []),
+  ];
+  const archPaths = [
+    ...(context.backend ? ["src"] : []),
+    "scripts",
+    ...(context.ai ? ["./.codex/hooks", "./.claude/hooks"] : []),
+  ];
+  const formatGlobs = [
+    ...(context.backend ? ["'src/**/*.{ts,tsx,js,jsx,mjs}'"] : []),
+    "'scripts/**/*.{ts,tsx,js,jsx,mjs}'",
+    ...(context.ai
+      ? ["'.codex/hooks/**/*.{ts,tsx,js,jsx,mjs}'", "'.claude/hooks/**/*.{ts,tsx,js,jsx,mjs}'"]
+      : []),
+  ];
+  const tsconfigInclude = [
+    ...(context.backend ? ["src/**/*.ts"] : []),
+    "scripts/**/*.ts",
+    ...(context.ai ? [".codex/hooks/**/*.ts", ".claude/hooks/**/*.ts"] : []),
+  ];
+  const knipRootEntry = [
+    ...(context.backend ? ["src/index.ts", "src/**/*.test.ts"] : []),
+    "scripts/**/*.ts",
+    ...(context.ai ? [".claude/hooks/**/*.ts", ".codex/hooks/**/*.ts"] : []),
+  ];
+  const knipRootProject = [
+    ...(context.backend ? ["src/**/*.ts"] : []),
+    "scripts/**/*.ts",
+    ...(context.ai ? [".claude/hooks/**/*.ts", ".codex/hooks/**/*.ts"] : []),
+  ];
+  const lefthookRootGlobs = [
+    "scripts/**/*.ts",
+    ...(context.backend ? ["src/**/*.ts"] : []),
+    ...(context.ai ? [".codex/hooks/**/*.ts", ".claude/hooks/**/*.ts"] : []),
+  ];
+  const lefthookTypecheckGlobs = [
+    ...lefthookRootGlobs,
+    ...(context.frontend === "tanstack" ? ["apps/frontend/**/*.{ts,tsx}"] : []),
+  ];
+
+  return {
+    lintPaths,
+    archPaths,
+    formatGlobs,
+    tsconfigInclude,
+    knipRootEntry,
+    knipRootProject,
+    lefthookRootGlobs,
+    lefthookTypecheckGlobs,
+  };
+}
+
+function frontendContractForContext(context: TemplateContext): FrontendContract {
+  if (context.frontend !== "tanstack") {
+    return { enabled: false };
+  }
+
+  const lintPaths = ["src/", "e2e/", "vite.config.ts", "playwright.config.ts"];
+  const formatPaths = ["src/", "e2e/", "vite.config.ts", "playwright.config.ts"];
+  const archPaths = ["src", "e2e", "playwright.config.ts", "vite.config.ts"];
+
+  return {
+    enabled: true,
+    lintPaths,
+    archPaths,
+    formatPaths,
+    cssGlob: "src/**/*.css",
+    lefthookGlob: "apps/frontend/**/*.{ts,tsx}",
+    knipWorkspace: {
+      entry: [
+        "src/main.tsx",
+        "src/routes/**/*.{ts,tsx}",
+        "src/**/*.{test,spec}.{ts,tsx}",
+        "e2e/**/*.ts",
+        "playwright.config.ts",
+        "vite.config.ts",
+      ],
+      project: ["src/**/*.{ts,tsx}", "e2e/**/*.ts", "playwright.config.ts", "vite.config.ts"],
+    },
+    packageJson: {
+      name: `@${context.packageName}/frontend`,
+      version: "0.0.0",
+      type: "module",
+      private: true,
+      scripts: {
+        dev: "vite dev --port 3000",
+        build: "vite build && tsc -b --pretty false",
+        test: "vitest run --environment jsdom",
+        typecheck: "tsc -b --pretty false",
+        lint: `oxlint --type-aware -c .oxlintrc.jsonc --format=unix ${lintPaths.join(" ")}`,
+        "lint:errors": `oxlint --type-aware -c .oxlintrc.jsonc --quiet --format=unix ${lintPaths.join(
+          " ",
+        )}`,
+        format: `oxfmt --write -c .oxfmtrc.jsonc ${formatPaths.join(" ")}`,
+        "format:check": `oxfmt --check -c .oxfmtrc.jsonc ${formatPaths.join(" ")}`,
+        "lint:css": 'stylelint "src/**/*.css"',
+        autofix: `oxlint --type-aware -c .oxlintrc.jsonc --fix ${lintPaths.join(
+          " ",
+        )} && oxfmt --write -c .oxfmtrc.jsonc ${formatPaths.join(" ")}`,
+        preview: "vite preview",
+      },
+      dependencies: {
+        "@tanstack/react-router": "1.169.2",
+        react: "19.2.6",
+        "react-dom": "19.2.6",
+      },
+      devDependencies: {
+        "@playwright/test": "1.59.1",
+        "@tanstack/router-plugin": "1.167.35",
+        "@testing-library/dom": "10.4.1",
+        "@testing-library/jest-dom": "6.9.1",
+        "@testing-library/react": "16.3.2",
+        "@types/node": "25.6.0",
+        "@types/react": "19.2.14",
+        "@types/react-dom": "19.2.3",
+        "@vitejs/plugin-react": "6.0.1",
+        jsdom: "29.1.1",
+        oxfmt: "0.48.0",
+        oxlint: "1.63.0",
+        "oxlint-tsgolint": "0.22.1",
+        stylelint: "17.11.0",
+        typescript: "6.0.3",
+        vite: "8.0.11",
+        vitest: "4.1.5",
+      },
+    },
+  };
+}
+
+export function buildGeneratedProjectContract(options: InitOptions): GeneratedProjectContract {
   const shape = resolveProjectShape(options);
   const templateContext = templateContextForOptions(options, shape);
   const presetCopySpecs = presetCopySpecsForShape(shape);
   const templateRenderSpecs = templateRenderSpecsForShape(shape);
+  const rootTooling = rootToolingContractForContext(templateContext);
 
   return {
     shape,
@@ -370,5 +644,18 @@ export function describeGeneratedProject(options: InitOptions): GeneratedProject
       templateRenderSpecs,
       shape,
     ),
+    packageJson: packageJsonContractForContext(templateContext, rootTooling),
+    rootTooling,
+    frontend: frontendContractForContext(templateContext),
   };
+}
+
+export function describeGeneratedProject(options: InitOptions): GeneratedProjectDescription {
+  const {
+    packageJson: _packageJson,
+    rootTooling: _rootTooling,
+    frontend: _frontend,
+    ...description
+  } = buildGeneratedProjectContract(options);
+  return description;
 }
