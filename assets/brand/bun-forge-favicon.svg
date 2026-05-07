@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title>bun-forge favicon</title>
+  <rect width="512" height="512" rx="104" fill="#fbf7ef"/>
+  <path
+    d="M132 222c16-82 87-135 139-135 50 0 98 49 112 135H132Z"
+    fill="#f7dfb7"
+    stroke="#101820"
+    stroke-width="34"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M94 231h324c20 0 34 16 28 36l-15 50c-4 14-17 24-32 24h-28l-20 54H161l-20-54h-28c-15 0-28-10-32-24l-15-50c-6-20 8-36 28-36Z"
+    fill="#20292d"
+    stroke="#101820"
+    stroke-width="30"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M213 286l-44 42 44 42M300 286l44 42-44 42M270 279l-31 98"
+    fill="none"
+    stroke="#fffdf8"
+    stroke-width="38"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M230 134c19-12 29-25 31-45M276 134c14-16 18-30 15-47"
+    fill="none"
+    stroke="#bd8845"
+    stroke-width="17"
+    stroke-linecap="round"
+  />
+</svg>

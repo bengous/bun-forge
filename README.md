@@ -1,134 +1,65 @@
-# bun-forge
+<h1 align="center">bun-forge</h1>
 
-Opinionated Bun project scaffolder.
+<p align="center">
+  <img src="./assets/brand/bun-forge-logo-full-640.png" alt="bun-forge logo: a smiling bun holding a forge hammer behind a code anvil" width="360" />
+</p>
 
-bun-forge starts from native ecosystem bootstraps, then normalizes the result into a Bun/TypeScript project with linting, formatting, tests, git hooks, validation scripts, and optional AI tooling.
+An opinionated Bun project starter for people who code with AI agents and want stronger guardrails from the first commit.
 
-## Quick start
+It will not eliminate AI slop. No scaffold can. What it can do is catch obvious bugs earlier, enforce a shared set of conventions, and give agents a project shape that is harder to damage by accident.
 
-Install from npm:
+## Why this exists
+
+This project started from a recurring frustration: too much time was going into correcting the same classes of agent mistakes across different repositories.
+
+At first, the fix was manual. Add the tools. Add the hooks. Tighten the lint rules. Bump OXLint, Biome, or another checker when a new family of mistakes kept showing up. Repeat the same setup in the next repo. Fix the same category of issues again.
+
+Eventually the pattern became clear: the problem should be handled closer to the source.
+
+The result is a reusable project foundation: centralized, shareable, and intentionally opinionated, while still being something you can tweak per project later.
+
+## What it gives you
+
+- A Bun/TypeScript project baseline with conventions already in place
+- Guardrails for common mistakes before they become review work
+- A repeatable setup for repos that will be touched by humans and AI agents
+- Tooling and hooks that keep the project honest during day-to-day changes
+- A way to apply the same baseline to an existing project instead of rebuilding it manually
+
+## Who it is for
+
+It is useful if you:
+
+- build Bun projects with AI coding agents
+- want to start vibe coding with more guardrails
+- keep seeing agents produce the same avoidable mistakes
+- want conventions enforced by tools instead of remembered by humans
+- need a shared baseline across several repositories
+
+## What it is not
+
+This is not a guarantee of good code. It will not replace judgment, review, tests, or product thinking.
+
+It is a starting point that makes the easy mistakes harder, keeps conventions visible, and reduces the amount of cleanup needed before real work can begin.
+
+## Start a new project
 
 ```bash
 bunx bun-forge@0.1.0 my-app --yes
 ```
 
-Omit `--yes` to answer prompts:
-
-```bash
-bunx bun-forge@0.1.0 my-app
-```
-
-## Project shapes
-
-The default project is a Bun backend with AI tooling, install/bootstrap enabled, and git initialized.
-
-| Option | Values | Default | Effect |
-|--------|--------|---------|--------|
-| `--backend` | `true` \| `false` | `true` | Generate a Bun backend starter |
-| `--frontend` | `none` \| `tanstack` | `none` | Add a React 19 + TanStack Router frontend in `apps/frontend/` |
-| `--ai` | `true` \| `false` | `true` | Add Claude/Codex hooks, rules, MCP config, and generated `AGENTS.md` files |
-| `--effect` | `true` \| `false` | `false` | Use an Effect backend starter and Effect tooling |
-| `--install` | `true` \| `false` | `true` | Run `bun install`, project `prepare`, and `mise install` when available |
-| `--git-init` | `true` \| `false` | `true` | Initialize a git repository |
-
-`--backend false` requires `--frontend tanstack`. `--effect true` requires the backend starter.
-
-Examples:
-
-```bash
-bunx bun-forge@0.1.0 api --backend true --frontend none --ai false --yes
-bunx bun-forge@0.1.0 web --frontend tanstack --effect true --yes
-bunx bun-forge@0.1.0 frontend-only --backend false --frontend tanstack --install false --yes
-```
-
 ## Adopt an existing project
 
-`adopt` plans Bun Forge tooling for an existing Bun/TypeScript project. It is dry-run by default.
-
-```bash
-bunx bun-forge@0.1.0 adopt . --yes
-```
-
-Apply the plan:
+Apply the `bun-forge` baseline to an existing Bun/TypeScript project.
 
 ```bash
 bunx bun-forge@0.1.0 adopt . --apply --yes
 ```
 
-Run install/bootstrap after applying:
+## In short
 
-```bash
-bunx bun-forge@0.1.0 adopt . --apply --install true --yes
-```
+A starting point for people who want to code faster with AI without accepting the default mess that often comes with it.
 
-Rollback a previous adoption run:
+## License
 
-```bash
-bunx bun-forge@0.1.0 adopt . --rollback <runId> --yes
-```
-
-Adoption options:
-
-| Flag | Values | Default | Effect |
-|------|--------|---------|--------|
-| `--name` | string | destination package name | Override project/package naming |
-| `--frontend` | `none` \| `tanstack` | `none` | Include frontend-related Bun Forge files |
-| `--ai` | `true` \| `false` | `true` | Include Claude/Codex/AGENTS tooling |
-| `--effect` | `true` \| `false` | `false` | Include Effect backend files |
-| `--install` | `true` \| `false` | `false` | Run install/bootstrap after apply |
-| `--apply` | flag | off | Write the adoption plan |
-| `--rollback` | run id | unset | Restore files from a previous adoption backup |
-| `--yes` | flag | off | Skip prompts and use defaults |
-
-## CLI usage
-
-```text
-bun-forge [options] [command] [destination]
-```
-
-Root options:
-
-```text
---name <projectName>
---backend <enabled>
---frontend <preset>
---ai <enabled>
---effect <enabled>
---install <enabled>
---git-init <enabled>
---yes
-```
-
-Subcommands:
-
-```text
-adopt [options] [destination]
-```
-
-## Generated project scripts
-
-Generated projects include the root scripts needed for local development and validation.
-
-| Command | Purpose |
-|---------|---------|
-| `bun run dev` | Run the project |
-| `bun run test` | Run tests |
-| `bun run lint` | Lint with OXLint |
-| `bun run format` | Format with OXFmt |
-| `bun run autofix` | Lint fix + format |
-| `bun run typecheck` | Type-check with TypeScript |
-| `bun run validate` | Run the validation suite |
-| `bun run lint:arch` | Check module boundaries |
-| `bun run lint:dead` | Find unused files, exports, and dependencies |
-| `bun run lint:dupes` | Find duplicated code |
-
-Frontend projects also include frontend-specific validation scripts under `apps/frontend/`.
-
-## Contributing
-
-```bash
-bun install
-bun run repo:prepare
-bun run dev -- /tmp/my-app --yes
-bun run validate
-```
+MIT
