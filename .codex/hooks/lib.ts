@@ -140,17 +140,16 @@ export function extractTouchedPaths(input: HookInput, root = repoRoot(input)): s
 export function extractApplyPatchPaths(patch: string): string[] {
   const prefixes = ["*** Add File: ", "*** Update File: ", "*** Delete File: ", "*** Move to: "];
 
-  return [
-    ...new Set(
-      patch
-        .split(/\r?\n/)
-        .flatMap((rawLine) =>
-          prefixes.flatMap((prefix) =>
-            rawLine.startsWith(prefix) ? [rawLine.slice(prefix.length).trim()] : [],
-          ),
-        ),
-    ),
-  ];
+  const paths = new Set<string>();
+  for (const rawLine of patch.split(/\r?\n/)) {
+    for (const prefix of prefixes) {
+      if (rawLine.startsWith(prefix)) {
+        paths.add(rawLine.slice(prefix.length).trim());
+      }
+    }
+  }
+
+  return [...paths];
 }
 
 function candidateTouchedPaths(toolInput: Record<string, unknown>): readonly string[] {

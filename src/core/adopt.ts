@@ -646,13 +646,20 @@ async function rollbackBackupEntry(
 }
 
 export function formatAdoptionPlan(plan: AdoptionPlan): string {
-  const byKind = Object.groupBy(plan.actions, (action) => action.kind);
-  const count = (kind: AdoptionAction["kind"]): number => byKind[kind]?.length ?? 0;
+  const counts: Record<AdoptionAction["kind"], number> = {
+    conflict: 0,
+    create: 0,
+    modify: 0,
+    skip: 0,
+  };
+  for (const action of plan.actions) {
+    counts[action.kind] += 1;
+  }
 
   const lines = [
     `Adoption plan for ${plan.destination}`,
     `runId: ${plan.runId}`,
-    `create: ${count("create")}, modify: ${count("modify")}, skip: ${count("skip")}, conflict: ${count("conflict")}`,
+    `create: ${counts.create}, modify: ${counts.modify}, skip: ${counts.skip}, conflict: ${counts.conflict}`,
   ];
 
   for (const action of plan.actions) {

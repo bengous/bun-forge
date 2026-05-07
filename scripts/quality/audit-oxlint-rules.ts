@@ -229,9 +229,16 @@ function parseCatalogRules(): ReadonlyArray<CatalogRule> {
 function groupByPlugin<T extends { readonly plugin: string }>(
   items: ReadonlyArray<T>,
 ): ReadonlyArray<readonly [string, T[]]> {
-  return Object.entries(Object.groupBy(items, (item) => item.plugin))
-    .map(([plugin, rules]) => [plugin, rules ?? []] as const)
-    .toSorted(([a], [b]) => a.localeCompare(b));
+  const groups = new Map<string, T[]>();
+  for (const item of items) {
+    const bucket = groups.get(item.plugin);
+    if (bucket === undefined) {
+      groups.set(item.plugin, [item]);
+    } else {
+      bucket.push(item);
+    }
+  }
+  return [...groups.entries()].toSorted(([left], [right]) => left.localeCompare(right));
 }
 
 function printSummary(

@@ -319,7 +319,6 @@ async function readManifest(): Promise<Manifest> {
 async function buildDirectoryMap(): Promise<{
   dirToRules: Map<string, Rule[]>;
   sourceContentByPath: Map<string, string>;
-  outputSourceByPath: Map<string, string>;
 }> {
   const glob = new Glob("*.md");
 
@@ -327,7 +326,6 @@ async function buildDirectoryMap(): Promise<{
     .filter((filename) => filename !== "AGENTS.md")
     .toSorted((left, right) => left.localeCompare(right));
   const sourceContentByPath = new Map<string, string>();
-  const outputSourceByPath = new Map<string, string>();
 
   const rules = await Promise.all(
     ruleFiles.map(async (filename) => {
@@ -351,10 +349,9 @@ async function buildDirectoryMap(): Promise<{
     } else {
       bucket.push(rule);
     }
-    outputSourceByPath.set(`${dir}/AGENTS.md`, `${RULES_DIR}/${rule.name}`);
   }
 
-  return { dirToRules, sourceContentByPath, outputSourceByPath };
+  return { dirToRules, sourceContentByPath };
 }
 
 function buildAgentsMdGenerationPlan(input: {
@@ -362,7 +359,6 @@ function buildAgentsMdGenerationPlan(input: {
   readonly oldManifest: Manifest;
   readonly rootContent: string;
   readonly sourceContentByPath: ReadonlyMap<string, string>;
-  readonly outputSourceByPath: ReadonlyMap<string, string>;
   readonly preserveExistingRoot: boolean;
 }): AgentsMdGenerationPlan {
   const generated = new Map<string, string>();
@@ -387,9 +383,6 @@ function buildAgentsMdGenerationPlan(input: {
     if (path !== ROOT_MD || !input.preserveExistingRoot) {
       sourceContentByPath.set(path, content);
     }
-  }
-  for (const [path, sourcePath] of input.outputSourceByPath) {
-    outputSourceByPath.set(path, sourcePath);
   }
 
   return {
@@ -474,12 +467,9 @@ async function checkManifest(expectedManifest: Manifest): Promise<string[]> {
     return [`${MANIFEST_PATH}: invalid manifest shape — run \`bun run agents:sync\``];
   }
 
-  const expectedPaths = [...expectedManifest.generated].toSorted((left, right) =>
-    left.localeCompare(right),
-  );
   const actualPaths = generatedPathsFromManifest(currentManifest);
   const errors: string[] = [];
-  if (JSON.stringify(expectedPaths) !== JSON.stringify(actualPaths)) {
+  if (JSON.stringify(expectedManifest.generated) !== JSON.stringify(actualPaths)) {
     errors.push(`${MANIFEST_PATH}: manifest path drift — run \`bun run agents:sync\``);
   }
   if (JSON.stringify(expectedManifest) !== JSON.stringify(currentManifest)) {
@@ -526,7 +516,7 @@ async function main(): Promise<void> {
   const mode = process.argv.includes("--write") ? "write" : "check";
   const preserveRoot = process.argv.includes("--preserve-root");
 
-  const { dirToRules, sourceContentByPath, outputSourceByPath } = await buildDirectoryMap();
+  const { dirToRules, sourceContentByPath } = await buildDirectoryMap();
   const rootContent = normalizeNewlines(await Bun.file(ROOT_MD).text());
   sourceContentByPath.set(ROOT_MD, rootContent);
   const oldManifest = await readManifest();
@@ -539,7 +529,6 @@ async function main(): Promise<void> {
     oldManifest,
     rootContent,
     sourceContentByPath,
-    outputSourceByPath,
     preserveExistingRoot,
   });
   const manifest = buildManifest(plan);

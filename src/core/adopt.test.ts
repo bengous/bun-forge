@@ -4,10 +4,12 @@ import { lstatSync, mkdtempSync, mkdirSync, symlinkSync, writeFileSync } from "n
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { brandValue } from "../types.ts";
 import {
   applyAdoptionPlan,
   buildAdoptionPlan,
   deriveAdoptOptions,
+  formatAdoptionPlan,
   rollbackAdoption,
 } from "./adopt.ts";
 import { toExistingBinName, toExistingPackageName, toProjectName } from "./naming.ts";
@@ -162,6 +164,47 @@ describe("deriveAdoptOptions", () => {
       }
       expect(error.message).toContain("Adoption currently supports Bun/TypeScript projects only");
     }
+  });
+});
+
+describe("formatAdoptionPlan", () => {
+  test("counts actions by kind without changing plan line order", () => {
+    const result = formatAdoptionPlan({
+      destination: "/tmp/adopt-target",
+      runId: brandValue<string, "BackupRunId">("run-1"),
+      actions: [
+        {
+          kind: "create",
+          path: brandValue<string, "SafeRelativePath">("created.ts"),
+          reason: "new file",
+          content: "",
+        },
+        {
+          kind: "modify",
+          path: brandValue<string, "SafeRelativePath">("package.json"),
+          reason: "merge scripts",
+          content: "",
+        },
+        {
+          kind: "skip",
+          path: brandValue<string, "SafeRelativePath">("README.md"),
+          reason: "already equivalent",
+        },
+        {
+          kind: "conflict",
+          path: brandValue<string, "SafeRelativePath">("src"),
+          reason: "parent path is a file",
+        },
+      ],
+    });
+
+    expect(result).toContain("create: 1, modify: 1, skip: 1, conflict: 1");
+    expect(result.split("\n").slice(3, 7)).toEqual([
+      "create   created.ts - new file",
+      "modify   package.json - merge scripts",
+      "skip     README.md - already equivalent",
+      "conflict src - parent path is a file",
+    ]);
   });
 });
 
