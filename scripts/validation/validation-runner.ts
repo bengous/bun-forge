@@ -5,11 +5,17 @@ const SPAWN_OPTS = {
   ...(process.platform === "win32" ? { windowsHide: true } : {}),
 };
 
-type ValidationResult = {
+export type ValidationResult = {
   readonly step: string;
   readonly exit: number;
   readonly output: string;
   readonly ms: number;
+};
+
+export type ValidationSummary = {
+  readonly total: number;
+  readonly failed: number;
+  readonly passed: number;
 };
 
 function parseFlag(args: readonly string[], flag: string, fallback: number): number {
@@ -49,6 +55,17 @@ function printFail(result: ValidationResult): void {
     console.error(result.output);
     console.error();
   }
+}
+
+export function summarizeValidationResults(
+  results: readonly ValidationResult[],
+): ValidationSummary {
+  const failed = results.filter((result) => result.exit !== 0).length;
+  return {
+    total: results.length,
+    failed,
+    passed: results.length - failed,
+  };
 }
 
 async function run(step: string): Promise<ValidationResult> {
@@ -112,15 +129,13 @@ export async function executeValidationPlan(
   const availableScripts = new Set(await packageScripts());
   const steps = resolveSteps(plan).filter((step) => availableScripts.has(step));
 
-  let failed = 0;
-  let total = 0;
+  const results: ValidationResult[] = [];
 
   function record(result: ValidationResult): void {
-    total++;
     if (result.exit !== 0) {
-      failed++;
       printFail(result);
     }
+    results.push(result);
   }
 
   if (verbose) {
@@ -131,10 +146,12 @@ export async function executeValidationPlan(
     await pool(steps, jobs, record);
   }
 
-  if (failed === 0) {
+  const summary = summarizeValidationResults(results);
+
+  if (summary.failed === 0) {
     console.log("OK");
   } else {
-    console.log(`validate: ${total - failed}/${total} passed, ${failed} failed`);
+    console.log(`validate: ${summary.passed}/${summary.total} passed, ${summary.failed} failed`);
     process.exit(1);
   }
 }
