@@ -30,24 +30,26 @@ export function parseFilePaths(raw: string): string[] {
   try {
     const parsed = JSON.parse(raw) as unknown;
     if (isRecord(parsed) && isRecord(parsed["tool_input"])) {
-      const paths = new Set<string>();
       const toolInput = parsed["tool_input"];
-      if ("file_path" in toolInput && typeof toolInput["file_path"] === "string") {
-        paths.add(toolInput["file_path"]);
-      }
-      if ("edits" in toolInput && Array.isArray(toolInput["edits"])) {
-        for (const edit of toolInput["edits"]) {
-          if (isRecord(edit) && typeof edit["file_path"] === "string") {
-            paths.add(edit["file_path"]);
-          }
-        }
-      }
-      return [...paths];
+      return [...new Set([...singleFilePath(toolInput), ...editFilePaths(toolInput)])];
     }
     return [];
   } catch {
     return [];
   }
+}
+
+function singleFilePath(toolInput: Record<string, unknown>): readonly string[] {
+  return typeof toolInput["file_path"] === "string" ? [toolInput["file_path"]] : [];
+}
+
+function editFilePaths(toolInput: Record<string, unknown>): readonly string[] {
+  const edits = toolInput["edits"];
+  return Array.isArray(edits)
+    ? edits.flatMap((edit) =>
+        isRecord(edit) && typeof edit["file_path"] === "string" ? [edit["file_path"]] : [],
+      )
+    : [];
 }
 
 export function resolveWorkspace(filePath: string): Workspace | null {

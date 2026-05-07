@@ -133,55 +133,57 @@ export function repoRoot(input: HookInput): string {
 
 export function extractTouchedPaths(input: HookInput, root = repoRoot(input)): string[] {
   const toolInput = input.tool_input ?? {};
-  const candidates = new Set<string>();
   const cwd = path.resolve(input.cwd ?? root);
 
-  const command = valueAsString(toolInput["command"]);
-  if (command !== undefined) {
-    for (const filePath of extractApplyPatchPaths(command)) {
-      candidates.add(filePath);
-    }
-  }
-
-  for (const key of ["file_path", "filePath", "path"]) {
-    const value = valueAsString(toolInput[key]);
-    if (value !== undefined) {
-      candidates.add(value);
-    }
-  }
-
-  const edits = toolInput["edits"];
-  if (Array.isArray(edits)) {
-    for (const edit of edits) {
-      if (!isRecord(edit)) {
-        continue;
-      }
-      const value = valueAsString(edit["file_path"] ?? edit["filePath"] ?? edit["path"]);
-      if (value !== undefined) {
-        candidates.add(value);
-      }
-    }
-  }
-
-  return [...candidates]
+  return [...new Set(candidateTouchedPaths(toolInput))]
     .map((filePath) => normalizeProjectPath(filePath, root, cwd))
     .filter((filePath): filePath is string => filePath !== null)
     .toSorted();
 }
 
 export function extractApplyPatchPaths(patch: string): string[] {
-  const paths = new Set<string>();
   const prefixes = ["*** Add File: ", "*** Update File: ", "*** Delete File: ", "*** Move to: "];
 
-  for (const rawLine of patch.split(/\r?\n/)) {
-    for (const prefix of prefixes) {
-      if (rawLine.startsWith(prefix)) {
-        paths.add(rawLine.slice(prefix.length).trim());
-      }
-    }
-  }
+  return [
+    ...new Set(
+      patch
+        .split(/\r?\n/)
+        .flatMap((rawLine) =>
+          prefixes.flatMap((prefix) =>
+            rawLine.startsWith(prefix) ? [rawLine.slice(prefix.length).trim()] : [],
+          ),
+        ),
+    ),
+  ];
+}
 
-  return [...paths];
+function candidateTouchedPaths(toolInput: Record<string, unknown>): readonly string[] {
+  const command = valueAsString(toolInput["command"]);
+  return [
+    ...(command === undefined ? [] : extractApplyPatchPaths(command)),
+    ...singlePathFields(toolInput),
+    ...editPathFields(toolInput),
+  ];
+}
+
+function singlePathFields(toolInput: Record<string, unknown>): readonly string[] {
+  return ["file_path", "filePath", "path"].flatMap((key) => {
+    const value = valueAsString(toolInput[key]);
+    return value === undefined ? [] : [value];
+  });
+}
+
+function editPathFields(toolInput: Record<string, unknown>): readonly string[] {
+  const edits = toolInput["edits"];
+  return Array.isArray(edits)
+    ? edits.flatMap((edit) => {
+        if (!isRecord(edit)) {
+          return [];
+        }
+        const value = valueAsString(edit["file_path"] ?? edit["filePath"] ?? edit["path"]);
+        return value === undefined ? [] : [value];
+      })
+    : [];
 }
 
 export function normalizeProjectPath(filePath: string, root: string, cwd = root): string | null {

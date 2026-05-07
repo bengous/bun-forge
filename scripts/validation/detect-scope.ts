@@ -127,16 +127,13 @@ export function classifyFile(filePath: string): Scope | null {
   return classifyFileWithWorkspace(filePath, workspacePresence());
 }
 
-export function classifyScopes(files: string[]): Set<Scope> {
-  const scopes = new Set<Scope>();
+export function classifyScopes(files: readonly string[]): Set<Scope> {
   const presence = workspacePresence();
-  for (const file of files) {
-    const scope = classifyFileWithWorkspace(file, presence);
-    if (scope !== null) {
-      scopes.add(scope);
-    }
-  }
-  return scopes;
+  return new Set(
+    files
+      .map((file) => classifyFileWithWorkspace(file, presence))
+      .filter((scope): scope is Scope => scope !== null),
+  );
 }
 
 export function expandConfigScope(scopes: Set<Scope>): Set<Scope> {

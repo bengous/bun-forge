@@ -228,14 +228,10 @@ function parseCatalogRules(): ReadonlyArray<CatalogRule> {
 
 function groupByPlugin<T extends { readonly plugin: string }>(
   items: ReadonlyArray<T>,
-): Map<string, T[]> {
-  const grouped = new Map<string, T[]>();
-  for (const item of items) {
-    const bucket = grouped.get(item.plugin) ?? [];
-    bucket.push(item);
-    grouped.set(item.plugin, bucket);
-  }
-  return grouped;
+): ReadonlyArray<readonly [string, T[]]> {
+  return Object.entries(Object.groupBy(items, (item) => item.plugin))
+    .map(([plugin, rules]) => [plugin, rules ?? []] as const)
+    .toSorted(([a], [b]) => a.localeCompare(b));
 }
 
 function printSummary(
@@ -246,17 +242,13 @@ function printSummary(
   console.log(`Oxlint: ${getVersion()}`);
   console.log(`Active rules: ${activeRules.length}`);
   console.log(`Available candidate rules: ${availableRules.length}`);
-  for (const [plugin, rules] of [...groupByPlugin(activeRules).entries()].toSorted(([a], [b]) =>
-    a.localeCompare(b),
-  )) {
+  for (const [plugin, rules] of groupByPlugin(activeRules)) {
     console.log(`- ${plugin}: ${rules.length} active`);
   }
 }
 
 function printActive(activeRules: ReadonlyArray<ActiveRule>): void {
-  for (const [plugin, rules] of [...groupByPlugin(activeRules).entries()].toSorted(([a], [b]) =>
-    a.localeCompare(b),
-  )) {
+  for (const [plugin, rules] of groupByPlugin(activeRules)) {
     console.log(`## ${plugin}`);
     for (const rule of rules.toSorted((a, b) => a.name.localeCompare(b.name))) {
       console.log(`${rule.severity} ${rule.name}`);
@@ -265,9 +257,7 @@ function printActive(activeRules: ReadonlyArray<ActiveRule>): void {
 }
 
 function printAvailable(rules: ReadonlyArray<CatalogRule>): void {
-  for (const [plugin, pluginRules] of [...groupByPlugin(rules).entries()].toSorted(([a], [b]) =>
-    a.localeCompare(b),
-  )) {
+  for (const [plugin, pluginRules] of groupByPlugin(rules)) {
     console.log(`## ${plugin}`);
     for (const rule of pluginRules.toSorted((a, b) => a.name.localeCompare(b.name))) {
       console.log(`${rule.category}${rule.fixable ? " fixable" : ""} ${rule.name}`);

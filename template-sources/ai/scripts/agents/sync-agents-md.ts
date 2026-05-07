@@ -78,6 +78,18 @@ export type Manifest = {
   generated: string[];
 };
 
+type Rule = {
+  readonly name: string;
+  readonly body: string;
+};
+
+type AgentsMdGenerationPlan = {
+  readonly generated: ReadonlyMap<string, string>;
+  readonly targetPaths: ReadonlySet<string>;
+  readonly stale: readonly string[];
+  readonly preserveExistingRoot: boolean;
+};
+
 function isManifest(value: unknown): value is Manifest {
   if (typeof value !== "object" || value === null || !("generated" in value)) {
     return false;
@@ -136,7 +148,7 @@ export function stripFrontmatter(content: string): string {
 }
 
 /** Generate a layer AGENTS.md containing only matched rule bodies. */
-export function generateLayerAgentsMd(rules: { name: string; body: string }[]): string {
+export function generateLayerAgentsMd(rules: readonly Rule[]): string {
   if (rules.length === 0) {
     return "";
   }
@@ -151,7 +163,7 @@ export function generateLayerAgentsMd(rules: { name: string; body: string }[]): 
  * Verify that each layer AGENTS.md contains exactly the expected rule blocks.
  */
 export function verifyLayerContent(
-  dirToRules: ReadonlyMap<string, { name: string; body: string }[]>,
+  dirToRules: ReadonlyMap<string, readonly Rule[]>,
   agentsFiles: ReadonlyMap<string, string>,
 ): string[] {
   const errors: string[] = [];
@@ -226,9 +238,8 @@ async function readManifest(): Promise<Manifest> {
 }
 
 async function buildDirectoryMap(): Promise<{
-  dirToRules: Map<string, { name: string; body: string }[]>;
+  dirToRules: Map<string, Rule[]>;
 }> {
-  const dirToRules = new Map<string, { name: string; body: string }[]>();
   const glob = new Glob("*.md");
 
   const ruleFiles = (await Array.fromAsync(glob.scan({ cwd: RULES_DIR }))).toSorted();
@@ -241,16 +252,46 @@ async function buildDirectoryMap(): Promise<{
     }),
   );
 
-  for (const { filename, dirs, body } of rules) {
-    for (const dir of dirs) {
-      if (!dirToRules.has(dir)) {
-        dirToRules.set(dir, []);
-      }
-      dirToRules.get(dir)!.push({ name: filename, body });
+  const rows = rules.flatMap(({ filename, dirs, body }) =>
+    dirs.map((dir) => ({ dir, rule: { name: filename, body } })),
+  );
+  const dirToRules = new Map<string, Rule[]>();
+  for (const { dir, rule } of rows) {
+    const bucket = dirToRules.get(dir);
+    if (bucket === undefined) {
+      dirToRules.set(dir, [rule]);
+    } else {
+      bucket.push(rule);
     }
   }
 
   return { dirToRules };
+}
+
+function buildAgentsMdGenerationPlan(input: {
+  readonly dirToRules: ReadonlyMap<string, readonly Rule[]>;
+  readonly oldManifest: Manifest;
+  readonly rootContent: string;
+  readonly preserveExistingRoot: boolean;
+}): AgentsMdGenerationPlan {
+  const generated = new Map<string, string>();
+  const targetPaths = new Set<string>(input.preserveExistingRoot ? [] : [ROOT_AGENTS_MD]);
+
+  if (!input.preserveExistingRoot) {
+    generated.set(ROOT_AGENTS_MD, input.rootContent);
+  }
+  for (const [dir, rules] of input.dirToRules) {
+    const path = `${dir}/AGENTS.md`;
+    targetPaths.add(path);
+    generated.set(path, generateLayerAgentsMd(rules));
+  }
+
+  return {
+    generated,
+    targetPaths,
+    stale: input.oldManifest.generated.filter((path) => !targetPaths.has(path)),
+    preserveExistingRoot: input.preserveExistingRoot,
+  };
 }
 
 function printErrors(errors: readonly string[]): void {
@@ -350,7 +391,7 @@ async function checkGeneratedState(
   generated: ReadonlyMap<string, string>,
   stale: readonly string[],
   targetPaths: ReadonlySet<string>,
-  dirToRules: ReadonlyMap<string, { name: string; body: string }[]>,
+  dirToRules: ReadonlyMap<string, readonly Rule[]>,
 ): Promise<string[]> {
   const generatedErrors = (
     await Promise.all(
@@ -377,24 +418,15 @@ async function main(): Promise<void> {
   const rootExists = await rootAgentsFile.exists();
   const rootWasManaged = oldManifest.generated.includes(ROOT_AGENTS_MD);
   const preserveExistingRoot = preserveRoot && rootExists && !rootWasManaged;
-  const targetPaths = new Set<string>(preserveExistingRoot ? [] : [ROOT_AGENTS_MD]);
-
-  // Generate layer AGENTS.md (rules only, no root duplication)
-  const generated = new Map<string, string>();
-  if (!preserveExistingRoot) {
-    generated.set(ROOT_AGENTS_MD, rootContent);
-  }
-  for (const [dir, rules] of dirToRules) {
-    const path = `${dir}/AGENTS.md`;
-    targetPaths.add(path);
-    generated.set(path, generateLayerAgentsMd(rules));
-  }
-
-  // Detect stale files from previous manifest
-  const stale = oldManifest.generated.filter((p) => !targetPaths.has(p));
+  const plan = buildAgentsMdGenerationPlan({
+    dirToRules,
+    oldManifest,
+    rootContent,
+    preserveExistingRoot,
+  });
 
   const errors: string[] = [];
-  const managedAgentsPaths = await listManagedAgentsPaths(!preserveExistingRoot);
+  const managedAgentsPaths = await listManagedAgentsPaths(!plan.preserveExistingRoot);
 
   errors.push(
     ...(
@@ -413,16 +445,17 @@ async function main(): Promise<void> {
       printErrors(errors);
       process.exit(1);
     }
-    await writeGeneratedFiles(generated);
-    await removeStaleFiles(stale);
-    // Write manifest
+    await writeGeneratedFiles(plan.generated);
+    await removeStaleFiles(plan.stale);
     const manifest: Manifest = {
-      generated: [...targetPaths].toSorted(),
+      generated: [...plan.targetPaths].toSorted(),
     };
     await Bun.write(MANIFEST_PATH, `${JSON.stringify(manifest, null, "\t")}\n`);
     console.log(`wrote ${MANIFEST_PATH}`);
   } else {
-    errors.push(...(await checkGeneratedState(generated, stale, targetPaths, dirToRules)));
+    errors.push(
+      ...(await checkGeneratedState(plan.generated, plan.stale, plan.targetPaths, dirToRules)),
+    );
   }
 
   if (errors.length > 0) {
