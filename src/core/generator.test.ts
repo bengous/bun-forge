@@ -167,6 +167,8 @@ describe("describeGeneratedProject", () => {
           "scripts/validation/typecheck-staged.ts",
           "scripts/validation/validate-push.ts",
           "scripts/validation/validate.ts",
+          "scripts/validation/validation-plan.ts",
+          "scripts/validation/validation-runner.ts",
           "scripts/setup/bootstrap-git-config.ts",
           "scripts/setup/bootstrap-prepare.ts",
           "scripts/quality/audit-oxlint-rules.ts",

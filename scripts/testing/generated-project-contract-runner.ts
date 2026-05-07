@@ -142,6 +142,9 @@ async function assertRootContract(
   assertPathExists(root, "README.md");
   assertPathExists(root, "bunfig.toml");
   assertPathExists(root, "scripts/validation/validate.ts");
+  const validationPlanPath = "scripts/validation/validation-plan.ts";
+  assertPathExists(root, validationPlanPath);
+  assertPathExists(root, "scripts/validation/validation-runner.ts");
   assertPathExists(root, "knip.jsonc");
   assertPathExists(root, "scripts/quality/check-links-local.ts");
 
@@ -186,6 +189,11 @@ async function assertRootContract(
   assertPathMissing(root, "index.ts");
   assertPathMissing(root, "bun.lock");
   assertPathMissing(root, "node_modules");
+  await assertFileContains(root, validationPlanPath, "GENERATED_PROJECT_VALIDATE_PLAN");
+  await assertFileContains(root, validationPlanPath, "GENERATED_PROJECT_PUSH_VALIDATION_POLICY");
+  await assertFileContains(root, validationPlanPath, "validate:frontend");
+  await assertFileExcludes(root, validationPlanPath, "guard-destructive:check");
+  await assertFileExcludes(root, validationPlanPath, "test:project-contract");
 }
 
 async function assertBackendContract(

@@ -2,6 +2,7 @@
 
 import { expandConfigScope, getChangedScopes } from "./detect-scope";
 import { resolveProjectRoot } from "./resolve-bin";
+import { GENERATED_PROJECT_PUSH_VALIDATION_POLICY } from "./validation-plan.ts";
 
 async function main(): Promise<void> {
   const projectRoot = resolveProjectRoot(import.meta.dir);
@@ -14,26 +15,29 @@ async function main(): Promise<void> {
 
   const errors: string[] = [];
 
-  async function run(label: string, script: string): Promise<void> {
+  async function runScript(script: string): Promise<void> {
     const result = await Bun.$`bun run --silent ${script}`.cwd(projectRoot).nothrow().quiet();
     if (result.exitCode !== 0) {
       const output = [result.stderr.toString(), result.stdout.toString()]
         .filter(Boolean)
         .join("\n")
         .trim();
-      errors.push(`[${label}] ${output || `exited with code ${result.exitCode}`}`);
+      errors.push(`[${script}] ${output || `exited with code ${result.exitCode}`}`);
     }
   }
 
+  async function runSteps(steps: readonly string[]): Promise<void> {
+    await steps.reduce(async (previous, step) => {
+      await previous;
+      await runScript(step);
+    }, Promise.resolve());
+  }
+
   if (scopes.has("backend") || scopes.has("scripts")) {
-    await run("typecheck", "typecheck");
-    await run("lint:errors", "lint:errors");
-    await run("format:check", "format:check");
-    await run("lint:arch", "lint:arch");
-    await run("test", "test");
+    await runSteps(GENERATED_PROJECT_PUSH_VALIDATION_POLICY.codeSteps);
   }
   if (scopes.has("frontend")) {
-    await run("validate:frontend", "validate:frontend");
+    await runSteps(GENERATED_PROJECT_PUSH_VALIDATION_POLICY.frontendSteps);
   }
 
   if (errors.length > 0) {
