@@ -1,8 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import {
+  formatCommand,
   formatCommandFailure,
+  lintCheckCommand,
+  lintFixCommand,
   parseFilePath,
   parseFilePaths,
+  productContractCommand,
   resolveWorkspace,
 } from "./format-and-lint";
 import {
@@ -42,6 +46,54 @@ describe("format-and-lint failure reporting", () => {
     expect(formatCommandFailure("format", ["src/a.ts", "src/b.ts"], "", "", 2)).toBe(
       "format: 2 files: src/a.ts, src/b.ts exited with code 2",
     );
+  });
+});
+
+describe("format-and-lint command specs", () => {
+  test("builds root lint, format, and lint-check commands without spawning", () => {
+    const workspace = resolveLiveRepoWorkspace("scripts/validation/validate.ts");
+    expect(workspace).not.toBeNull();
+
+    expect(lintFixCommand("oxlint", workspace!, ["scripts/validation/validate.ts"])).toEqual([
+      "oxlint",
+      "-c",
+      ".oxlintrc.jsonc",
+      "--fix",
+      "--quiet",
+      "scripts/validation/validate.ts",
+    ]);
+    expect(formatCommand("oxfmt", workspace!, ["scripts/validation/validate.ts"])).toEqual([
+      "oxfmt",
+      "--write",
+      "-c",
+      ".oxfmtrc.jsonc",
+      "scripts/validation/validate.ts",
+    ]);
+    expect(lintCheckCommand("oxlint", workspace!, ["scripts/validation/validate.ts"])).toEqual([
+      "oxlint",
+      "-c",
+      ".oxlintrc.jsonc",
+      "--quiet",
+      "--format=unix",
+      "scripts/validation/validate.ts",
+    ]);
+  });
+
+  test("builds Codex hook check-only format command without lint-fix policy leakage", () => {
+    const workspace = resolveLiveRepoWorkspace(".codex/hooks/lib.ts");
+    expect(workspace?.lintFix).toBe(false);
+
+    expect(formatCommand("oxfmt", workspace!, [".codex/hooks/lib.ts"])).toEqual([
+      "oxfmt",
+      "--check",
+      "-c",
+      ".oxfmtrc.jsonc",
+      ".codex/hooks/lib.ts",
+    ]);
+  });
+
+  test("builds product contract command as a pure spec", () => {
+    expect(productContractCommand()).toEqual(["bun", "run", "--silent", "test:project-contract"]);
   });
 });
 

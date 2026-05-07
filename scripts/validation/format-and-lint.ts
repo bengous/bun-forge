@@ -140,6 +140,51 @@ function commandFailure(
   );
 }
 
+export function lintFixCommand(
+  oxlint: string,
+  workspace: Workspace,
+  paths: readonly string[],
+): string[] {
+  return [
+    oxlint,
+    ...workspace.oxlintArgs,
+    "-c",
+    workspace.oxlintConfig,
+    "--fix",
+    "--quiet",
+    ...paths,
+  ];
+}
+
+export function formatCommand(
+  oxfmt: string,
+  workspace: Workspace,
+  paths: readonly string[],
+): string[] {
+  const mode = workspace.formatMode === "write" ? "--write" : "--check";
+  return [oxfmt, mode, "-c", workspace.oxfmtConfig, ...paths];
+}
+
+export function lintCheckCommand(
+  oxlint: string,
+  workspace: Workspace,
+  paths: readonly string[],
+): string[] {
+  return [
+    oxlint,
+    ...workspace.oxlintArgs,
+    "-c",
+    workspace.oxlintConfig,
+    "--quiet",
+    "--format=unix",
+    ...paths,
+  ];
+}
+
+export function productContractCommand(): string[] {
+  return ["bun", "run", "--silent", "test:project-contract"];
+}
+
 if (import.meta.main) {
   const projectRoot = resolveProjectRoot(import.meta.dir);
   const oxlint = resolveBin(projectRoot, "oxlint");
@@ -164,21 +209,10 @@ if (import.meta.main) {
 
   for (const bucket of buckets.values()) {
     if (bucket.lintFixPaths.length > 0) {
-      const lintFix = Bun.spawnSync(
-        [
-          oxlint,
-          ...bucket.workspace.oxlintArgs,
-          "-c",
-          bucket.workspace.oxlintConfig,
-          "--fix",
-          "--quiet",
-          ...bucket.lintFixPaths,
-        ],
-        {
-          stdout: "pipe",
-          stderr: "pipe",
-        },
-      );
+      const lintFix = Bun.spawnSync(lintFixCommand(oxlint, bucket.workspace, bucket.lintFixPaths), {
+        stdout: "pipe",
+        stderr: "pipe",
+      });
       if (lintFix.exitCode !== 0) {
         failures.push(commandFailure("lint --fix", bucket.lintFixPaths, lintFix));
         continue;
@@ -186,14 +220,10 @@ if (import.meta.main) {
     }
 
     if (bucket.formatPaths.length > 0) {
-      const mode = bucket.workspace.formatMode === "write" ? "--write" : "--check";
-      const format = Bun.spawnSync(
-        [oxfmt, mode, "-c", bucket.workspace.oxfmtConfig, ...bucket.formatPaths],
-        {
-          stdout: "pipe",
-          stderr: "pipe",
-        },
-      );
+      const format = Bun.spawnSync(formatCommand(oxfmt, bucket.workspace, bucket.formatPaths), {
+        stdout: "pipe",
+        stderr: "pipe",
+      });
       if (format.exitCode !== 0) {
         failures.push(commandFailure("format", bucket.formatPaths, format));
       }
@@ -201,15 +231,7 @@ if (import.meta.main) {
 
     if (bucket.lintCheckPaths.length > 0) {
       const lint = Bun.spawnSync(
-        [
-          oxlint,
-          ...bucket.workspace.oxlintArgs,
-          "-c",
-          bucket.workspace.oxlintConfig,
-          "--quiet",
-          "--format=unix",
-          ...bucket.lintCheckPaths,
-        ],
+        lintCheckCommand(oxlint, bucket.workspace, bucket.lintCheckPaths),
         { stdout: "pipe", stderr: "pipe" },
       );
       if (lint.exitCode !== 0) {
@@ -234,7 +256,7 @@ if (import.meta.main) {
   }
 
   if (needsProductContract) {
-    const contract = Bun.spawnSync(["bun", "run", "--silent", "test:project-contract"], {
+    const contract = Bun.spawnSync(productContractCommand(), {
       stdout: "pipe",
       stderr: "pipe",
     });
