@@ -192,14 +192,16 @@ const CATEGORY_RE = /^## (\w+) \(\d+\)/;
 function parseCatalogRules(): ReadonlyArray<CatalogRule> {
   const output = exec(["--import-plugin", "--rules"]);
   let currentCategory = "";
-  return output.split(/\r?\n/).flatMap((line) => {
+  const rules: CatalogRule[] = [];
+
+  for (const line of output.split(/\r?\n/)) {
     const categoryMatch = CATEGORY_RE.exec(line);
     if (categoryMatch !== null) {
       currentCategory = categoryMatch[1]!.toLowerCase();
-      return [];
+      continue;
     }
     if (!line.startsWith("|")) {
-      return [];
+      continue;
     }
     const cols = line
       .split("|")
@@ -212,18 +214,18 @@ function parseCatalogRules(): ReadonlyArray<CatalogRule> {
       fixableCol === undefined ||
       ruleName === "Rule name"
     ) {
-      return [];
+      continue;
     }
     const plugin = ruleName.includes("/") ? ruleName.split("/")[0]! : source.toLowerCase();
-    return [
-      {
-        name: ruleName,
-        plugin,
-        category: currentCategory,
-        fixable: fixableCol.toLowerCase().includes("fix"),
-      },
-    ];
-  });
+    rules.push({
+      name: ruleName,
+      plugin,
+      category: currentCategory,
+      fixable: fixableCol.toLowerCase().includes("fix"),
+    });
+  }
+
+  return rules;
 }
 
 function groupByPlugin<T extends { readonly plugin: string }>(

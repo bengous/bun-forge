@@ -163,23 +163,33 @@ function candidateTouchedPaths(toolInput: Record<string, unknown>): readonly str
 }
 
 function singlePathFields(toolInput: Record<string, unknown>): readonly string[] {
-  return ["file_path", "filePath", "path"].flatMap((key) => {
+  const paths: string[] = [];
+  for (const key of ["file_path", "filePath", "path"]) {
     const value = valueAsString(toolInput[key]);
-    return value === undefined ? [] : [value];
-  });
+    if (value !== undefined) {
+      paths.push(value);
+    }
+  }
+  return paths;
 }
 
 function editPathFields(toolInput: Record<string, unknown>): readonly string[] {
   const edits = toolInput["edits"];
-  return Array.isArray(edits)
-    ? edits.flatMap((edit) => {
-        if (!isRecord(edit)) {
-          return [];
-        }
-        const value = valueAsString(edit["file_path"] ?? edit["filePath"] ?? edit["path"]);
-        return value === undefined ? [] : [value];
-      })
-    : [];
+  if (!Array.isArray(edits)) {
+    return [];
+  }
+
+  const paths: string[] = [];
+  for (const edit of edits) {
+    if (!isRecord(edit)) {
+      continue;
+    }
+    const value = valueAsString(edit["file_path"] ?? edit["filePath"] ?? edit["path"]);
+    if (value !== undefined) {
+      paths.push(value);
+    }
+  }
+  return paths;
 }
 
 export function normalizeProjectPath(filePath: string, root: string, cwd = root): string | null {

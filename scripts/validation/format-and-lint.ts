@@ -45,11 +45,17 @@ function singleFilePath(toolInput: Record<string, unknown>): readonly string[] {
 
 function editFilePaths(toolInput: Record<string, unknown>): readonly string[] {
   const edits = toolInput["edits"];
-  return Array.isArray(edits)
-    ? edits.flatMap((edit) =>
-        isRecord(edit) && typeof edit["file_path"] === "string" ? [edit["file_path"]] : [],
-      )
-    : [];
+  if (!Array.isArray(edits)) {
+    return [];
+  }
+
+  const filePaths: string[] = [];
+  for (const edit of edits) {
+    if (isRecord(edit) && typeof edit["file_path"] === "string") {
+      filePaths.push(edit["file_path"]);
+    }
+  }
+  return filePaths;
 }
 
 export function resolveWorkspace(filePath: string): Workspace | null {
