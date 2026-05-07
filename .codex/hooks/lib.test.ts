@@ -63,6 +63,33 @@ describe("Codex hook path handling", () => {
     ).toEqual(["AGENTS.md", "scripts/validation/AGENTS.md", ".agents/agents-md-manifest.json"]);
   });
 
+  test("blocks agent files listed only in the manifest", async () => {
+    const root = await makeTestRoot();
+    try {
+      await seedFile(
+        root,
+        ".agents/agents-md-manifest.json",
+        JSON.stringify({
+          version: 2,
+          generated: ["AGENTS.md"],
+          outputs: {
+            "docs/agent/AGENTS.md": {
+              kind: "layer",
+              sourcePath: ".claude/rules/docs.md",
+              checksum: "sha256-test",
+            },
+          },
+        }),
+      );
+
+      expect(forbiddenTouchedPaths(["docs/agent/AGENTS.md", "docs/agent/source.md"], root)).toEqual(
+        ["docs/agent/AGENTS.md"],
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   test("extracts single and multi edit path fields from hook input", async () => {
     const root = await mkdtemp(path.join(tmpdir(), "bun-forge-codex-hooks-"));
     try {

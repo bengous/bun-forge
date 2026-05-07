@@ -296,7 +296,7 @@ async function assertAiContract(
   contract: GeneratedProjectContract,
   packageScripts: JsonObject,
 ): Promise<void> {
-  const { ai, backend } = contract.shape;
+  const { ai, backend, frontend } = contract.shape;
 
   if (!ai) {
     assertPathMissing(root, "CLAUDE.md");
@@ -375,6 +375,12 @@ async function assertAiContract(
     "./guard-destructive-core.ts",
   );
   await assertFileContains(root, ".codex/hooks/lib.ts", "stop_hook_active");
+  await assertFileContains(root, ".codex/hooks/lib.ts", "generatedAgentPathsFromManifest");
+  await assertFileContains(root, ".codex/hooks/lib.ts", "agents-md-manifest.json");
+  await assertGeneratedAgentsManifest(root, {
+    backend,
+    frontend: frontend === "tanstack",
+  });
   await assertFileContains(
     root,
     "scripts/validation/format-and-lint.ts",
@@ -430,6 +436,40 @@ async function assertAiContract(
     contract.packageJson.scripts["test:hooks"],
     "test:hooks script",
   );
+}
+
+async function assertGeneratedAgentsManifest(
+  root: string,
+  shape: { readonly backend: boolean; readonly frontend: boolean },
+): Promise<void> {
+  const manifest = await readJsonObject(join(root, ".agents/agents-md-manifest.json"));
+  assertEqual(manifest["version"], 2, "agents manifest version");
+  const generated = manifest["generated"];
+  const outputs = objectField(manifest, "outputs");
+  const sources = objectField(manifest, "sources");
+  const expectedGenerated = [
+    "AGENTS.md",
+    ...(shape.frontend ? ["apps/frontend/src/AGENTS.md"] : []),
+    "scripts/AGENTS.md",
+    ...(shape.backend ? ["src/AGENTS.md"] : []),
+  ].toSorted((left, right) => left.localeCompare(right));
+
+  assertStringArrayExact(generated, expectedGenerated, "agents manifest generated");
+  assertObjectHasKey(outputs, "AGENTS.md", "agents manifest outputs");
+  if (shape.backend) {
+    assertObjectHasKey(outputs, "src/AGENTS.md", "agents manifest outputs");
+  }
+  if (shape.frontend) {
+    assertObjectHasKey(outputs, "apps/frontend/src/AGENTS.md", "agents manifest outputs");
+  }
+  assertObjectHasKey(outputs, "scripts/AGENTS.md", "agents manifest outputs");
+  const rootOutput = objectField(outputs, "AGENTS.md");
+  assertEqual(rootOutput["kind"], "root", "AGENTS.md manifest kind");
+  assertEqual(rootOutput["sourcePath"], "CLAUDE.md", "AGENTS.md manifest sourcePath");
+  if (typeof rootOutput["checksum"] !== "string" || !rootOutput["checksum"].startsWith("sha256-")) {
+    throw new Error("Expected AGENTS.md manifest checksum to be sha256-prefixed");
+  }
+  assertObjectHasKey(sources, "CLAUDE.md", "agents manifest sources");
 }
 
 async function assertFrontendContract(

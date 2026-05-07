@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -37,11 +37,7 @@ type Workspace = {
   readonly formatMode: "write" | "check";
 };
 
-const generatedPathPatterns = [
-  /^AGENTS\.md$/,
-  /^\.agents\/agents-md-manifest\.json$/,
-  /^(?:src|scripts|templates|template-sources|\.claude\/rules)(?:\/[^/]+)*\/AGENTS\.md$/,
-];
+const generatedPathPatterns = [/^\.agents\/agents-md-manifest\.json$/];
 
 const lintExtensions = new Set([".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"]);
 const formatExtensions = new Set([
@@ -201,9 +197,12 @@ export function normalizeProjectPath(filePath: string, root: string, cwd = root)
   return toPosix(relative);
 }
 
-export function forbiddenTouchedPaths(paths: readonly string[]): string[] {
-  return paths.filter((filePath) =>
-    generatedPathPatterns.some((pattern) => pattern.test(filePath)),
+export function forbiddenTouchedPaths(paths: readonly string[], root = process.cwd()): string[] {
+  const manifestGeneratedPaths = generatedAgentPathsFromManifest(root);
+  return paths.filter(
+    (filePath) =>
+      manifestGeneratedPaths.has(filePath) ||
+      generatedPathPatterns.some((pattern) => pattern.test(filePath)),
   );
 }
 
@@ -263,7 +262,7 @@ export async function runPostEditQuality(
   await recordTouchedPaths(input, extracted);
 
   const paths = extracted.length > 0 ? extracted : await readTouchedPaths(input);
-  const forbidden = forbiddenTouchedPaths(paths);
+  const forbidden = forbiddenTouchedPaths(paths, root);
   if (forbidden.length > 0) {
     return { blockReason: generatedPathMessage(forbidden) };
   }
@@ -392,7 +391,7 @@ export async function runStopValidation(
   }
 
   const root = repoRoot(input);
-  const forbidden = forbiddenTouchedPaths(await readTouchedPaths(input));
+  const forbidden = forbiddenTouchedPaths(await readTouchedPaths(input), root);
   if (forbidden.length > 0) {
     return { blockReason: generatedPathMessage(forbidden) };
   }
@@ -502,6 +501,22 @@ function generatedPathMessage(paths: readonly string[]): string {
   )}. Edit CLAUDE.md or .claude/rules/*.md, then run bun run agents:sync.`;
 }
 
+function generatedAgentPathsFromManifest(root: string): Set<string> {
+  const manifestPath = path.join(root, ".agents", "agents-md-manifest.json");
+  if (!existsSync(manifestPath)) {
+    return new Set(["AGENTS.md"]);
+  }
+
+  const parsed = parseJsonObject(readFileSync(manifestPath, "utf8"));
+  if (parsed === null) {
+    return new Set(["AGENTS.md"]);
+  }
+
+  const generated = stringArray(parsed["generated"]);
+  const outputs = isRecord(parsed["outputs"]) ? Object.keys(parsed["outputs"]) : [];
+  return new Set([...generated, ...outputs, ".agents/agents-md-manifest.json"]);
+}
+
 function commandOutput(result: CommandResult): string {
   return `${result.stdout}\n${result.stderr}`.trim();
 }
@@ -520,6 +535,21 @@ function valueAsString(value: unknown): string | undefined {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function parseJsonObject(content: string): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    return isRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string")
+    : [];
 }
 
 function toPosix(filePath: string): string {

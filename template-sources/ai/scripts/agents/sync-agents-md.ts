@@ -44,7 +44,20 @@
  *
  * ## Manifest schema (.agents/agents-md-manifest.json)
  *
- *   { "generated": ["AGENTS.md", "src/cli/AGENTS.md", ...] }
+ *   {
+ *     "version": 2,
+ *     "generated": ["AGENTS.md", "src/cli/AGENTS.md", ...],
+ *     "outputs": {
+ *       "AGENTS.md": {
+ *         "kind": "root",
+ *         "sourcePath": "CLAUDE.md",
+ *         "checksum": "sha256-..."
+ *       }
+ *     },
+ *     "sources": {
+ *       "CLAUDE.md": { "checksum": "sha256-..." }
+ *     }
+ *   }
  *
  * Tracks all managed files. Used to detect stale files when rules are removed.
  *
@@ -65,6 +78,7 @@
  */
 
 import { Glob } from "bun";
+import { createHash } from "node:crypto";
 import { lstat, mkdir, rm } from "node:fs/promises";
 import { dirname } from "node:path";
 
@@ -75,7 +89,20 @@ const MANIFEST_PATH = ".agents/agents-md-manifest.json";
 const MANAGED_AGENTS_GLOBS = ["src/*/AGENTS.md", "scripts/AGENTS.md", "scripts/*/AGENTS.md"];
 
 export type Manifest = {
-  generated: string[];
+  readonly version?: 1 | 2;
+  readonly generated: string[];
+  readonly outputs?: Record<string, ManifestOutput>;
+  readonly sources?: Record<string, ManifestSource>;
+};
+
+export type ManifestOutput = {
+  readonly kind: "root" | "layer";
+  readonly checksum: string;
+  readonly sourcePath?: string;
+};
+
+export type ManifestSource = {
+  readonly checksum: string;
 };
 
 type Rule = {
@@ -85,6 +112,8 @@ type Rule = {
 
 type AgentsMdGenerationPlan = {
   readonly generated: ReadonlyMap<string, string>;
+  readonly sourceContentByPath: ReadonlyMap<string, string>;
+  readonly outputSourceByPath: ReadonlyMap<string, string>;
   readonly targetPaths: ReadonlySet<string>;
   readonly stale: readonly string[];
   readonly preserveExistingRoot: boolean;
@@ -97,6 +126,56 @@ function isManifest(value: unknown): value is Manifest {
 
   const generated = value["generated"];
   return Array.isArray(generated) && generated.every((entry) => typeof entry === "string");
+}
+
+function checksum(content: string): string {
+  return `sha256-${createHash("sha256").update(normalizeNewlines(content)).digest("hex")}`;
+}
+
+function outputKind(path: string): ManifestOutput["kind"] {
+  return path === ROOT_AGENTS_MD ? "root" : "layer";
+}
+
+export function generatedPathsFromManifest(manifest: Manifest): string[] {
+  const outputPaths = manifest.outputs === undefined ? [] : Object.keys(manifest.outputs);
+  return [...new Set([...manifest.generated, ...outputPaths])].toSorted((left, right) =>
+    left.localeCompare(right),
+  );
+}
+
+export function buildManifest(input: {
+  readonly generated: ReadonlyMap<string, string>;
+  readonly sourceContentByPath: ReadonlyMap<string, string>;
+  readonly outputSourceByPath: ReadonlyMap<string, string>;
+  readonly targetPaths: ReadonlySet<string>;
+}): Manifest {
+  const outputs: Record<string, ManifestOutput> = {};
+  for (const path of [...input.targetPaths].toSorted((left, right) => left.localeCompare(right))) {
+    const content = input.generated.get(path);
+    if (content === undefined) {
+      continue;
+    }
+    const sourcePath = input.outputSourceByPath.get(path);
+    outputs[path] = {
+      kind: outputKind(path),
+      ...(sourcePath === undefined ? {} : { sourcePath }),
+      checksum: checksum(content),
+    };
+  }
+
+  const sources: Record<string, ManifestSource> = {};
+  for (const [path, content] of [...input.sourceContentByPath].toSorted(([left], [right]) =>
+    left.localeCompare(right),
+  )) {
+    sources[path] = { checksum: checksum(content) };
+  }
+
+  return {
+    version: 2,
+    generated: [...input.targetPaths].toSorted((left, right) => left.localeCompare(right)),
+    outputs,
+    sources,
+  };
 }
 
 export function normalizeNewlines(content: string): string {
@@ -239,13 +318,22 @@ async function readManifest(): Promise<Manifest> {
 
 async function buildDirectoryMap(): Promise<{
   dirToRules: Map<string, Rule[]>;
+  sourceContentByPath: Map<string, string>;
+  outputSourceByPath: Map<string, string>;
 }> {
   const glob = new Glob("*.md");
 
-  const ruleFiles = (await Array.fromAsync(glob.scan({ cwd: RULES_DIR }))).toSorted();
+  const ruleFiles = (await Array.fromAsync(glob.scan({ cwd: RULES_DIR })))
+    .filter((filename) => filename !== "AGENTS.md")
+    .toSorted((left, right) => left.localeCompare(right));
+  const sourceContentByPath = new Map<string, string>();
+  const outputSourceByPath = new Map<string, string>();
+
   const rules = await Promise.all(
     ruleFiles.map(async (filename) => {
-      const content = await Bun.file(`${RULES_DIR}/${filename}`).text();
+      const sourcePath = `${RULES_DIR}/${filename}`;
+      const content = await Bun.file(sourcePath).text();
+      sourceContentByPath.set(sourcePath, content);
       const dirs = parsePaths(content);
       const body = stripFrontmatter(content);
       return { filename, dirs, body };
@@ -263,33 +351,53 @@ async function buildDirectoryMap(): Promise<{
     } else {
       bucket.push(rule);
     }
+    outputSourceByPath.set(`${dir}/AGENTS.md`, `${RULES_DIR}/${rule.name}`);
   }
 
-  return { dirToRules };
+  return { dirToRules, sourceContentByPath, outputSourceByPath };
 }
 
 function buildAgentsMdGenerationPlan(input: {
   readonly dirToRules: ReadonlyMap<string, readonly Rule[]>;
   readonly oldManifest: Manifest;
   readonly rootContent: string;
+  readonly sourceContentByPath: ReadonlyMap<string, string>;
+  readonly outputSourceByPath: ReadonlyMap<string, string>;
   readonly preserveExistingRoot: boolean;
 }): AgentsMdGenerationPlan {
   const generated = new Map<string, string>();
+  const sourceContentByPath = new Map<string, string>();
+  const outputSourceByPath = new Map<string, string>();
   const targetPaths = new Set<string>(input.preserveExistingRoot ? [] : [ROOT_AGENTS_MD]);
 
   if (!input.preserveExistingRoot) {
     generated.set(ROOT_AGENTS_MD, input.rootContent);
+    sourceContentByPath.set(ROOT_MD, input.rootContent);
+    outputSourceByPath.set(ROOT_AGENTS_MD, ROOT_MD);
   }
   for (const [dir, rules] of input.dirToRules) {
     const path = `${dir}/AGENTS.md`;
     targetPaths.add(path);
     generated.set(path, generateLayerAgentsMd(rules));
+    for (const rule of rules) {
+      outputSourceByPath.set(path, `${RULES_DIR}/${rule.name}`);
+    }
+  }
+  for (const [path, content] of input.sourceContentByPath) {
+    if (path !== ROOT_MD || !input.preserveExistingRoot) {
+      sourceContentByPath.set(path, content);
+    }
+  }
+  for (const [path, sourcePath] of input.outputSourceByPath) {
+    outputSourceByPath.set(path, sourcePath);
   }
 
   return {
     generated,
+    sourceContentByPath,
+    outputSourceByPath,
     targetPaths,
-    stale: input.oldManifest.generated.filter((path) => !targetPaths.has(path)),
+    stale: generatedPathsFromManifest(input.oldManifest).filter((path) => !targetPaths.has(path)),
     preserveExistingRoot: input.preserveExistingRoot,
   };
 }
@@ -354,7 +462,7 @@ async function checkStaleFiles(stale: readonly string[]): Promise<string[]> {
   return results.filter((error): error is string => error !== null);
 }
 
-async function checkManifest(targetPaths: ReadonlySet<string>): Promise<string[]> {
+async function checkManifest(expectedManifest: Manifest): Promise<string[]> {
   const manifestFile = Bun.file(MANIFEST_PATH);
   if (!(await manifestFile.exists())) {
     return [`${MANIFEST_PATH}: missing — run \`bun run agents:sync\``];
@@ -366,11 +474,18 @@ async function checkManifest(targetPaths: ReadonlySet<string>): Promise<string[]
     return [`${MANIFEST_PATH}: invalid manifest shape — run \`bun run agents:sync\``];
   }
 
-  const expectedPaths = [...targetPaths].toSorted();
-  const actualPaths = [...currentManifest.generated].toSorted();
-  return JSON.stringify(expectedPaths) === JSON.stringify(actualPaths)
-    ? []
-    : [`${MANIFEST_PATH}: manifest drift — run \`bun run agents:sync\``];
+  const expectedPaths = [...expectedManifest.generated].toSorted((left, right) =>
+    left.localeCompare(right),
+  );
+  const actualPaths = generatedPathsFromManifest(currentManifest);
+  const errors: string[] = [];
+  if (JSON.stringify(expectedPaths) !== JSON.stringify(actualPaths)) {
+    errors.push(`${MANIFEST_PATH}: manifest path drift — run \`bun run agents:sync\``);
+  }
+  if (JSON.stringify(expectedManifest) !== JSON.stringify(currentManifest)) {
+    errors.push(`${MANIFEST_PATH}: manifest metadata drift — run \`bun run agents:sync\``);
+  }
+  return errors;
 }
 
 async function readLayerAgentsFiles(
@@ -390,7 +505,7 @@ async function readLayerAgentsFiles(
 async function checkGeneratedState(
   generated: ReadonlyMap<string, string>,
   stale: readonly string[],
-  targetPaths: ReadonlySet<string>,
+  expectedManifest: Manifest,
   dirToRules: ReadonlyMap<string, readonly Rule[]>,
 ): Promise<string[]> {
   const generatedErrors = (
@@ -402,7 +517,7 @@ async function checkGeneratedState(
   return [
     ...generatedErrors,
     ...(await checkStaleFiles(stale)),
-    ...(await checkManifest(targetPaths)),
+    ...(await checkManifest(expectedManifest)),
     ...verifyLayerContent(dirToRules, agentsFiles),
   ];
 }
@@ -411,8 +526,9 @@ async function main(): Promise<void> {
   const mode = process.argv.includes("--write") ? "write" : "check";
   const preserveRoot = process.argv.includes("--preserve-root");
 
-  const { dirToRules } = await buildDirectoryMap();
+  const { dirToRules, sourceContentByPath, outputSourceByPath } = await buildDirectoryMap();
   const rootContent = normalizeNewlines(await Bun.file(ROOT_MD).text());
+  sourceContentByPath.set(ROOT_MD, rootContent);
   const oldManifest = await readManifest();
   const rootAgentsFile = Bun.file(ROOT_AGENTS_MD);
   const rootExists = await rootAgentsFile.exists();
@@ -422,8 +538,11 @@ async function main(): Promise<void> {
     dirToRules,
     oldManifest,
     rootContent,
+    sourceContentByPath,
+    outputSourceByPath,
     preserveExistingRoot,
   });
+  const manifest = buildManifest(plan);
 
   const errors: string[] = [];
   const managedAgentsPaths = await listManagedAgentsPaths(!plan.preserveExistingRoot);
@@ -447,15 +566,10 @@ async function main(): Promise<void> {
     }
     await writeGeneratedFiles(plan.generated);
     await removeStaleFiles(plan.stale);
-    const manifest: Manifest = {
-      generated: [...plan.targetPaths].toSorted(),
-    };
     await Bun.write(MANIFEST_PATH, `${JSON.stringify(manifest, null, "\t")}\n`);
     console.log(`wrote ${MANIFEST_PATH}`);
   } else {
-    errors.push(
-      ...(await checkGeneratedState(plan.generated, plan.stale, plan.targetPaths, dirToRules)),
-    );
+    errors.push(...(await checkGeneratedState(plan.generated, plan.stale, manifest, dirToRules)));
   }
 
   if (errors.length > 0) {

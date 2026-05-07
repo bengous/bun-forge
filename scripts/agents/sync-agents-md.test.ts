@@ -5,8 +5,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readJsonObject, stringArray } from "../../src/core/json.ts";
 import {
+  buildManifest,
   fileContainsCrlf,
   generateLayerAgentsMd,
+  generatedPathsFromManifest,
   normalizeNewlines,
   parsePaths,
   pathIsSymlink,
@@ -94,6 +96,50 @@ describe("stripFrontmatter", () => {
 describe("newline and file helpers", () => {
   test("normalizes CRLF to LF", () => {
     expect(normalizeNewlines("a\r\nb\r\n")).toBe("a\nb\n");
+  });
+});
+
+describe("manifest metadata", () => {
+  test("builds v2 output metadata with checksums and source paths", () => {
+    const manifest = buildManifest({
+      generated: new Map([
+        ["AGENTS.md", "## Root\n"],
+        ["src/AGENTS.md", "## Src\n"],
+      ]),
+      sourceContentByPath: new Map([
+        ["CLAUDE.md", "## Root\n"],
+        [".claude/rules/src.md", "## Src source\n"],
+      ]),
+      outputSourceByPath: new Map([
+        ["AGENTS.md", "CLAUDE.md"],
+        ["src/AGENTS.md", ".claude/rules/src.md"],
+      ]),
+      targetPaths: new Set(["AGENTS.md", "src/AGENTS.md"]),
+    });
+
+    expect(manifest.version).toBe(2);
+    expect(manifest.generated).toEqual(["AGENTS.md", "src/AGENTS.md"]);
+    expect(manifest.outputs?.["AGENTS.md"]?.kind).toBe("root");
+    expect(manifest.outputs?.["AGENTS.md"]?.sourcePath).toBe("CLAUDE.md");
+    expect(manifest.outputs?.["src/AGENTS.md"]?.kind).toBe("layer");
+    expect(manifest.outputs?.["src/AGENTS.md"]?.sourcePath).toBe(".claude/rules/src.md");
+    expect(manifest.outputs?.["AGENTS.md"]?.checksum).toStartWith("sha256-");
+    expect(manifest.sources?.["CLAUDE.md"]?.checksum).toStartWith("sha256-");
+  });
+
+  test("reads generated paths from legacy v1 and v2 outputs", () => {
+    expect(
+      generatedPathsFromManifest({
+        generated: ["AGENTS.md"],
+        outputs: {
+          "src/AGENTS.md": {
+            kind: "layer",
+            checksum: "sha256-test",
+            sourcePath: ".claude/rules/src.md",
+          },
+        },
+      }),
+    ).toEqual(["AGENTS.md", "src/AGENTS.md"]);
   });
 });
 
@@ -297,6 +343,11 @@ describe("integration: sandbox project", () => {
     expect(generated).toContain("src/layerA/AGENTS.md");
     expect(generated).toContain("src/layerB/AGENTS.md");
     expect(generated).toContain("scripts/tools/AGENTS.md");
+    expect(manifest["version"]).toBe(2);
+    expect(JSON.stringify(manifest["outputs"])).toContain('"kind"');
+    expect(JSON.stringify(manifest["outputs"])).toContain('"checksum"');
+    expect(JSON.stringify(manifest["outputs"])).toContain('"sourcePath"');
+    expect(JSON.stringify(manifest["sources"])).toContain("CLAUDE.md");
   });
 
   test("--check detects drift after rule modification", async () => {
