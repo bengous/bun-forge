@@ -6,9 +6,9 @@ paths:
 
 ## Antipattern Coverage
 
-Last audit: 2026-04-24 | OXLint 1.61.0 | TypeScript 6.0.3 | Bun 1.3.13
+Last audit: 2026-05-07 | OXLint 1.63.0 | TypeScript 6.0.3 | Bun 1.3.13
 
-Active rules: 246 | Available candidates: 448
+Active rules: 249 | Available candidates: 455
 
 When upgrading OXLint, TypeScript, or Bun, run `/antipattern-audit`.
 
@@ -16,10 +16,10 @@ When upgrading OXLint, TypeScript, or Bun, run `/antipattern-audit`.
 
 | Plugin     | Active | Focus                                                                          |
 | ---------- | ------ | ------------------------------------------------------------------------------ |
-| eslint     | 94     | Correctness, best practices, no-unused-vars at error                           |
+| eslint     | 96     | Correctness, best practices, no-unused-vars at error                           |
 | typescript | 73     | Type safety, no-explicit-any, no-unsafe-* flow, strict-boolean-expressions     |
 | unicorn    | 40     | Modern JS idioms, array method safety                                          |
-| oxc        | 20     | Oxc-specific: bad comparisons, const analysis, erasing ops                     |
+| oxc        | 21     | Oxc-specific: bad comparisons, const analysis, erasing ops                     |
 | import     | 19     | Module hygiene: no-cycle, no-default-export, consistent-type-specifier         |
 
 ### Key enforcement levels
@@ -29,6 +29,8 @@ When upgrading OXLint, TypeScript, or Bun, run `/antipattern-audit`.
 | Unused variables           | no-unused-vars                                       | error |
 | Explicit `any`             | no-explicit-any                                      | error |
 | Floating promises          | no-floating-promises                                 | error |
+| Awaiting non-thenables     | await-thenable                                       | error |
+| Misused spread             | no-misused-spread                                    | error |
 | Misused promises           | no-misused-promises                                  | error |
 | Unsafe type assertions     | no-unsafe-type-assertion                             | error |
 | Unsafe `any` flow          | no-unsafe-assignment, no-unsafe-call, no-unsafe-*    | error |
@@ -37,6 +39,8 @@ When upgrading OXLint, TypeScript, or Bun, run `/antipattern-audit`.
 | Duplicate keys/cases       | no-dupe-keys, no-duplicate-case                      | error |
 | Constant conditions        | no-constant-condition, no-constant-binary-expression | error |
 | Import cycles              | import/no-cycle                                      | warn  |
+| Shared branch code         | branches-sharing-code                                | warn  |
+| Inefficient set lookup     | prefer-set-has                                       | warn  |
 | Strict boolean expressions | strict-boolean-expressions                           | warn  |
 | Consistent type imports    | consistent-type-imports                              | warn  |
 | Prefer nullish coalescing  | prefer-nullish-coalescing                            | warn  |

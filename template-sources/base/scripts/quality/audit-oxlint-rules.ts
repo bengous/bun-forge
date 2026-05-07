@@ -277,6 +277,7 @@ function printRuleTest(ruleName: string): void {
   const result = execAllowFailure([
     "-c",
     CONFIG_PATH,
+    "--quiet",
     "--deny",
     ruleName,
     "--format=unix",

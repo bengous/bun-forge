@@ -17,27 +17,27 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@tanstack/react-router": "1.168.10",
-    "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "@tanstack/react-router": "1.169.2",
+    "react": "19.2.6",
+    "react-dom": "19.2.6"
   },
   "devDependencies": {
     "@playwright/test": "1.59.1",
-    "@tanstack/router-plugin": "1.167.12",
+    "@tanstack/router-plugin": "1.167.35",
     "@testing-library/dom": "10.4.1",
     "@testing-library/jest-dom": "6.9.1",
-    "@testing-library/react": "16.3.0",
-    "@types/node": "25.5.0",
+    "@testing-library/react": "16.3.2",
+    "@types/node": "25.6.0",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.1",
-    "jsdom": "28.1.0",
-    "oxfmt": "0.46.0",
-    "oxlint": "1.61.0",
-    "oxlint-tsgolint": "0.19.0",
-    "stylelint": "17.6.0",
-    "typescript": "6.0.2",
-    "vite": "8.0.3",
+    "jsdom": "29.1.1",
+    "oxfmt": "0.48.0",
+    "oxlint": "1.63.0",
+    "oxlint-tsgolint": "0.22.1",
+    "stylelint": "17.11.0",
+    "typescript": "6.0.3",
+    "vite": "8.0.11",
     "vitest": "4.1.5"
   }
 }

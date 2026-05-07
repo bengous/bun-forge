@@ -63,10 +63,10 @@ export function templateValues(context: TemplateContext): Record<string, string>
     : "";
 
   const effectDependenciesBlock = context.effect
-    ? '  "dependencies": {\n    "@effect/cli": "0.75.0",\n    "@effect/platform": "0.96.0",\n    "@effect/platform-bun": "0.89.0",\n    "effect": "3.21.0"\n  },\n'
+    ? '  "dependencies": {\n    "@effect/cli": "0.75.1",\n    "@effect/platform": "0.96.1",\n    "@effect/platform-bun": "0.89.0",\n    "effect": "3.21.2"\n  },\n'
     : "";
 
-  const effectDevDependencies = context.effect ? '    "@effect/language-service": "0.84.2",\n' : "";
+  const effectDevDependencies = context.effect ? '    "@effect/language-service": "0.85.1",\n' : "";
 
   const effectTsconfigPlugins = context.effect
     ? ',\n    "plugins": [{\n      "name": "@effect/language-service",\n      "diagnostics": true,\n      "quickinfo": true,\n      "completions": true,\n      "ignoreEffectWarningsInTscExitCode": false,\n      "diagnosticSeverity": {\n        "anyUnknownInErrorContext": "warning",\n        "deterministicKeys": "warning",\n        "extendsNativeError": "warning",\n        "importFromBarrel": "warning",\n        "instanceOfSchema": "warning",\n        "missedPipeableOpportunity": "suggestion",\n        "missingEffectServiceDependency": "warning",\n        "nodeBuiltinImport": "off",\n        "schemaUnionOfLiterals": "suggestion",\n        "serviceNotAsClass": "warning",\n        "strictBooleanExpressions": "warning",\n        "strictEffectProvide": "warning"\n      }\n    }]'

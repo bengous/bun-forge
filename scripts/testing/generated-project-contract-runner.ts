@@ -50,6 +50,15 @@ function assertObjectHasKey(source: JsonObject, key: string, label: string): voi
   }
 }
 
+function assertDependencyVersion(
+  source: JsonObject,
+  packageName: string,
+  expectedVersion: string,
+  label: string,
+): void {
+  assertEqual(source[packageName], expectedVersion, `${label} ${packageName}`);
+}
+
 async function assertFileContains(
   root: string,
   relativePath: string,
@@ -96,6 +105,7 @@ async function assertRootContract(
   const projectName = description.templateContext.projectName;
   const packageName = description.templateContext.packageName;
   const lefthook = await Bun.file(join(root, "lefthook.yml")).text();
+  const devDependencies = objectField(packageJson, "devDependencies");
 
   assertPathExists(root, "package.json");
   assertPathExists(root, "README.md");
@@ -118,6 +128,21 @@ async function assertRootContract(
   }
 
   assertEqual(packageJson["name"], packageName, "root package name");
+  assertDependencyVersion(devDependencies, "@types/bun", "1.3.13", "root devDependencies");
+  assertDependencyVersion(devDependencies, "dependency-cruiser", "17.4.0", "root devDependencies");
+  assertDependencyVersion(devDependencies, "jscpd", "4.0.9", "root devDependencies");
+  assertDependencyVersion(devDependencies, "knip", "6.12.0", "root devDependencies");
+  assertDependencyVersion(devDependencies, "lefthook", "2.1.6", "root devDependencies");
+  assertDependencyVersion(devDependencies, "oxfmt", "0.48.0", "root devDependencies");
+  assertDependencyVersion(devDependencies, "oxlint", "1.63.0", "root devDependencies");
+  assertDependencyVersion(
+    devDependencies,
+    "oxlint-plugin-complexity",
+    "2.1.2",
+    "root devDependencies",
+  );
+  assertDependencyVersion(devDependencies, "oxlint-tsgolint", "0.22.1", "root devDependencies");
+  assertDependencyVersion(devDependencies, "typescript", "6.0.3", "root devDependencies");
   assertEqual(
     packageScripts["check:links"],
     "bun scripts/quality/check-links-local.ts",
@@ -199,6 +224,16 @@ async function assertEffectContract(
     assertObjectHasKey(dependencies, "@effect/platform", "dependencies");
     assertObjectHasKey(dependencies, "@effect/platform-bun", "dependencies");
     assertObjectHasKey(devDependencies, "@effect/language-service", "devDependencies");
+    assertDependencyVersion(dependencies, "effect", "3.21.2", "dependencies");
+    assertDependencyVersion(dependencies, "@effect/cli", "0.75.1", "dependencies");
+    assertDependencyVersion(dependencies, "@effect/platform", "0.96.1", "dependencies");
+    assertDependencyVersion(dependencies, "@effect/platform-bun", "0.89.0", "dependencies");
+    assertDependencyVersion(
+      devDependencies,
+      "@effect/language-service",
+      "0.85.1",
+      "devDependencies",
+    );
     assertDefined(packageScripts["effect:diagnose"], "effect:diagnose script");
     assertDefined(packageScripts["effect:quickfixes"], "effect:quickfixes script");
     if (!tsconfig.includes("@effect/language-service")) {
@@ -343,6 +378,7 @@ async function assertFrontendContract(
 
   const frontendPackage = await readJsonObject(join(root, "apps/frontend/package.json"));
   const frontendScripts = objectField(frontendPackage, "scripts");
+  const frontendDependencies = objectField(frontendPackage, "dependencies");
   const frontendDevDependencies = objectField(frontendPackage, "devDependencies");
   const workspaces = packageJson["workspaces"];
 
@@ -402,6 +438,91 @@ async function assertFrontendContract(
     "@testing-library/jest-dom",
     "frontend devDependencies",
   );
+  assertDependencyVersion(
+    frontendDependencies,
+    "@tanstack/react-router",
+    "1.169.2",
+    "frontend dependencies",
+  );
+  assertDependencyVersion(frontendDependencies, "react", "19.2.6", "frontend dependencies");
+  assertDependencyVersion(frontendDependencies, "react-dom", "19.2.6", "frontend dependencies");
+  assertDependencyVersion(
+    frontendDevDependencies,
+    "@playwright/test",
+    "1.59.1",
+    "frontend devDependencies",
+  );
+  assertDependencyVersion(
+    frontendDevDependencies,
+    "@tanstack/router-plugin",
+    "1.167.35",
+    "frontend devDependencies",
+  );
+  assertDependencyVersion(
+    frontendDevDependencies,
+    "@testing-library/dom",
+    "10.4.1",
+    "frontend devDependencies",
+  );
+  assertDependencyVersion(
+    frontendDevDependencies,
+    "@testing-library/jest-dom",
+    "6.9.1",
+    "frontend devDependencies",
+  );
+  assertDependencyVersion(
+    frontendDevDependencies,
+    "@testing-library/react",
+    "16.3.2",
+    "frontend devDependencies",
+  );
+  assertDependencyVersion(
+    frontendDevDependencies,
+    "@types/node",
+    "25.6.0",
+    "frontend devDependencies",
+  );
+  assertDependencyVersion(
+    frontendDevDependencies,
+    "@types/react",
+    "19.2.14",
+    "frontend devDependencies",
+  );
+  assertDependencyVersion(
+    frontendDevDependencies,
+    "@types/react-dom",
+    "19.2.3",
+    "frontend devDependencies",
+  );
+  assertDependencyVersion(
+    frontendDevDependencies,
+    "@vitejs/plugin-react",
+    "6.0.1",
+    "frontend devDependencies",
+  );
+  assertDependencyVersion(frontendDevDependencies, "jsdom", "29.1.1", "frontend devDependencies");
+  assertDependencyVersion(frontendDevDependencies, "oxfmt", "0.48.0", "frontend devDependencies");
+  assertDependencyVersion(frontendDevDependencies, "oxlint", "1.63.0", "frontend devDependencies");
+  assertDependencyVersion(
+    frontendDevDependencies,
+    "oxlint-tsgolint",
+    "0.22.1",
+    "frontend devDependencies",
+  );
+  assertDependencyVersion(
+    frontendDevDependencies,
+    "typescript",
+    "6.0.3",
+    "frontend devDependencies",
+  );
+  assertDependencyVersion(
+    frontendDevDependencies,
+    "stylelint",
+    "17.11.0",
+    "frontend devDependencies",
+  );
+  assertDependencyVersion(frontendDevDependencies, "vite", "8.0.11", "frontend devDependencies");
+  assertDependencyVersion(frontendDevDependencies, "vitest", "4.1.5", "frontend devDependencies");
 
   assertPathMissing(root, "apps/frontend/.cta.json");
   assertPathMissing(root, "apps/frontend/.vscode");

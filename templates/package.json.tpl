@@ -24,14 +24,14 @@ __FRONTEND_SCRIPTS__    "validate": "bun scripts/validation/validate.ts",
   },
 __EFFECT_DEPENDENCIES_BLOCK__  "devDependencies": {
 __EFFECT_DEV_DEPENDENCIES__    "@types/bun": "1.3.13",
-    "dependency-cruiser": "17.3.10",
-    "jscpd": "4.0.8",
-    "knip": "6.6.2",
-    "lefthook": "2.1.4",
-    "oxfmt": "0.46.0",
-    "oxlint": "1.61.0",
-    "oxlint-plugin-complexity": "2.0.3",
-    "oxlint-tsgolint": "0.19.0",
-    "typescript": "6.0.2"
+    "dependency-cruiser": "17.4.0",
+    "jscpd": "4.0.9",
+    "knip": "6.12.0",
+    "lefthook": "2.1.6",
+    "oxfmt": "0.48.0",
+    "oxlint": "1.63.0",
+    "oxlint-plugin-complexity": "2.1.2",
+    "oxlint-tsgolint": "0.22.1",
+    "typescript": "6.0.3"
   }
 }

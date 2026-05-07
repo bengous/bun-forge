@@ -213,7 +213,7 @@ describe("buildAdoptionPlan", () => {
     expect(packageJson.scripts["lint:arch"]).toBeDefined();
     expect(packageJson.dependencies["effect"]).toBe("^3.19.15");
     expect(packageJson.dependencies["@effect/platform-bun"]).toBe("^0.87.1");
-    expect(packageJson.dependencies["@effect/platform"]).toBe("0.96.0");
+    expect(packageJson.dependencies["@effect/platform"]).toBe("0.96.1");
     expect(packageJson.devDependencies["@types/bun"]).toBe("^1.3.8");
   });
 
