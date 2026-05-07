@@ -1,6 +1,6 @@
 import type { AdoptOptions } from "../types.ts";
 import { afterEach, describe, expect, test } from "bun:test";
-import { lstatSync, mkdtempSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -15,6 +15,24 @@ import {
 import { toExistingBinName, toExistingPackageName, toProjectName } from "./naming.ts";
 
 const tempDirs: string[] = [];
+
+function canCreateFileSymlink(): boolean {
+  const dir = mkdtempSync(join(tmpdir(), "bun-forge-symlink-capability-"));
+  const target = join(dir, "target.md");
+  const link = join(dir, "link.md");
+
+  try {
+    writeFileSync(target, "target\n");
+    symlinkSync("target.md", link, "file");
+    return lstatSync(link).isSymbolicLink();
+  } catch {
+    return false;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+const canCreateSymlinks = canCreateFileSymlink();
 
 afterEach(async () => {
   await Promise.all(
@@ -406,36 +424,39 @@ describe("buildAdoptionPlan", () => {
     ).toBe(true);
   });
 
-  test("preserves Vex-like root AI files and adds a Bun Forge rule", async () => {
-    const dir = makeTempProject();
-    seedBunTsProject(dir);
-    writeProjectFile(dir, "AI.md", "Existing Vex guidance\n");
-    symlinkSync("AI.md", join(dir, "CLAUDE.md"));
-    symlinkSync("AI.md", join(dir, "AGENTS.md"));
-    writeProjectFile(dir, ".codex", "legacy codex marker\n");
-    mkdirSync(join(dir, ".claude/worktrees"), { recursive: true });
+  test.if(canCreateSymlinks)(
+    "preserves Vex-like root AI files and adds a Bun Forge rule",
+    async () => {
+      const dir = makeTempProject();
+      seedBunTsProject(dir);
+      writeProjectFile(dir, "AI.md", "Existing Vex guidance\n");
+      symlinkSync("AI.md", join(dir, "CLAUDE.md"), "file");
+      symlinkSync("AI.md", join(dir, "AGENTS.md"), "file");
+      writeProjectFile(dir, ".codex", "legacy codex marker\n");
+      mkdirSync(join(dir, ".claude/worktrees"), { recursive: true });
 
-    const plan = await buildAdoptionPlan(makeOptions(dir, { ai: true }));
+      const plan = await buildAdoptionPlan(makeOptions(dir, { ai: true }));
 
-    expect(
-      plan.actions.some(
-        (action) =>
-          action.kind === "skip" &&
-          action.path === "CLAUDE.md" &&
-          action.reason.includes("preserved"),
-      ),
-    ).toBe(true);
-    expect(
-      plan.actions.some(
-        (action) =>
-          action.kind === "create" &&
-          action.path === ".claude/rules/bun-forge-project-conventions.md",
-      ),
-    ).toBe(true);
-    expect(
-      plan.actions.some((action) => action.path === ".claude/rules/project-conventions.md"),
-    ).toBe(false);
-  });
+      expect(
+        plan.actions.some(
+          (action) =>
+            action.kind === "skip" &&
+            action.path === "CLAUDE.md" &&
+            action.reason.includes("preserved"),
+        ),
+      ).toBe(true);
+      expect(
+        plan.actions.some(
+          (action) =>
+            action.kind === "create" &&
+            action.path === ".claude/rules/bun-forge-project-conventions.md",
+        ),
+      ).toBe(true);
+      expect(
+        plan.actions.some((action) => action.path === ".claude/rules/project-conventions.md"),
+      ).toBe(false);
+    },
+  );
 });
 
 describe("applyAdoptionPlan and rollbackAdoption", () => {
@@ -491,12 +512,12 @@ describe("applyAdoptionPlan and rollbackAdoption", () => {
     expect(await Bun.file(join(dir, "CLAUDE.md")).text()).toBe("Existing guidance\n");
   });
 
-  test("keeps root AI symlinks intact during apply", async () => {
+  test.if(canCreateSymlinks)("keeps root AI symlinks intact during apply", async () => {
     const dir = await makeAsyncTempProject();
     seedBunTsProject(dir);
     writeProjectFile(dir, "AI.md", "Existing Vex guidance\n");
-    symlinkSync("AI.md", join(dir, "CLAUDE.md"));
-    symlinkSync("AI.md", join(dir, "AGENTS.md"));
+    symlinkSync("AI.md", join(dir, "CLAUDE.md"), "file");
+    symlinkSync("AI.md", join(dir, "AGENTS.md"), "file");
     const options = makeOptions(dir, { ai: true });
     const plan = await buildAdoptionPlan(options);
 

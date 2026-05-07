@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { join } from "node:path";
 import { resolveBin, resolveProjectRoot } from "./resolve-bin.ts";
 
 describe("resolveProjectRoot", () => {
@@ -11,6 +12,8 @@ describe("resolveProjectRoot", () => {
 describe("resolveBin", () => {
   test("builds the node_modules binary path", () => {
     const expectedSuffix = process.platform === "win32" ? "oxlint.exe" : "oxlint";
-    expect(resolveBin("/repo", "oxlint")).toBe(`/repo/node_modules/.bin/${expectedSuffix}`);
+    expect(resolveBin("/repo", "oxlint")).toBe(
+      join("/repo", "node_modules", ".bin", expectedSuffix),
+    );
   });
 });

@@ -1,6 +1,10 @@
 import { mkdir, readdir } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 
+function toPosixPath(path: string): string {
+  return path.replaceAll("\\", "/");
+}
+
 async function walk(dir: string, root = dir): Promise<string[]> {
   const entries = await readdir(dir, { withFileTypes: true });
   const nestedFiles = await Promise.all(
@@ -9,7 +13,7 @@ async function walk(dir: string, root = dir): Promise<string[]> {
       if (entry.isDirectory()) {
         return walk(fullPath, root);
       }
-      return [relative(root, fullPath)];
+      return [toPosixPath(relative(root, fullPath))];
     }),
   );
 

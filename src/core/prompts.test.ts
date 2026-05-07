@@ -1,6 +1,7 @@
 import type { FrontendPreset, InitOptions } from "../types.ts";
 import type { PromptRuntime } from "./prompts.ts";
 import { describe, expect, test } from "bun:test";
+import { join } from "node:path";
 import {
   collectOptionsWithRuntime,
   defaultPromptRuntime,
@@ -72,7 +73,7 @@ describe("normalizeFlagOptions", () => {
       gitInit: true,
       yes: false,
     });
-    expect(normalized.destination.endsWith("/My App")).toBe(true);
+    expect(normalized.destination.endsWith(join("My App"))).toBe(true);
   });
 
   test("respects explicit flags", () => {
@@ -109,6 +110,7 @@ describe("normalizeFlagOptions", () => {
     expect(String(normalized.projectName)).toBe("fancy-project");
     expect(String(normalized.packageName)).toBe("fancy-project");
     expect(String(normalized.binName)).toBe("fancy-project");
+    expect(normalized.destination.endsWith(join("tmp", "nested", "Fancy Project"))).toBe(true);
   });
 
   test("rejects an explicit empty project name", () => {

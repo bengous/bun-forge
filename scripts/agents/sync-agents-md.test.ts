@@ -1,6 +1,6 @@
 import { $ } from "bun";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { lstatSync, mkdtempSync, symlinkSync, unlinkSync } from "node:fs";
+import { lstatSync, mkdtempSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readJsonObject, stringArray } from "../../src/core/json.ts";
@@ -69,6 +69,11 @@ describe("parsePaths", () => {
     const content = `---\r\npaths:\r\n  - "src/hooks/**/*.ts"\r\n---\r\n`;
     expect(parsePaths(content)).toEqual(["src/hooks"]);
   });
+
+  test("normalizes Windows path separators from frontmatter", () => {
+    const content = `---\npaths:\n  - "src\\hooks\\**\\*.ts"\n---\n`;
+    expect(parsePaths(content)).toEqual(["src/hooks"]);
+  });
 });
 
 describe("stripFrontmatter", () => {
@@ -130,16 +135,16 @@ describe("manifest metadata", () => {
   test("reads generated paths from legacy v1 and v2 outputs", () => {
     expect(
       generatedPathsFromManifest({
-        generated: ["AGENTS.md"],
+        generated: ["AGENTS.md", "scripts\\AGENTS.md"],
         outputs: {
-          "src/AGENTS.md": {
+          "src\\AGENTS.md": {
             kind: "layer",
             checksum: "sha256-test",
             sourcePath: ".claude/rules/src.md",
           },
         },
       }),
-    ).toEqual(["AGENTS.md", "src/AGENTS.md"]);
+    ).toEqual(["AGENTS.md", "scripts/AGENTS.md", "src/AGENTS.md"]);
   });
 });
 
@@ -218,6 +223,24 @@ describe("verifyLayerContent", () => {
 // ---------------------------------------------------------------------------
 
 const SCRIPT_PATH = `${import.meta.dir}/sync-agents-md.ts`;
+
+function canCreateFileSymlink(): boolean {
+  const dir = mkdtempSync(join(tmpdir(), "bun-forge-symlink-capability-"));
+  const target = join(dir, "target.md");
+  const link = join(dir, "link.md");
+
+  try {
+    writeFileSync(target, "target\n");
+    symlinkSync("target.md", link, "file");
+    return lstatSync(link).isSymbolicLink();
+  } catch {
+    return false;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+const canCreateSymlinks = canCreateFileSymlink();
 
 function makeTempDir(): string {
   return mkdtempSync(join(tmpdir(), "etch-sync-test-"));
@@ -422,9 +445,9 @@ describe("integration: sandbox project", () => {
     runScript(dir, "--write");
   });
 
-  test("--check rejects symlinked managed AGENTS files", () => {
+  test.if(canCreateSymlinks)("--check rejects symlinked managed AGENTS files", () => {
     unlinkSync(`${dir}/AGENTS.md`);
-    symlinkSync("CLAUDE.md", `${dir}/AGENTS.md`);
+    symlinkSync("CLAUDE.md", `${dir}/AGENTS.md`, "file");
     expect(lstatSync(`${dir}/AGENTS.md`).isSymbolicLink()).toBe(true);
 
     const { exitCode, stderr } = runScript(dir, "--check");
@@ -436,14 +459,14 @@ describe("integration: sandbox project", () => {
   });
 });
 
-describe("integration: preserve root mode", () => {
+describe.if(canCreateSymlinks)("integration: preserve root mode", () => {
   let dir: string;
 
   beforeAll(async () => {
     dir = makeTempDir();
     await Bun.write(`${dir}/AI.md`, "## Existing Root\n\nProject-specific guidance.\n");
-    symlinkSync("AI.md", `${dir}/CLAUDE.md`);
-    symlinkSync("AI.md", `${dir}/AGENTS.md`);
+    symlinkSync("AI.md", `${dir}/CLAUDE.md`, "file");
+    symlinkSync("AI.md", `${dir}/AGENTS.md`, "file");
     await Bun.write(
       `${dir}/.claude/rules/bun-forge-project-conventions.md`,
       `---\npaths:\n  - "src/**/*.ts"\n---\n\n## Bun Forge Rule\n\nAdopted rule content.\n`,
