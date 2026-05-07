@@ -50,7 +50,9 @@ export async function smoke(scenario: SmokeScenario, config: ScenarioConfig): Pr
 }
 
 if (import.meta.main) {
-  for (const scenario of smokeScenariosFromArgv(process.argv)) {
-    await smoke(scenario, SCAFFOLD_SCENARIO_CONFIG[scenario]);
-  }
+  await Promise.all(
+    smokeScenariosFromArgv(process.argv).map(async (scenario) =>
+      smoke(scenario, SCAFFOLD_SCENARIO_CONFIG[scenario]),
+    ),
+  );
 }

@@ -79,8 +79,9 @@ export async function e2eContract(
 }
 
 if (import.meta.main) {
-  for (const scenario of e2eContractScenariosFromArgv(process.argv)) {
-    const config = SCAFFOLD_SCENARIO_CONFIG[scenario];
-    await e2eContract(scenario, config);
-  }
+  await Promise.all(
+    e2eContractScenariosFromArgv(process.argv).map(async (scenario) =>
+      e2eContract(scenario, SCAFFOLD_SCENARIO_CONFIG[scenario]),
+    ),
+  );
 }

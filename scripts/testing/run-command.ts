@@ -1,4 +1,5 @@
 const DEFAULT_TIMEOUT_MS = 300_000;
+const timedOut = Symbol("timedOut");
 
 export type RunCommandOptions = {
   readonly cwd: string;
@@ -21,6 +22,7 @@ export async function runCommand(
   options: RunCommandOptions,
 ): Promise<void> {
   const timeoutMs = options.timeoutMs ?? commandTimeoutMs(options.env);
+  const env = options.env ?? {};
   const proc = Bun.spawn([...command], {
     cwd: options.cwd,
     stdin: "ignore",
@@ -28,24 +30,26 @@ export async function runCommand(
     stderr: "inherit",
     env: {
       ...process.env,
-      ...options.env,
-      BUN_TMPDIR: options.env?.["BUN_TMPDIR"] ?? process.env["BUN_TMPDIR"] ?? "/tmp",
-      BUN_INSTALL: options.env?.["BUN_INSTALL"] ?? process.env["BUN_INSTALL"] ?? "/tmp/bun-install",
+      ...env,
+      BUN_TMPDIR: env["BUN_TMPDIR"] ?? process.env["BUN_TMPDIR"] ?? "/tmp",
+      BUN_INSTALL: env["BUN_INSTALL"] ?? process.env["BUN_INSTALL"] ?? "/tmp/bun-install",
     },
     ...(process.platform === "win32" ? { windowsHide: true } : {}),
   });
 
-  let timedOut = false;
-  const timeout = setTimeout(() => {
-    timedOut = true;
-    proc.kill();
-  }, timeoutMs);
-  timeout.unref?.();
+  let timer: NodeJS.Timeout;
+  const timeout = new Promise<typeof timedOut>((resolve) => {
+    timer = setTimeout(() => {
+      proc.kill();
+      resolve(timedOut);
+    }, timeoutMs);
+    timer.unref();
+  });
 
-  const exitCode = await proc.exited;
-  clearTimeout(timeout);
+  const exitCode = await Promise.race([proc.exited, timeout]);
+  clearTimeout(timer!);
 
-  if (timedOut) {
+  if (exitCode === timedOut) {
     throw new Error(`${command.join(" ")} timed out after ${timeoutMs}ms`);
   }
   if (exitCode !== 0) {

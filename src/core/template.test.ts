@@ -164,6 +164,6 @@ describe("renderTemplate", () => {
     expect(entry).toContain("console.log(createGreeting())");
     expect(starterTest).toContain('import { createGreeting, projectName } from "./index";');
     expect(starterTest).toContain("expect(createGreeting()).toBe(`Hello from ");
-    expect(starterTest).toContain("$" + "{projectName}`)");
+    expect(starterTest).toContain("${".concat("projectName}`"));
   });
 });

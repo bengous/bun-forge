@@ -20,8 +20,7 @@ function formatUnknown(value: unknown): string {
   if (value === undefined) {
     return "undefined";
   }
-  const serialized = JSON.stringify(value);
-  return serialized ?? `[${typeof value}]`;
+  return JSON.stringify(value);
 }
 
 function assertEqual(actual: unknown, expected: unknown, label: string): void {

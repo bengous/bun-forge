@@ -33,7 +33,10 @@ function makeOptions(overrides: Partial<InitOptions> = {}): InitOptions {
   };
 }
 
-function createRuntime(overrides: Partial<GenerationRuntime> = {}) {
+function createRuntime(overrides: Partial<GenerationRuntime> = {}): {
+  readonly runtime: GenerationRuntime;
+  readonly calls: string[];
+} {
   const calls: string[] = [];
 
   const runtime: GenerationRuntime = {

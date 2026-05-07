@@ -111,7 +111,7 @@ async function cleanupNativeScaffold(options: InitOptions): Promise<void> {
   await removePaths(options.destination, cleanupPathsForOptions(options));
 }
 
-export function enabledPresets(options: InitOptions) {
+export function enabledPresets(options: InitOptions): typeof PRESETS {
   const presetNames: ReadonlySet<string> = new Set(
     describeGeneratedProject(options).presetCopySpecs.map((spec) => spec.name),
   );
@@ -119,9 +119,11 @@ export function enabledPresets(options: InitOptions) {
 }
 
 async function copyEnabledPresets(options: InitOptions): Promise<void> {
-  for (const preset of describeGeneratedProject(options).presetCopySpecs) {
-    await copyPreset(preset, options.destination);
-  }
+  await Promise.all(
+    describeGeneratedProject(options).presetCopySpecs.map(async (preset) =>
+      copyPreset(preset, options.destination),
+    ),
+  );
 }
 
 export const defaultGenerationRuntime: GenerationRuntime = {

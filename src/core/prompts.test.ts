@@ -37,14 +37,6 @@ function createPromptRuntime(
   const selectQueue = [...(responses.selects ?? [])];
   const confirmQueue = [...(responses.confirms ?? [])];
 
-  function nextResponse<T>(queue: T[], kind: string): T {
-    const response = queue.shift();
-    if (response === undefined) {
-      throw new Error(`Missing queued ${kind} prompt response`);
-    }
-    return response;
-  }
-
   return {
     ...defaultPromptRuntime,
     intro() {},
@@ -55,6 +47,14 @@ function createPromptRuntime(
     isCancel: (value: unknown) => value === cancelled,
     resolvePath: (value: string) => (value.startsWith("/") ? value : `${resolvedPrefix}/${value}`),
   };
+}
+
+function nextResponse<T>(queue: T[], kind: string): T {
+  const response = queue.shift();
+  if (response === undefined) {
+    throw new Error(`Missing queued ${kind} prompt response`);
+  }
+  return response;
 }
 
 describe("normalizeFlagOptions", () => {

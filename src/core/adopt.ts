@@ -620,17 +620,29 @@ export async function rollbackAdoption(
     throw new TypeError("Invalid adoption rollback manifest entry");
   });
 
-  for (const entry of entries.toReversed()) {
-    const target = join(destination, entry.path);
-    if (entry.kind === "created") {
-      await rm(target, { recursive: true, force: true });
-    } else if (entry.backupPath !== undefined) {
-      await mkdir(dirname(target), { recursive: true });
-      await copyFile(join(root, entry.backupPath), target);
-    }
-  }
+  await entries
+    .toReversed()
+    .reduce(
+      async (previous, entry) =>
+        previous.then(async () => rollbackBackupEntry(destination, root, entry)),
+      Promise.resolve(),
+    );
 
   return { runId: toBackupRunId(manifest["runId"]), entries };
+}
+
+async function rollbackBackupEntry(
+  destination: string,
+  root: string,
+  entry: BackupEntry,
+): Promise<void> {
+  const target = join(destination, entry.path);
+  if (entry.kind === "created") {
+    await rm(target, { recursive: true, force: true });
+  } else if (entry.backupPath !== undefined) {
+    await mkdir(dirname(target), { recursive: true });
+    await copyFile(join(root, entry.backupPath), target);
+  }
 }
 
 export function formatAdoptionPlan(plan: AdoptionPlan): string {

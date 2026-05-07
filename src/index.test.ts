@@ -12,7 +12,11 @@ import {
   runCli,
 } from "./index.ts";
 
-function createRuntime(overrides: Partial<CliRuntime> = {}) {
+function createRuntime(overrides: Partial<CliRuntime> = {}): {
+  readonly runtime: CliRuntime;
+  readonly stdout: string[];
+  readonly stderr: string[];
+} {
   const stdout: string[] = [];
   const stderr: string[] = [];
 

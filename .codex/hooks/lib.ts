@@ -166,7 +166,7 @@ export function extractTouchedPaths(input: HookInput, root = repoRoot(input)): s
   return [...candidates]
     .map((filePath) => normalizeProjectPath(filePath, root, cwd))
     .filter((filePath): filePath is string => filePath !== null)
-    .sort();
+    .toSorted();
 }
 
 export function extractApplyPatchPaths(patch: string): string[] {
@@ -215,7 +215,7 @@ export async function recordTouchedPaths(
 
   const filePath = touchedStatePath(input);
   await mkdir(path.dirname(filePath), { recursive: true });
-  const next = [...new Set([...(await readTouchedPaths(input)), ...paths])].sort();
+  const next = [...new Set([...(await readTouchedPaths(input)), ...paths])].toSorted();
   await writeFile(filePath, `${JSON.stringify(next, null, 2)}\n`, "utf8");
 }
 
@@ -227,7 +227,7 @@ export async function readTouchedPaths(input: HookInput): Promise<string[]> {
 
   const parsed = JSON.parse(await readFile(filePath, "utf8")) as unknown;
   return Array.isArray(parsed)
-    ? parsed.filter((value): value is string => typeof value === "string").sort()
+    ? parsed.filter((value): value is string => typeof value === "string").toSorted()
     : [];
 }
 
@@ -269,64 +269,11 @@ export async function runPostEditQuality(
   const existingPaths = paths.filter((filePath) => existsSync(path.join(root, filePath)));
   const needsProductContract = existingPaths.some((filePath) => isProductSurface(filePath));
   const buckets = bucketByWorkspace(existingPaths);
-  const failures: string[] = [];
-
-  for (const bucket of buckets.values()) {
-    if (bucket.lintFixPaths.length > 0) {
-      const lintFix = await runner(
-        [
-          localTool(root, "oxlint"),
-          ...bucket.workspace.lintArgs,
-          "-c",
-          bucket.workspace.lintConfig,
-          "--fix",
-          "--quiet",
-          ...bucket.lintFixPaths,
-        ],
-        { cwd: root },
-      );
-      if (lintFix.code !== 0) {
-        failures.push(batchedCommandFailure("lint --fix", bucket.lintFixPaths, lintFix));
-        continue;
-      }
-    }
-
-    if (bucket.formatPaths.length > 0) {
-      const mode = bucket.workspace.formatMode === "write" ? "--write" : "--check";
-      const format = await runner(
-        [
-          localTool(root, "oxfmt"),
-          mode,
-          "-c",
-          bucket.workspace.formatConfig,
-          ...bucket.formatPaths,
-        ],
-        { cwd: root },
-      );
-      if (format.code !== 0) {
-        failures.push(batchedCommandFailure("format", bucket.formatPaths, format));
-        continue;
-      }
-    }
-
-    if (bucket.lintCheckPaths.length > 0) {
-      const lint = await runner(
-        [
-          localTool(root, "oxlint"),
-          ...bucket.workspace.lintArgs,
-          "-c",
-          bucket.workspace.lintConfig,
-          "--quiet",
-          "--format=unix",
-          ...bucket.lintCheckPaths,
-        ],
-        { cwd: root },
-      );
-      if (lint.code !== 0) {
-        failures.push(batchedCommandFailure("lint", bucket.lintCheckPaths, lint));
-      }
-    }
-  }
+  const failures = (
+    await Promise.all(
+      [...buckets.values()].map(async (bucket) => runBucketQuality(root, bucket, runner)),
+    )
+  ).flat();
 
   if (needsProductContract) {
     const contract = await runner(["bun", "run", "--silent", "test:project-contract"], {
@@ -346,6 +293,92 @@ export async function runPostEditQuality(
   // report autofixed content through that channel instead of relying only on
   // filesystem mutation. Avoid echoing whole files into context meanwhile.
   return {};
+}
+
+async function runBucketQuality(
+  root: string,
+  bucket: BucketEntry,
+  runner: CommandRunner,
+): Promise<string[]> {
+  const lintFixFailure = await runLintFix(root, bucket, runner);
+  if (lintFixFailure !== null) {
+    return [lintFixFailure];
+  }
+
+  const formatFailure = await runFormat(root, bucket, runner);
+  if (formatFailure !== null) {
+    return [formatFailure];
+  }
+
+  const lintFailure = await runLintCheck(root, bucket, runner);
+  return lintFailure === null ? [] : [lintFailure];
+}
+
+async function runLintFix(
+  root: string,
+  bucket: BucketEntry,
+  runner: CommandRunner,
+): Promise<string | null> {
+  if (bucket.lintFixPaths.length === 0) {
+    return null;
+  }
+
+  const lintFix = await runner(
+    [
+      localTool(root, "oxlint"),
+      ...bucket.workspace.lintArgs,
+      "-c",
+      bucket.workspace.lintConfig,
+      "--fix",
+      "--quiet",
+      ...bucket.lintFixPaths,
+    ],
+    { cwd: root },
+  );
+  return lintFix.code === 0
+    ? null
+    : batchedCommandFailure("lint --fix", bucket.lintFixPaths, lintFix);
+}
+
+async function runFormat(
+  root: string,
+  bucket: BucketEntry,
+  runner: CommandRunner,
+): Promise<string | null> {
+  if (bucket.formatPaths.length === 0) {
+    return null;
+  }
+
+  const mode = bucket.workspace.formatMode === "write" ? "--write" : "--check";
+  const format = await runner(
+    [localTool(root, "oxfmt"), mode, "-c", bucket.workspace.formatConfig, ...bucket.formatPaths],
+    { cwd: root },
+  );
+  return format.code === 0 ? null : batchedCommandFailure("format", bucket.formatPaths, format);
+}
+
+async function runLintCheck(
+  root: string,
+  bucket: BucketEntry,
+  runner: CommandRunner,
+): Promise<string | null> {
+  if (bucket.lintCheckPaths.length === 0) {
+    return null;
+  }
+
+  const lint = await runner(
+    [
+      localTool(root, "oxlint"),
+      ...bucket.workspace.lintArgs,
+      "-c",
+      bucket.workspace.lintConfig,
+      "--quiet",
+      "--format=unix",
+      ...bucket.lintCheckPaths,
+    ],
+    { cwd: root },
+  );
+  return lint.code === 0 ? null : batchedCommandFailure("lint", bucket.lintCheckPaths, lint);
 }
 
 export async function runStopValidation(
@@ -476,7 +509,7 @@ function tail(text: string, lines: number): string {
 }
 
 function sanitizeStateKey(value: string): string {
-  return value.replace(/[^a-zA-Z0-9._-]/g, "_");
+  return value.replaceAll(/[^a-zA-Z0-9._-]/g, "_");
 }
 
 function valueAsString(value: unknown): string | undefined {

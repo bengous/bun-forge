@@ -21,7 +21,11 @@ function makeOptions(overrides: Partial<InitOptions> = {}): InitOptions {
   };
 }
 
-function createInstallRuntime(overrides: Partial<InstallRuntime> = {}) {
+function createInstallRuntime(overrides: Partial<InstallRuntime> = {}): {
+  readonly runtime: InstallRuntime;
+  readonly commands: string[][];
+  readonly warnings: string[];
+} {
   const commands: string[][] = [];
   const warnings: string[] = [];
 
