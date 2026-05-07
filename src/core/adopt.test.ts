@@ -346,6 +346,23 @@ describe("buildAdoptionPlan", () => {
     ).toBe(true);
   });
 
+  test("keeps non-Codex parent path conflicts explicit before apply", async () => {
+    const dir = makeTempProject();
+    seedBunTsProject(dir);
+    writeProjectFile(dir, ".claude", "legacy claude marker\n");
+
+    const plan = await buildAdoptionPlan(makeOptions(dir, { ai: true }));
+
+    expect(
+      plan.actions.some(
+        (action) =>
+          action.kind === "conflict" &&
+          action.path === ".claude/rules/bun-forge-project-conventions.md" &&
+          action.reason.includes("Cannot create below existing non-directory path"),
+      ),
+    ).toBe(true);
+  });
+
   test("preserves Vex-like root AI files and adds a Bun Forge rule", async () => {
     const dir = makeTempProject();
     seedBunTsProject(dir);

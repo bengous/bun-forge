@@ -10,7 +10,6 @@ import type {
 import type {
   GeneratedProjectDescription,
   PresetCopySpec,
-  PresetName,
   TemplateRenderSpec,
 } from "./generated-project-contract.ts";
 import type { JsonObject } from "./json.ts";
@@ -18,9 +17,19 @@ import { existsSync, statSync } from "node:fs";
 import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { brandValue } from "../types.ts";
+import {
+  adoptionTemplatePolicy,
+  frontendConflictReason,
+  isNonDirectoryParentConflict,
+  mergeAdoptedPackageJson,
+  presetAdoptionReason,
+  presetMismatchPolicy,
+  shouldOmitPresetDuringAdopt,
+  shouldOmitTemplateDuringAdopt,
+} from "./adoption-policy.ts";
 import { describeGeneratedProject } from "./generated-project-contract.ts";
 import { finalizeProject, runCommand } from "./install.ts";
-import { isJsonObject, objectField, parseJsonObject, readJsonObject, stringArray } from "./json.ts";
+import { isJsonObject, objectField, parseJsonObject, readJsonObject } from "./json.ts";
 import {
   toExistingBinName,
   toExistingPackageName,
@@ -149,23 +158,6 @@ async function writeText(path: string, content: string): Promise<void> {
   await writeFile(path, content);
 }
 
-function mergeObjectsPreservingExisting(existing: JsonObject, additions: JsonObject): JsonObject {
-  const merged: JsonObject = { ...existing };
-  for (const [key, value] of Object.entries(additions)) {
-    if (!(key in merged)) {
-      merged[key] = value;
-    }
-  }
-  return merged;
-}
-
-function mergeStringArrayPreservingExisting(existing: unknown, additions: unknown): unknown {
-  if (!Array.isArray(existing) || !Array.isArray(additions)) {
-    return existing ?? additions;
-  }
-  return [...new Set([...stringArray(existing), ...stringArray(additions)])];
-}
-
 function renderJsonTemplate(templateName: string, context: TemplateContext): JsonObject {
   return parseJsonObject(renderTemplate(templateName, context), templateName);
 }
@@ -240,40 +232,6 @@ function describeAdoptedProject(options: AdoptOptions): GeneratedProjectDescript
   });
 }
 
-function mergePackageJson(existing: JsonObject, expected: JsonObject): JsonObject {
-  return {
-    ...existing,
-    scripts: mergeObjectsPreservingExisting(
-      objectField(existing, "scripts"),
-      objectField(expected, "scripts"),
-    ),
-    dependencies: mergeObjectsPreservingExisting(
-      objectField(existing, "dependencies"),
-      objectField(expected, "dependencies"),
-    ),
-    devDependencies: mergeObjectsPreservingExisting(
-      objectField(existing, "devDependencies"),
-      objectField(expected, "devDependencies"),
-    ),
-    workspaces: mergeStringArrayPreservingExisting(existing["workspaces"], expected["workspaces"]),
-  };
-}
-
-function withAdoptionPackageScripts(expected: JsonObject, context: TemplateContext): JsonObject {
-  if (!context.ai) {
-    return expected;
-  }
-
-  return {
-    ...expected,
-    scripts: {
-      ...objectField(expected, "scripts"),
-      "agents:sync": "bun scripts/agents/sync-agents-md.ts --write --preserve-root",
-      "agents:check": "bun scripts/agents/sync-agents-md.ts --check --preserve-root",
-    },
-  };
-}
-
 function stableJson(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
@@ -286,41 +244,9 @@ async function planStaticFile(
 ): Promise<AdoptionAction> {
   const safePath = toSafeRelativePath(relativePath);
   const content = await readText(join(sourceRoot, safePath));
-  return planFileContent(destination, safePath, content, reason, {
-    kind: "conflict",
-    reason: `Existing file differs from Bun Forge ${reason}`,
-  });
-}
-
-function presetAdoptionReason(name: PresetName): string {
-  switch (name) {
-    case "base":
-      return "base tooling file";
-    case "frontend-tanstack":
-      return "frontend preset file";
-    case "ai":
-      return "AI tooling file";
-    case "effect":
-      return "Effect preset file";
-    default:
-      throw new Error("Unknown preset");
-  }
-}
-
-function applyPresetAdoptionPolicy(action: AdoptionAction): AdoptionAction {
-  if (
-    action.kind === "conflict" &&
-    action.path.startsWith(".codex/") &&
-    action.reason.includes("existing non-directory path")
-  ) {
-    return {
-      kind: "skip",
-      path: action.path,
-      reason: "Existing .codex path is not a directory; Codex config preserved and skipped",
-    };
-  }
-
-  return action;
+  return planFileContent(destination, safePath, content, reason, (mismatchReason) =>
+    presetMismatchPolicy(relativePath, reason, mismatchReason),
+  );
 }
 
 async function planPresetCopySpec(
@@ -328,12 +254,11 @@ async function planPresetCopySpec(
   spec: PresetCopySpec,
 ): Promise<AdoptionAction[]> {
   const reason = presetAdoptionReason(spec.name);
-  const actions = await Promise.all(
+  return Promise.all(
     spec.relativePaths.map(async (path) =>
       planStaticFile(destination, spec.sourceDir, path, reason),
     ),
   );
-  return actions.map(applyPresetAdoptionPolicy);
 }
 
 async function planPackageJson(
@@ -345,11 +270,8 @@ async function planPackageJson(
   const packagePath = join(destination, relativePath);
   const current = await readText(packagePath);
   const existing = parseJsonObject(current, packagePath);
-  const expected = withAdoptionPackageScripts(
-    renderJsonTemplate("package.json.tpl", context),
-    context,
-  );
-  const merged = mergePackageJson(existing, expected);
+  const expected = renderJsonTemplate("package.json.tpl", context);
+  const merged = mergeAdoptedPackageJson(existing, expected, context);
   const content = stableJson(merged);
 
   if (current === content) {
@@ -368,88 +290,6 @@ async function planPackageJson(
   };
 }
 
-function templateAdoptionPath(spec: TemplateRenderSpec): string {
-  if (spec.relativePath === ".claude/rules/project-conventions.md") {
-    return ".claude/rules/bun-forge-project-conventions.md";
-  }
-
-  if (spec.relativePath === ".claude/rules/frontend-conventions.md") {
-    return ".claude/rules/bun-forge-frontend-conventions.md";
-  }
-
-  return spec.relativePath;
-}
-
-function templateCreateReason(spec: TemplateRenderSpec): string {
-  switch (spec.relativePath) {
-    case "README.md":
-      return "create Bun Forge README";
-    case "tsconfig.json":
-      return "adopt Bun Forge TypeScript config";
-    case "knip.jsonc":
-      return "adopt Bun Forge dead-code config";
-    case "lefthook.yml":
-      return "adopt Bun Forge Git hooks";
-    case "CLAUDE.md":
-      return "create Claude guidance";
-    case ".claude/rules/project-conventions.md":
-      return "create Bun Forge Claude project convention rule";
-    case ".claude/rules/frontend-conventions.md":
-      return "create Bun Forge Claude frontend convention rule";
-    case "apps/frontend/package.json":
-      return "create TanStack frontend package";
-    case "apps/frontend/index.html":
-      return "create TanStack frontend entry HTML";
-    case "apps/frontend/vite.config.ts":
-      return "create TanStack frontend Vite config";
-    case "apps/frontend/playwright.config.ts":
-      return "create TanStack frontend Playwright config";
-    case "apps/frontend/src/main.tsx":
-      return "create TanStack frontend entrypoint";
-    case "apps/frontend/src/routeTree.gen.ts":
-      return "seed TanStack route tree";
-    case "apps/frontend/src/routes/__root.tsx":
-      return "create TanStack root route";
-    case "apps/frontend/src/routes/index.tsx":
-      return "create TanStack index route";
-    case "apps/frontend/src/routes/-index.test.tsx":
-      return "create TanStack route test";
-    case "apps/frontend/src/testing/setup.ts":
-      return "create TanStack frontend test setup";
-    case "apps/frontend/e2e/home.spec.ts":
-      return "create TanStack frontend e2e test";
-    case "apps/frontend/src/styles.css":
-      return "create TanStack frontend styles";
-    default:
-      return `create Bun Forge template output from ${spec.templateName}`;
-  }
-}
-
-function templatePreserveReason(spec: TemplateRenderSpec): string {
-  switch (spec.relativePath) {
-    case "CLAUDE.md":
-      return "Existing Claude/root guidance preserved";
-    case ".claude/rules/project-conventions.md":
-      return "Existing Bun Forge Claude project convention rule preserved";
-    case ".claude/rules/frontend-conventions.md":
-      return "Existing Bun Forge Claude frontend convention rule preserved";
-    default:
-      return "Existing project file preserved";
-  }
-}
-
-function shouldPreserveExistingTemplate(spec: TemplateRenderSpec): boolean {
-  return (
-    spec.relativePath === "CLAUDE.md" ||
-    spec.relativePath === ".claude/rules/project-conventions.md" ||
-    spec.relativePath === ".claude/rules/frontend-conventions.md"
-  );
-}
-
-function shouldSkipTemplateInAdopt(spec: TemplateRenderSpec): boolean {
-  return spec.relativePath === "src/index.ts" || spec.relativePath === "src/index.test.ts";
-}
-
 async function planPreservedTemplateFile(
   destination: string,
   context: TemplateContext,
@@ -458,12 +298,17 @@ async function planPreservedTemplateFile(
   createReason: string,
   preserveReason: string,
 ): Promise<AdoptionAction> {
-  const safePath = toSafeRelativePath(relativePath);
-  const content = renderTemplate(templateName, context);
-  return planFileContent(destination, safePath, content, createReason, {
-    kind: "skip",
-    reason: preserveReason,
-  });
+  return planRenderedTemplateFile(
+    destination,
+    context,
+    templateName,
+    relativePath,
+    createReason,
+    (mismatchReason) => ({
+      kind: isNonDirectoryParentConflict(mismatchReason) ? "conflict" : "skip",
+      reason: isNonDirectoryParentConflict(mismatchReason) ? mismatchReason : preserveReason,
+    }),
+  );
 }
 
 async function planTemplateFile(
@@ -471,14 +316,33 @@ async function planTemplateFile(
   context: TemplateContext,
   templateName: string,
   relativePath: string,
-  reason: string,
+  createReason: string,
+  conflictReason: string,
+): Promise<AdoptionAction> {
+  return planRenderedTemplateFile(
+    destination,
+    context,
+    templateName,
+    relativePath,
+    createReason,
+    (mismatchReason) => ({
+      kind: "conflict",
+      reason: isNonDirectoryParentConflict(mismatchReason) ? mismatchReason : conflictReason,
+    }),
+  );
+}
+
+async function planRenderedTemplateFile(
+  destination: string,
+  context: TemplateContext,
+  templateName: string,
+  relativePath: string,
+  createReason: string,
+  mismatch: (reason: string) => FileContentMismatch,
 ): Promise<AdoptionAction> {
   const safePath = toSafeRelativePath(relativePath);
   const content = renderTemplate(templateName, context);
-  return planFileContent(destination, safePath, content, reason, {
-    kind: "conflict",
-    reason: `Existing file needs review before ${reason}`,
-  });
+  return planFileContent(destination, safePath, content, createReason, mismatch);
 }
 
 async function planFileContent(
@@ -486,16 +350,15 @@ async function planFileContent(
   safePath: SafeRelativePath,
   content: string,
   createReason: string,
-  mismatch: FileContentMismatch,
+  mismatch: (reason: string) => FileContentMismatch,
 ): Promise<AdoptionAction> {
   const target = join(destination, safePath);
   const blockedBy = blockingParentPath(destination, safePath);
   if (blockedBy !== undefined) {
-    return {
-      kind: "conflict",
-      path: safePath,
-      reason: `Cannot create below existing non-directory path: ${blockedBy}`,
-    };
+    const mismatchPolicy = mismatch(
+      `Cannot create below existing non-directory path: ${blockedBy}`,
+    );
+    return { ...mismatchPolicy, path: safePath };
   }
   if (!existsSync(target)) {
     return { kind: "create", path: safePath, reason: createReason, content };
@@ -506,7 +369,7 @@ async function planFileContent(
     return { kind: "skip", path: safePath, reason: "Already matches Bun Forge output" };
   }
 
-  return { ...mismatch, path: safePath };
+  return { ...mismatch("Existing file differs from Bun Forge output"), path: safePath };
 }
 
 function hasExistingFrontend(
@@ -518,21 +381,13 @@ function hasExistingFrontend(
   );
 }
 
-function isFrontendPresetSpec(spec: PresetCopySpec): boolean {
-  return spec.name === "frontend-tanstack";
-}
-
-function isFrontendTemplateSpec(spec: TemplateRenderSpec): boolean {
-  return spec.relativePath.startsWith("apps/frontend/");
-}
-
 async function planPresetCopySpecs(
   destination: string,
   description: GeneratedProjectDescription,
 ): Promise<AdoptionAction[]> {
   const preserveExistingFrontend = hasExistingFrontend(destination, description);
   const specs = description.presetCopySpecs.filter(
-    (spec) => !(preserveExistingFrontend && isFrontendPresetSpec(spec)),
+    (spec) => !shouldOmitPresetDuringAdopt(spec, preserveExistingFrontend),
   );
   const actionSets = await Promise.all(
     specs.map(async (spec) => planPresetCopySpec(destination, spec)),
@@ -545,26 +400,28 @@ async function planTemplateSpec(
   description: GeneratedProjectDescription,
   spec: TemplateRenderSpec,
 ): Promise<AdoptionAction> {
-  if (spec.relativePath === "package.json") {
+  const policy = adoptionTemplatePolicy(spec);
+
+  if (policy.kind === "package-json") {
     return planPackageJson(destination, description);
   }
 
-  if (shouldSkipTemplateInAdopt(spec)) {
+  if (policy.kind === "skip") {
     return {
       kind: "skip",
-      path: toSafeRelativePath(spec.relativePath),
-      reason: "Existing project source preserved; Bun Forge starter source skipped",
+      path: toSafeRelativePath(policy.path),
+      reason: policy.reason,
     };
   }
 
-  if (shouldPreserveExistingTemplate(spec)) {
+  if (policy.kind === "preserve-existing") {
     return planPreservedTemplateFile(
       destination,
       description.templateContext,
       spec.templateName,
-      templateAdoptionPath(spec),
-      templateCreateReason(spec),
-      templatePreserveReason(spec),
+      policy.path,
+      policy.createReason,
+      policy.preserveReason,
     );
   }
 
@@ -572,8 +429,9 @@ async function planTemplateSpec(
     destination,
     description.templateContext,
     spec.templateName,
-    spec.relativePath,
-    templateCreateReason(spec),
+    policy.path,
+    policy.createReason,
+    policy.conflictReason,
   );
 }
 
@@ -583,7 +441,7 @@ async function planTemplateRenderSpecs(
 ): Promise<AdoptionAction[]> {
   const preserveExistingFrontend = hasExistingFrontend(destination, description);
   const specs = description.templateRenderSpecs.filter(
-    (spec) => !(preserveExistingFrontend && isFrontendTemplateSpec(spec)),
+    (spec) => !shouldOmitTemplateDuringAdopt(spec, preserveExistingFrontend),
   );
   return Promise.all(specs.map(async (spec) => planTemplateSpec(destination, description, spec)));
 }
@@ -600,7 +458,7 @@ function planExistingFrontendConflict(
     {
       kind: "conflict",
       path: toSafeRelativePath("apps/frontend"),
-      reason: "Existing frontend detected; Bun Forge does not convert frontends in adopt v1",
+      reason: frontendConflictReason(),
     },
   ];
 }
