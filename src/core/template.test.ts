@@ -1,7 +1,9 @@
 import type { TemplateContext } from "../types.ts";
+import type { GeneratedProjectContract } from "./generated-project-contract.ts";
 import { describe, expect, test } from "bun:test";
+import { buildGeneratedProjectContract } from "./generated-project-contract.ts";
 import { toBinName, toPackageName, toProjectName } from "./naming.ts";
-import { renderTemplate, templateValues } from "./template.ts";
+import { renderTemplate, templateValues, templateValuesFromContract } from "./template.ts";
 
 const backendContext: TemplateContext = {
   projectName: toProjectName("forge-backend"),
@@ -35,6 +37,22 @@ const effectContext: TemplateContext = {
   effect: true,
   hasWorkspaces: false,
 };
+
+function contractFor(context: TemplateContext): GeneratedProjectContract {
+  return buildGeneratedProjectContract({
+    destination: "",
+    projectName: context.projectName,
+    packageName: context.packageName,
+    binName: context.binName,
+    backend: context.backend,
+    frontend: context.frontend,
+    ai: context.ai,
+    effect: context.effect,
+    install: false,
+    gitInit: false,
+    yes: true,
+  });
+}
 
 describe("templateValues", () => {
   test("omits optional script blocks when features are disabled", () => {
@@ -70,6 +88,49 @@ describe("templateValues", () => {
     expect(values["ROOT_DEV_DEPENDENCIES"]).toContain('"@effect/language-service"');
     expect(values["EFFECT_TSCONFIG_PLUGINS"]).toContain("@effect/language-service");
     expect(values["EFFECT_TSCONFIG_PLUGINS"]).toContain("diagnosticSeverity");
+  });
+});
+
+describe("templateValuesFromContract characterization", () => {
+  test("projects backend-only package and root tooling tokens", () => {
+    const values = templateValuesFromContract(contractFor(backendContext));
+
+    expect(values["DEV_COMMAND"]).toBe("bun run src/index.ts");
+    expect(values["TEST_COMMAND"]).toBe("bun test ./src");
+    expect(values["BIN_BLOCK"]).toBe('  "bin": {\n    "forge-backend": "./src/index.ts"\n  },\n');
+    expect(values["ROOT_LINT_PATHS"]).toBe("src/ scripts/");
+    expect(values["ROOT_ARCH_PATHS"]).toBe("src scripts");
+    expect(values["TSCONFIG_INCLUDE"]).toBe('"src/**/*.ts", "scripts/**/*.ts"');
+    expect(values["BACKEND_LEFTHOOK_GLOB"]).toBe('        - "src/**/*.ts"\n');
+  });
+
+  test("projects frontend package, script, and workspace tokens", () => {
+    const values = templateValuesFromContract(contractFor(frontendAiContext));
+
+    expect(values["WORKSPACES_BLOCK"]).toBe('  "workspaces": [\n    "apps/*"\n  ],\n');
+    expect(values["FRONTEND_PACKAGE_NAME"]).toBe("@forge-frontend/frontend");
+    expect(values["FRONTEND_SCRIPTS"]).toContain(
+      '    "dev:frontend": "cd apps/frontend && bun run dev",\n',
+    );
+    expect(values["FRONTEND_SCRIPTS"]).toContain(
+      '    "test:e2e": "cd apps/frontend && bunx playwright test",\n',
+    );
+    expect(values["FRONTEND_LEFTHOOK_COMMAND"]).toContain("frontend-oxc:");
+    expect(values["FRONTEND_TYPECHECK_GLOB"]).toBe('        - "apps/frontend/**/*.{ts,tsx}"\n');
+    expect(values["FRONTEND_PACKAGE_SCRIPTS"]).toContain('    "dev": "vite dev --port 3000"');
+  });
+
+  test("projects Effect script, dependency, and tsconfig plugin tokens", () => {
+    const values = templateValuesFromContract(contractFor(effectContext));
+
+    expect(values["EFFECT_SCRIPTS"]).toBe(
+      '    "effect:diagnose": "effect-language-service diagnostics --project tsconfig.json",\n    "effect:quickfixes": "effect-language-service quickfixes --project tsconfig.json",\n',
+    );
+    expect(values["EFFECT_DEPENDENCIES_BLOCK"]).toContain('  "dependencies": {');
+    expect(values["EFFECT_DEPENDENCIES_BLOCK"]).toContain('    "effect": ');
+    expect(values["ROOT_DEV_DEPENDENCIES"]).toContain('    "@effect/language-service": "0.85.1"');
+    expect(values["EFFECT_TSCONFIG_PLUGINS"]).toContain('"name": "@effect/language-service"');
+    expect(values["EFFECT_TSCONFIG_PLUGINS"]).toContain('"strictEffectProvide": "warning"');
   });
 });
 
