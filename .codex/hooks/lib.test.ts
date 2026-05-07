@@ -1,3 +1,4 @@
+import type { CommandResult } from "./lib";
 import { describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -10,7 +11,6 @@ import {
   parseHookInput,
   runPostEditQuality,
   runStopValidation,
-  type CommandResult,
 } from "./lib";
 
 async function makeTestRoot(): Promise<string> {

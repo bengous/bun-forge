@@ -40,6 +40,26 @@ When upgrading OXLint, TypeScript, or Bun, run `/antipattern-audit`.
 | Prefer nullish coalescing  | prefer-nullish-coalescing                            | warn  |
 | Cognitive complexity       | oxlint-plugin-complexity                             | warn  |
 
+### Bonforge rule families
+
+Bonforge uses OXLint categories as raw inputs, but product decisions are made by
+Bonforge families. A rule is `error` when it is a rail for agents: type safety,
+async safety, error propagation, import hygiene, frontend correctness, or a
+mechanical convention with low ambiguity. A rule stays `warn` when it is a
+refactor smell, style candidate, context-dependent performance hint, or likely to
+need human judgment.
+
+| Bonforge family        | Error rails                                                                                             | Warn candidates                                                                                     | Surfaces                    | Rationale                                       |
+| ---------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------- | ----------------------------------------------- |
+| Type safety            | no-explicit-any, no-unsafe-*, no-unsafe-type-assertion, no-unsafe-enum-comparison, no-redundant-types   | strict-boolean-expressions, restrict-plus-operands, no-unnecessary-condition                        | repo, scaffold base, frontend | Block unsafe flows; keep noisy inference rules as pressure. |
+| Async safety           | no-floating-promises, no-misused-promises, await-thenable, return-await                                 | promise-function-async, no-await-in-loop                                                            | repo, scaffold base, frontend | Block broken async; allow deliberate sequential IO. |
+| Error handling         | only-throw-error, missing-throw, no-promise-executor-return                                             | unicorn/error-message, prefer-type-error                                                            | repo, scaffold base, frontend | Throw real errors and avoid swallowed throws.   |
+| Exhaustiveness/flow    | switch-exhaustiveness-check, consistent-return, no-fallthrough, no-unreachable                          | branches-sharing-code, complexity/complexity                                                        | repo, scaffold base, frontend | Block ambiguous control flow; keep refactor smells advisory. |
+| Import hygiene         | no-default-export, first, no-duplicates, consistent-type-specifier-style, consistent-type-imports        | no-cycle, extensions, no-commonjs, no-dynamic-require, unambiguous                                  | repo, scaffold base, frontend | Normalize module shape; keep layout-dependent rules advisory. |
+| Mechanical conventions | logical-assignment-operators, object-shorthand, no-unnecessary-template-expression, prefer-set-has       | prefer-array-find, prefer-array-flat-map, prefer-string-replace-all, prefer-optional-chain          | repo, scaffold base, frontend | Enforce simple low-ambiguity conventions; keep taste/perf calls advisory. |
+| Frontend accessibility | alt-text, aria-props, heading-has-content, interactive-supports-focus, label-has-associated-control     | none currently                                                                                      | scaffold frontend           | Generated frontends must be keyboard/a11y safe. |
+| React correctness      | button-has-type, no-did-update-set-state, jsx-key, jsx-no-duplicate-props, jsx-no-undef                 | self-closing-comp                                                                                   | scaffold frontend           | Block React correctness bugs; keep presentation style advisory. |
+
 ### Known gaps
 
 | Gap                        | Reason                                          | Revisit when                     |

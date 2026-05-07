@@ -302,6 +302,8 @@ function presetAdoptionReason(name: PresetName): string {
       return "AI tooling file";
     case "effect":
       return "Effect preset file";
+    default:
+      throw new Error("Unknown preset");
   }
 }
 
