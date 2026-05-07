@@ -38,6 +38,7 @@ const generatedPathPatterns = [
   /^\.agents\/agents-md-manifest\.json$/,
   /^apps\/frontend\/src\/routeTree\.gen\.ts$/,
 ];
+const generatedAgentPathFallbackPatterns = [/^(?:.+\/)?AGENTS\.md$/];
 const lintExtensions = new Set([".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"]);
 const formatExtensions = new Set([
   ".js",
@@ -184,8 +185,10 @@ export function forbiddenTouchedPaths(paths: readonly string[], root = process.c
   const manifestGeneratedPaths = generatedAgentPathsFromManifest(root);
   return paths.filter(
     (filePath) =>
-      manifestGeneratedPaths.has(filePath) ||
-      generatedPathPatterns.some((pattern) => pattern.test(filePath)),
+      manifestGeneratedPaths.paths.has(filePath) ||
+      generatedPathPatterns.some((pattern) => pattern.test(filePath)) ||
+      (manifestGeneratedPaths.useFallbackPatterns &&
+        generatedAgentPathFallbackPatterns.some((pattern) => pattern.test(filePath))),
   );
 }
 
@@ -429,20 +432,32 @@ function generatedPathMessage(paths: readonly string[]): string {
   )}. Edit CLAUDE.md, .claude/rules/*.md, or route files, then run the matching generator.`;
 }
 
-function generatedAgentPathsFromManifest(root: string): Set<string> {
+function generatedAgentPathsFromManifest(root: string): {
+  readonly paths: ReadonlySet<string>;
+  readonly useFallbackPatterns: boolean;
+} {
   const manifestPath = path.join(root, ".agents", "agents-md-manifest.json");
   if (!existsSync(manifestPath)) {
-    return new Set(["AGENTS.md"]);
+    return {
+      paths: new Set(["AGENTS.md"]),
+      useFallbackPatterns: true,
+    };
   }
 
   const parsed = parseJsonObject(readFileSync(manifestPath, "utf8"));
   if (parsed === null) {
-    return new Set(["AGENTS.md"]);
+    return {
+      paths: new Set(["AGENTS.md", ".agents/agents-md-manifest.json"]),
+      useFallbackPatterns: true,
+    };
   }
 
   const generated = stringArray(parsed["generated"]);
   const outputs = isRecord(parsed["outputs"]) ? Object.keys(parsed["outputs"]) : [];
-  return new Set([...generated, ...outputs, ".agents/agents-md-manifest.json"]);
+  return {
+    paths: new Set([...generated, ...outputs, ".agents/agents-md-manifest.json"]),
+    useFallbackPatterns: false,
+  };
 }
 
 function commandOutput(result: CommandResult): string {

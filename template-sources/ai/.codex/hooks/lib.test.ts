@@ -103,6 +103,26 @@ describe("Codex hook path handling", () => {
     }
   });
 
+  test("blocks nested agent files when the manifest is missing or invalid", async () => {
+    const root = await makeTestRoot();
+    try {
+      expect(
+        forbiddenTouchedPaths(["scripts/validation/AGENTS.md", "docs/product/PRD.md"], root),
+      ).toEqual(["scripts/validation/AGENTS.md"]);
+
+      await seedFile(root, ".agents/agents-md-manifest.json", "not-json");
+
+      expect(
+        forbiddenTouchedPaths(
+          ["scripts/validation/AGENTS.md", ".agents/agents-md-manifest.json"],
+          root,
+        ),
+      ).toEqual(["scripts/validation/AGENTS.md", ".agents/agents-md-manifest.json"]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   test("extracts file path fields from hook input", async () => {
     const root = await mkdtemp(path.join(tmpdir(), "bun-forge-codex-hooks-"));
     try {
