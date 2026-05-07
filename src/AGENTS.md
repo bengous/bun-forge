@@ -86,6 +86,16 @@ need human judgment.
 
 **Validation rule**: Contract changes are incomplete unless smoke-style validation still demonstrates that the emitted project installs, validates, and behaves as expected.
 
+## Pragmatic Functional Style
+
+**Use pure helpers for**: classification, planning, summarizing, token generation, manifest metadata, and command specs.
+
+**Keep boundaries imperative**: CLI parsing, `Bun.file`, `Bun.write`, `Bun.spawn`, `Bun.spawnSync`, cleanup, and process exits should stay direct.
+
+**Prefer explicit collections when clearer**: Use `for`, `Map`, `Set`, or `Record` for indexing, counting, deduping, and stateful parsing when chained array methods hide intent.
+
+**No FP library**: Do not add a functional-programming dependency for local script or scaffolder cleanup.
+
 ## Preset Composition
 
 **Composition order**: Presets compose explicitly over a project that has already been bootstrapped and cleaned. Base comes first, optional overlays come after, and template rendering happens after preset copies.

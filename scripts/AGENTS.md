@@ -67,6 +67,16 @@ need human judgment.
 | Schema-level JSON parsing  | Guards are manual, no schema library            | External JSON contracts grow     |
 | Broad path nominal typing  | Only adoption relative paths are branded        | More path domains appear         |
 
+## Pragmatic Functional Style
+
+**Use pure helpers for**: classification, planning, summarizing, token generation, manifest metadata, and command specs.
+
+**Keep boundaries imperative**: CLI parsing, `Bun.file`, `Bun.write`, `Bun.spawn`, `Bun.spawnSync`, cleanup, and process exits should stay direct.
+
+**Prefer explicit collections when clearer**: Use `for`, `Map`, `Set`, or `Record` for indexing, counting, deduping, and stateful parsing when chained array methods hide intent.
+
+**No FP library**: Do not add a functional-programming dependency for local script or scaffolder cleanup.
+
 ## Scripts Layer
 
 **Layer invariant**: `scripts/` contains standalone Bun automation for the repo and for confidence in generated projects.

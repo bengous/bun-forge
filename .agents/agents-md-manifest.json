@@ -27,7 +27,7 @@
 		"scripts/AGENTS.md": {
 			"kind": "layer",
 			"sourcePath": ".claude/rules/scripts-layer.md",
-			"checksum": "sha256-0cd78d2c9fc322d457004b71013b3eef2d8a5f9578033dc3dd9fdb676ecbc69e"
+			"checksum": "sha256-13adcc557eadc9e0ddfa5f0d8ce97f829f657ec7dc14282bfceaa1d97399904a"
 		},
 		"scripts/agents/AGENTS.md": {
 			"kind": "layer",
@@ -57,7 +57,7 @@
 		"src/AGENTS.md": {
 			"kind": "layer",
 			"sourcePath": ".claude/rules/scaffolder-source.md",
-			"checksum": "sha256-9fc388e93b03d6643596272c8deddc0b82369da2c19771f7e6eec84eec7920fd"
+			"checksum": "sha256-373f8f14037b70bc7a3ab0a18f3b9f32aca038f196d990105eb79aa439dba49d"
 		},
 		"template-sources/AGENTS.md": {
 			"kind": "layer",
@@ -79,6 +79,9 @@
 		},
 		".claude/rules/generated-project-contract.md": {
 			"checksum": "sha256-4d5ce671bad5aa5a5d60d01b087ed8248bd27ee5ef15b5827ad00b5d296170f4"
+		},
+		".claude/rules/pragmatic-functional-style.md": {
+			"checksum": "sha256-69326c959f5c0775613f1f3f757a2181c0ef179295c0647e32a534a133ff73fa"
 		},
 		".claude/rules/preset-composition.md": {
 			"checksum": "sha256-97e7b64049411b0dff27a882ed5d182aba525c65b11507ece3ed550a6cdef012"
