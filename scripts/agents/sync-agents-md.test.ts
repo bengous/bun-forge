@@ -5,10 +5,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readJsonObject, stringArray } from "../../src/core/json.ts";
 import {
+  generatedPathsFromManifest as generatedPresetPathsFromManifest,
+  parsePaths as generatedPresetParsePaths,
+} from "../../template-sources/ai/scripts/agents/sync-agents-md.ts";
+import {
   buildManifest,
   fileContainsCrlf,
   generateLayerAgentsMd,
   generatedPathsFromManifest,
+  managedPathRegularFileError,
   normalizeNewlines,
   parsePaths,
   pathIsSymlink,
@@ -74,6 +79,11 @@ describe("parsePaths", () => {
     const content = `---\npaths:\n  - "src\\hooks\\**\\*.ts"\n---\n`;
     expect(parsePaths(content)).toEqual(["src/hooks"]);
   });
+
+  test("generated preset normalizes Windows path separators from frontmatter", () => {
+    const content = `---\npaths:\n  - "src\\hooks\\**\\*.ts"\n---\n`;
+    expect(generatedPresetParsePaths(content)).toEqual(["src/hooks"]);
+  });
 });
 
 describe("stripFrontmatter", () => {
@@ -101,6 +111,15 @@ describe("stripFrontmatter", () => {
 describe("newline and file helpers", () => {
   test("normalizes CRLF to LF", () => {
     expect(normalizeNewlines("a\r\nb\r\n")).toBe("a\nb\n");
+  });
+
+  test("reports managed AGENTS.md symlinks without creating a symlink", () => {
+    // Windows blocks symlink creation unless Developer Mode or admin is enabled.
+    // Keep the policy covered even when the real filesystem capability test is skipped.
+    expect(managedPathRegularFileError("AGENTS.md", true)).toBe(
+      "AGENTS.md: symlinks are not allowed for managed AGENTS.md files",
+    );
+    expect(managedPathRegularFileError("AGENTS.md", false)).toBeNull();
   });
 });
 
@@ -135,6 +154,21 @@ describe("manifest metadata", () => {
   test("reads generated paths from legacy v1 and v2 outputs", () => {
     expect(
       generatedPathsFromManifest({
+        generated: ["AGENTS.md", "scripts\\AGENTS.md"],
+        outputs: {
+          "src\\AGENTS.md": {
+            kind: "layer",
+            checksum: "sha256-test",
+            sourcePath: ".claude/rules/src.md",
+          },
+        },
+      }),
+    ).toEqual(["AGENTS.md", "scripts/AGENTS.md", "src/AGENTS.md"]);
+  });
+
+  test("generated preset normalizes manifest paths", () => {
+    expect(
+      generatedPresetPathsFromManifest({
         generated: ["AGENTS.md", "scripts\\AGENTS.md"],
         outputs: {
           "src\\AGENTS.md": {

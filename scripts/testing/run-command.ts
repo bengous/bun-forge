@@ -1,3 +1,6 @@
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 const DEFAULT_TIMEOUT_MS = 300_000;
 const timedOut = Symbol("timedOut");
 
@@ -17,6 +20,25 @@ export function commandTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_TIMEOUT_MS;
 }
 
+export function bunForgeTempPath(name: string): string {
+  return join(tmpdir(), name);
+}
+
+export function runCommandEnv(
+  env: NodeJS.ProcessEnv = {},
+  baseEnv: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  const tempPath = env["TMPDIR"] ?? baseEnv["TMPDIR"] ?? bunForgeTempPath("bun-tmp");
+
+  return {
+    ...baseEnv,
+    ...env,
+    // Keep generated-project commands off Unix-only /tmp without forcing a shared BUN_INSTALL.
+    TMPDIR: tempPath,
+    BUN_TMPDIR: env["BUN_TMPDIR"] ?? baseEnv["BUN_TMPDIR"] ?? tempPath,
+  };
+}
+
 export async function runCommand(
   command: readonly string[],
   options: RunCommandOptions,
@@ -28,12 +50,7 @@ export async function runCommand(
     stdin: "ignore",
     stdout: "inherit",
     stderr: "inherit",
-    env: {
-      ...process.env,
-      ...env,
-      BUN_TMPDIR: env["BUN_TMPDIR"] ?? process.env["BUN_TMPDIR"] ?? "/tmp",
-      BUN_INSTALL: env["BUN_INSTALL"] ?? process.env["BUN_INSTALL"] ?? "/tmp/bun-install",
-    },
+    env: runCommandEnv(env),
     ...(process.platform === "win32" ? { windowsHide: true } : {}),
   });
 

@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
 export type HookInput = {
@@ -494,17 +495,27 @@ function batchedCommandFailure(
   return `${label}: ${summary}\n${tail(commandOutput(result), 40)}`;
 }
 
-function localTool(root: string, name: string): string {
-  const local = path.join(root, "node_modules", ".bin", name);
-  return existsSync(local) ? local : name;
+export function localTool(
+  root: string,
+  name: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  const candidates = platform === "win32" ? [`${name}.cmd`, `${name}.exe`, name] : [name];
+  for (const candidate of candidates) {
+    const local = path.join(root, "node_modules", ".bin", candidate);
+    if (existsSync(local)) {
+      return local;
+    }
+  }
+  return name;
 }
 
-function touchedStatePath(input: HookInput): string {
+export function touchedStatePath(input: HookInput): string {
   const root = repoRoot(input);
   const repoName = sanitizeStateKey(path.basename(root));
   const sessionId = sanitizeStateKey(input.session_id ?? "unknown-session");
   const turnId = sanitizeStateKey(input.turn_id ?? "unknown-turn");
-  return path.join("/tmp", `${repoName}-codex-hooks`, `${sessionId}-${turnId}.json`);
+  return path.join(tmpdir(), `${repoName}-codex-hooks`, `${sessionId}-${turnId}.json`);
 }
 
 function generatedPathMessage(paths: readonly string[]): string {

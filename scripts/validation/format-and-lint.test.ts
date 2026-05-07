@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
+  normalizeTouchedPath as normalizeGeneratedPresetTouchedPath,
+  resolveGeneratedProjectWorkspace as resolveGeneratedPresetWorkspace,
+} from "../../template-sources/ai/scripts/validation/format-and-lint-routing.ts";
+import {
   formatCommand,
   formatCommandFailure,
   lintCheckCommand,
@@ -16,6 +20,7 @@ import {
   resolveGeneratedProjectWorkspace,
   resolveLiveRepoWorkspace,
 } from "./format-and-lint-routing.ts";
+import { repoRelativePath } from "./repo-path.ts";
 
 describe("format-and-lint hook input parsing", () => {
   test("keeps single file path compatibility", () => {
@@ -138,6 +143,38 @@ describe("format-and-lint workspace resolution", () => {
     expect(normalizeTouchedPath("./.claude/hooks/guard-destructive.ts")).toBe(
       ".claude/hooks/guard-destructive.ts",
     );
+  });
+
+  test("normalizes Windows absolute and relative paths before routing", () => {
+    const root = String.raw`C:\repo\bun-forge`;
+    expect(repoRelativePath(String.raw`C:\repo\bun-forge\src\index.ts`, root)).toBe("src/index.ts");
+    expect(repoRelativePath(String.raw`src\index.ts`, root, root)).toBe("src/index.ts");
+    expect(repoRelativePath(String.raw`C:\repo\other\src\index.ts`, root)).toBeNull();
+    expect(
+      normalizeTouchedPath(String.raw`C:\repo\bun-forge\scripts\validation\validate.ts`, root),
+    ).toBe("scripts/validation/validate.ts");
+    expect(
+      resolveLiveRepoWorkspace(
+        String.raw`C:\repo\bun-forge\template-sources\ai\.codex\hooks\lib.ts`,
+        root,
+      )?.name,
+    ).toBe("product");
+  });
+
+  test("generated routing normalizes Windows paths before routing", () => {
+    const root = String.raw`C:\repo\generated-app`;
+    expect(
+      normalizeGeneratedPresetTouchedPath(String.raw`C:\repo\generated-app\src\index.ts`, root),
+    ).toBe("src/index.ts");
+    expect(
+      resolveGeneratedPresetWorkspace(String.raw`C:\repo\generated-app\src\index.ts`, root)?.name,
+    ).toBe("root");
+    expect(
+      resolveGeneratedPresetWorkspace(
+        String.raw`C:\repo\generated-app\apps\frontend\src\main.tsx`,
+        root,
+      )?.name,
+    ).toBe("frontend");
   });
 
   test("documents extension policy for lint and format routing", () => {

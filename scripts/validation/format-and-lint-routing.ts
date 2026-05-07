@@ -1,3 +1,5 @@
+import { repoRelativePath, toPosixSeparators } from "./repo-path.ts";
+
 export type Workspace = {
   readonly name: "root" | "codex-hooks" | "frontend" | "product";
   readonly oxlintConfig: string;
@@ -66,7 +68,9 @@ const PRODUCT_WORKSPACE: Workspace = {
 };
 
 export function normalizeTouchedPath(filePath: string, projectRoot = process.cwd()): string {
-  return filePath.replace(`${projectRoot}/`, "").replace(/^\.\//, "");
+  return (
+    repoRelativePath(filePath, projectRoot) ?? toPosixSeparators(filePath).replace(/^\.\//, "")
+  );
 }
 
 export function hasLintableExtension(filePath: string): boolean {
@@ -77,8 +81,11 @@ export function hasFormattableExtension(filePath: string): boolean {
   return FORMATTABLE_EXTENSIONS.has(extensionOf(filePath));
 }
 
-export function resolveLiveRepoWorkspace(filePath: string): Workspace | null {
-  const normalized = normalizeTouchedPath(filePath);
+export function resolveLiveRepoWorkspace(
+  filePath: string,
+  projectRoot = process.cwd(),
+): Workspace | null {
+  const normalized = normalizeTouchedPath(filePath, projectRoot);
   if (!hasFormattableExtension(normalized) && !hasLintableExtension(normalized)) {
     return null;
   }
@@ -99,8 +106,11 @@ export function resolveLiveRepoWorkspace(filePath: string): Workspace | null {
   return null;
 }
 
-export function resolveGeneratedProjectWorkspace(filePath: string): Workspace | null {
-  const normalized = normalizeTouchedPath(filePath);
+export function resolveGeneratedProjectWorkspace(
+  filePath: string,
+  projectRoot = process.cwd(),
+): Workspace | null {
+  const normalized = normalizeTouchedPath(filePath, projectRoot);
   if (!hasLintableExtension(normalized)) {
     return null;
   }
@@ -121,8 +131,8 @@ export function resolveGeneratedProjectWorkspace(filePath: string): Workspace | 
   return null;
 }
 
-export function isProductSurface(filePath: string): boolean {
-  const normalized = normalizeTouchedPath(filePath);
+export function isProductSurface(filePath: string, projectRoot = process.cwd()): boolean {
+  const normalized = normalizeTouchedPath(filePath, projectRoot);
   return normalized.startsWith("templates/") || normalized.startsWith("template-sources/");
 }
 

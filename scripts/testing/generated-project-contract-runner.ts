@@ -334,7 +334,9 @@ async function assertAiContract(
   assertPathExists(root, ".claude/hooks/guard-destructive.test.ts");
   assertPathExists(root, "scripts/validation/format-and-lint.ts");
   assertPathExists(root, "scripts/validation/format-and-lint-routing.ts");
+  assertPathExists(root, "scripts/validation/repo-path.ts");
   assertPathExists(root, "scripts/validation/validate-on-stop.ts");
+  assertPathExists(root, "scripts/agents/sync-agents-md.ts");
 
   await assertFileContains(root, "CLAUDE.md", "Opinionated Bun project bootstrapped");
   await assertFileContains(
@@ -378,10 +380,19 @@ async function assertAiContract(
   await assertFileContains(root, ".codex/hooks/lib.ts", "stop_hook_active");
   await assertFileContains(root, ".codex/hooks/lib.ts", "generatedAgentPathsFromManifest");
   await assertFileContains(root, ".codex/hooks/lib.ts", "agents-md-manifest.json");
+  await assertFileContains(root, ".codex/hooks/lib.ts", "tmpdir()");
+  await assertFileContains(root, ".codex/hooks/lib.ts", 'platform === "win32"');
+  await assertFileContains(root, ".codex/hooks/lib.ts", ".cmd");
+  await assertFileContains(root, ".codex/hooks/lib.ts", ".exe");
   await assertGeneratedAgentsManifest(root, {
     backend,
     frontend: frontend === "tanstack",
   });
+  await assertFileContains(root, "scripts/agents/sync-agents-md.ts", "toPosixPath");
+  await assertFileContains(root, "scripts/agents/sync-agents-md.ts", "generated.map(toPosixPath)");
+  await assertFileContains(root, "scripts/agents/sync-agents-md.ts", ".map(toPosixPath)");
+  await assertFileContains(root, "scripts/validation/repo-path.ts", "repoRelativePath");
+  await assertFileContains(root, "scripts/validation/repo-path.ts", "toPosixSeparators");
   await assertFileContains(
     root,
     "scripts/validation/format-and-lint.ts",
@@ -391,6 +402,11 @@ async function assertAiContract(
     root,
     "scripts/validation/format-and-lint-routing.ts",
     "resolveGeneratedProjectWorkspace",
+  );
+  await assertFileContains(
+    root,
+    "scripts/validation/format-and-lint-routing.ts",
+    "repoRelativePath",
   );
   await assertFileContains(
     root,

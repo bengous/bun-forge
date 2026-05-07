@@ -7,10 +7,12 @@ import {
   extractApplyPatchPaths,
   extractTouchedPaths,
   forbiddenTouchedPaths,
+  localTool,
   normalizeProjectPath,
   parseHookInput,
   runPostEditQuality,
   runStopValidation,
+  touchedStatePath,
 } from "./lib";
 
 async function makeTestRoot(): Promise<string> {
@@ -130,6 +132,29 @@ describe("Codex hook path handling", () => {
   test("preserves active stop hook state from hook input", () => {
     expect(parseHookInput({ stop_hook_active: true })).toEqual({ stop_hook_active: true });
     expect(parseHookInput({ stop_hook_active: "true" })).toEqual({});
+  });
+
+  test("resolves Windows local tool shims before PATH fallback", async () => {
+    const root = await makeTestRoot();
+    try {
+      await seedFile(root, "node_modules/.bin/oxlint.cmd");
+      expect(localTool(root, "oxlint", "win32")).toBe(
+        path.join(root, "node_modules", ".bin", "oxlint.cmd"),
+      );
+      expect(localTool(root, "oxfmt", "win32")).toBe("oxfmt");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("stores hook state under the OS temp directory", () => {
+    expect(
+      touchedStatePath({
+        cwd: process.cwd(),
+        session_id: "session",
+        turn_id: "turn",
+      }),
+    ).toBe(path.join(tmpdir(), "bun-forge-codex-hooks", "session-turn.json"));
   });
 });
 

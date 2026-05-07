@@ -88,6 +88,10 @@ const ROOT_AGENTS_MD = "AGENTS.md";
 const MANIFEST_PATH = ".agents/agents-md-manifest.json";
 const MANAGED_AGENTS_GLOBS = ["src/*/AGENTS.md", "scripts/AGENTS.md", "scripts/*/AGENTS.md"];
 
+function toPosixPath(path: string): string {
+  return path.replaceAll("\\", "/");
+}
+
 export type Manifest = {
   readonly version?: 1 | 2;
   readonly generated: string[];
@@ -137,9 +141,10 @@ function outputKind(path: string): ManifestOutput["kind"] {
 }
 
 export function generatedPathsFromManifest(manifest: Manifest): string[] {
-  const outputPaths = manifest.outputs === undefined ? [] : Object.keys(manifest.outputs);
-  return [...new Set([...manifest.generated, ...outputPaths])].toSorted((left, right) =>
-    left.localeCompare(right),
+  const outputPaths =
+    manifest.outputs === undefined ? [] : Object.keys(manifest.outputs).map(toPosixPath);
+  return [...new Set([...manifest.generated.map(toPosixPath), ...outputPaths])].toSorted(
+    (left, right) => left.localeCompare(right),
   );
 }
 
@@ -201,7 +206,7 @@ export function parsePaths(content: string): string[] {
     if (quoted === null) {
       continue;
     }
-    const glob = quoted[1] ?? "";
+    const glob = toPosixPath(quoted[1] ?? "");
     const segments = glob.split("/");
     const dirSegments: string[] = [];
     for (const seg of segments) {
@@ -277,11 +282,12 @@ export async function pathIsSymlink(path: string): Promise<boolean> {
   }
 }
 
+export function managedPathRegularFileError(path: string, isSymlink: boolean): string | null {
+  return isSymlink ? `${path}: symlinks are not allowed for managed AGENTS.md files` : null;
+}
+
 async function ensureManagedPathIsRegularFile(path: string): Promise<string | null> {
-  if (await pathIsSymlink(path)) {
-    return `${path}: symlinks are not allowed for managed AGENTS.md files`;
-  }
-  return null;
+  return managedPathRegularFileError(path, await pathIsSymlink(path));
 }
 
 async function writeLfFile(path: string, content: string): Promise<void> {
@@ -295,7 +301,7 @@ async function listManagedAgentsPaths(includeRoot: boolean): Promise<string[]> {
   const managedPaths = await Promise.all(
     MANAGED_AGENTS_GLOBS.map(async (pattern) => {
       const glob = new Glob(pattern);
-      return Array.fromAsync(glob.scan({ cwd: "." }));
+      return (await Array.fromAsync(glob.scan({ cwd: "." }))).map(toPosixPath);
     }),
   );
   paths.push(...managedPaths.flat());

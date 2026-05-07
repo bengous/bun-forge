@@ -211,6 +211,7 @@ describe("describeGeneratedProject", () => {
           ".claude/hooks/guard-destructive.test.ts",
           "scripts/validation/format-and-lint.ts",
           "scripts/validation/format-and-lint-routing.ts",
+          "scripts/validation/repo-path.ts",
           "scripts/validation/validate-on-stop.ts",
           "scripts/agents/sync-agents-md.ts",
         ],

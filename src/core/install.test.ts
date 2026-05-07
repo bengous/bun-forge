@@ -1,7 +1,15 @@
 import type { InitOptions } from "../types.ts";
 import type { InstallRuntime } from "./install.ts";
 import { describe, expect, test } from "bun:test";
-import { defaultInstallRuntime, finalizeProject, maybeInstallMiseWithRuntime } from "./install.ts";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  bunForgeTempPath,
+  bunInstallEnv,
+  defaultInstallRuntime,
+  finalizeProject,
+  maybeInstallMiseWithRuntime,
+} from "./install.ts";
 import { toBinName, toPackageName, toProjectName } from "./naming.ts";
 
 function makeOptions(overrides: Partial<InitOptions> = {}): InitOptions {
@@ -92,6 +100,31 @@ describe("maybeInstallMiseWithRuntime", () => {
       "mise is not installed. Install it from https://mise.jdx.dev/getting-started.html",
       "Skipping `mise install`. Run it manually after installing mise.",
     ]);
+  });
+});
+
+describe("bunInstallEnv", () => {
+  test("defaults Bun temp paths to the OS temp directory", () => {
+    expect(bunForgeTempPath("bun-tmp")).toBe(join(tmpdir(), "bun-tmp"));
+    expect(bunInstallEnv({})["TMPDIR"]).toBe(join(tmpdir(), "bun-tmp"));
+    expect(bunInstallEnv({})["BUN_TMPDIR"]).toBe(join(tmpdir(), "bun-tmp"));
+    expect(bunInstallEnv({})["BUN_INSTALL"]).toBeUndefined();
+  });
+
+  test("preserves explicit Bun temp path overrides", () => {
+    expect(
+      bunInstallEnv({
+        BUN_TMPDIR: "custom-tmp",
+        BUN_INSTALL: "custom-install",
+        BUN_INSTALL_CACHE_DIR: "custom-cache",
+        TMPDIR: "custom-tmpdir",
+      }),
+    ).toMatchObject({
+      BUN_TMPDIR: "custom-tmp",
+      BUN_INSTALL: "custom-install",
+      BUN_INSTALL_CACHE_DIR: "custom-cache",
+      TMPDIR: "custom-tmpdir",
+    });
   });
 });
 

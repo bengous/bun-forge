@@ -1,6 +1,8 @@
 import type { InitOptions } from "../types.ts";
 import { confirm, isCancel } from "@clack/prompts";
 import { mkdir } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 type RunOptions = {
   readonly env?: NodeJS.ProcessEnv;
@@ -58,11 +60,19 @@ export const defaultInstallRuntime: InstallRuntime = {
   warn: console.warn,
 };
 
-export function bunInstallEnv(): NodeJS.ProcessEnv {
+export function bunForgeTempPath(name: string): string {
+  return join(tmpdir(), name);
+}
+
+export function bunInstallEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const tempPath = env["TMPDIR"] ?? bunForgeTempPath("bun-tmp");
+
   return {
-    ...process.env,
-    BUN_TMPDIR: process.env["BUN_TMPDIR"] ?? "/tmp",
-    BUN_INSTALL: process.env["BUN_INSTALL"] ?? "/tmp/bun-install",
+    ...env,
+    // Bun documents TMPDIR for intermediate files. BUN_INSTALL is user/global state,
+    // so preserve it only when the caller already set it.
+    TMPDIR: tempPath,
+    BUN_TMPDIR: env["BUN_TMPDIR"] ?? tempPath,
   };
 }
 

@@ -1,3 +1,5 @@
+import { repoRelativePath, toPosixSeparators } from "./repo-path.ts";
+
 export type Workspace = {
   readonly name: "root" | "codex-hooks" | "frontend";
   readonly oxlintConfig: string;
@@ -41,15 +43,20 @@ const FRONTEND_WORKSPACE: Workspace = {
 };
 
 export function normalizeTouchedPath(filePath: string, projectRoot = process.cwd()): string {
-  return filePath.replace(`${projectRoot}/`, "").replace(/^\.\//, "");
+  return (
+    repoRelativePath(filePath, projectRoot) ?? toPosixSeparators(filePath).replace(/^\.\//, "")
+  );
 }
 
 export function hasRoutableExtension(filePath: string): boolean {
   return ROUTED_EXTENSIONS.has(extensionOf(filePath));
 }
 
-export function resolveGeneratedProjectWorkspace(filePath: string): Workspace | null {
-  const normalized = normalizeTouchedPath(filePath);
+export function resolveGeneratedProjectWorkspace(
+  filePath: string,
+  projectRoot = process.cwd(),
+): Workspace | null {
+  const normalized = normalizeTouchedPath(filePath, projectRoot);
   if (!hasRoutableExtension(normalized)) {
     return null;
   }

@@ -282,11 +282,12 @@ export async function pathIsSymlink(path: string): Promise<boolean> {
   }
 }
 
+export function managedPathRegularFileError(path: string, isSymlink: boolean): string | null {
+  return isSymlink ? `${path}: symlinks are not allowed for managed AGENTS.md files` : null;
+}
+
 async function ensureManagedPathIsRegularFile(path: string): Promise<string | null> {
-  if (await pathIsSymlink(path)) {
-    return `${path}: symlinks are not allowed for managed AGENTS.md files`;
-  }
-  return null;
+  return managedPathRegularFileError(path, await pathIsSymlink(path));
 }
 
 async function writeLfFile(path: string, content: string): Promise<void> {

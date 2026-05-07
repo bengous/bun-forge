@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import type { ScaffoldScenario, ScenarioConfig } from "./scenarios.ts";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildGeneratedProjectContract } from "../../src/core/generated-project-contract.ts";
@@ -29,9 +29,15 @@ export async function e2eContract(
   config: ScenarioConfig,
 ): Promise<void> {
   const dir = await mkdtemp(join(tmpdir(), `bun-forge-e2e-contract-${scenario}-`));
+  const envDir = await mkdtemp(join(tmpdir(), `bun-forge-e2e-env-${scenario}-`));
   const projectName = `forge-e2e-${scenario}`;
+  const bunTmpDir = join(envDir, "bun-tmp");
+  const bunCacheDir = join(envDir, "bun-cache");
 
   try {
+    await mkdir(bunTmpDir, { recursive: true });
+    await mkdir(bunCacheDir, { recursive: true });
+
     await runCommand(
       [
         "bun",
@@ -54,7 +60,14 @@ export async function e2eContract(
         "--install",
         "false",
       ],
-      { cwd: process.cwd() },
+      {
+        cwd: process.cwd(),
+        env: {
+          BUN_INSTALL_CACHE_DIR: bunCacheDir,
+          BUN_TMPDIR: bunTmpDir,
+          TMPDIR: bunTmpDir,
+        },
+      },
     );
 
     await assertGeneratedProjectContract(
@@ -74,7 +87,10 @@ export async function e2eContract(
       }),
     );
   } finally {
-    await rm(dir, { recursive: true, force: true });
+    await Promise.all([
+      rm(dir, { recursive: true, force: true }),
+      rm(envDir, { recursive: true, force: true }),
+    ]);
   }
 }
 
