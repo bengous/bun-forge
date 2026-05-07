@@ -10,6 +10,18 @@ import { TEMPLATES_DIR } from "./paths.ts";
 
 const TOKEN_PATTERN = /__([A-Z0-9_]+?)__/g;
 
+const FRONTEND_ROOT_SCRIPT_NAMES = [
+  "dev:frontend",
+  "typecheck:frontend",
+  "lint:frontend",
+  "format:check:frontend",
+  "lint:arch:frontend",
+  "lint:css:frontend",
+  "build:frontend",
+  "test:e2e",
+  "validate:frontend",
+] as const;
+
 function quoteArray(values: readonly string[]): string {
   return values.map((value) => JSON.stringify(value)).join(", ");
 }
@@ -68,10 +80,7 @@ function lefthookGlobLines(globs: readonly string[]): string {
   return globs.map((glob) => `        - ${JSON.stringify(glob)}\n`).join("");
 }
 
-export function templateValuesFromContract(
-  contract: GeneratedProjectContract,
-): Record<string, string> {
-  const context = contract.templateContext;
+function packageTemplateValues(contract: GeneratedProjectContract): Record<string, string> {
   const workspacesBlock =
     contract.packageJson.workspaces === undefined
       ? ""
@@ -98,26 +107,20 @@ export function templateValuesFromContract(
       ? `    "agents:sync": ${JSON.stringify(contract.packageJson.scripts["agents:sync"])},\n    "agents:check": ${JSON.stringify(contract.packageJson.scripts["agents:check"])},\n`
       : "";
 
-  const frontendScriptNames = [
-    "dev:frontend",
-    "typecheck:frontend",
-    "lint:frontend",
-    "format:check:frontend",
-    "lint:arch:frontend",
-    "lint:css:frontend",
-    "build:frontend",
-    "test:e2e",
-    "validate:frontend",
-  ];
-  const frontendScripts = frontendScriptNames
-    .flatMap((scriptName) => {
-      const command = contract.packageJson.scripts[scriptName];
-      return command === undefined
-        ? []
-        : [`    ${JSON.stringify(scriptName)}: ${JSON.stringify(command)},\n`];
-    })
-    .join("");
+  return {
+    BIN_BLOCK: binBlock,
+    DEV_COMMAND: contract.packageJson.scripts["dev"] ?? "",
+    TEST_COMMAND: contract.packageJson.scripts["test"] ?? "",
+    TEST_UNIT_SCRIPT: frontendUnitTestScript,
+    TEST_HOOKS_SCRIPT: testHooksScript,
+    WORKSPACES_BLOCK: workspacesBlock,
+    AI_SCRIPTS: aiScripts,
+    ROOT_DEV_DEPENDENCIES: devDependencyEntries(contract.packageJson),
+  };
+}
 
+function effectTemplateValues(contract: GeneratedProjectContract): Record<string, string> {
+  const context = contract.templateContext;
   const effectScripts =
     contract.packageJson.scripts["effect:diagnose"] !== undefined
       ? `    "effect:diagnose": ${JSON.stringify(contract.packageJson.scripts["effect:diagnose"])},\n    "effect:quickfixes": ${JSON.stringify(contract.packageJson.scripts["effect:quickfixes"])},\n`
@@ -132,6 +135,22 @@ export function templateValuesFromContract(
     ? ',\n    "plugins": [{\n      "name": "@effect/language-service",\n      "diagnostics": true,\n      "quickinfo": true,\n      "completions": true,\n      "ignoreEffectWarningsInTscExitCode": false,\n      "diagnosticSeverity": {\n        "anyUnknownInErrorContext": "warning",\n        "deterministicKeys": "warning",\n        "extendsNativeError": "warning",\n        "importFromBarrel": "warning",\n        "instanceOfSchema": "warning",\n        "missedPipeableOpportunity": "suggestion",\n        "missingEffectServiceDependency": "warning",\n        "nodeBuiltinImport": "off",\n        "schemaUnionOfLiterals": "suggestion",\n        "serviceNotAsClass": "warning",\n        "strictBooleanExpressions": "warning",\n        "strictEffectProvide": "warning"\n      }\n    }]'
     : "";
 
+  return {
+    EFFECT_SCRIPTS: effectScripts,
+    EFFECT_DEPENDENCIES_BLOCK: effectDependenciesBlock,
+    EFFECT_DEV_DEPENDENCIES: "",
+    EFFECT_TSCONFIG_PLUGINS: effectTsconfigPlugins,
+  };
+}
+
+function frontendTemplateValues(contract: GeneratedProjectContract): Record<string, string> {
+  const frontendScripts = FRONTEND_ROOT_SCRIPT_NAMES.flatMap((scriptName) => {
+    const command = contract.packageJson.scripts[scriptName];
+    return command === undefined
+      ? []
+      : [`    ${JSON.stringify(scriptName)}: ${JSON.stringify(command)},\n`];
+  }).join("");
+
   const frontendLefthookCommand = contract.frontend.enabled
     ? `    frontend-oxc:\n      glob:\n        - ${JSON.stringify(contract.frontend.lefthookGlob)}\n      run: ./node_modules/.bin/oxlint --type-aware -c apps/frontend/.oxlintrc.jsonc --fix --quiet --format=unix {staged_files} && ./node_modules/.bin/oxfmt --write -c apps/frontend/.oxfmtrc.jsonc {staged_files}\n      stage_fixed: true\n`
     : "";
@@ -140,15 +159,6 @@ export function templateValuesFromContract(
     ? `        - ${JSON.stringify(contract.frontend.lefthookGlob)}\n`
     : "";
 
-  const rootLefthookExtraGlobs = contract.rootTooling.lefthookRootGlobs.filter(
-    (glob) => glob !== "scripts/**/*.ts",
-  );
-
-  const tsconfigPlugins = context.effect ? effectTsconfigPlugins : "";
-  const tsconfigInclude = quoteArray(contract.rootTooling.tsconfigInclude);
-  const knipRootEntry = quoteArray(contract.rootTooling.knipRootEntry);
-  const knipRootProject = quoteArray(contract.rootTooling.knipRootProject);
-
   const knipFrontendWorkspace = contract.frontend.enabled
     ? `,\n    "apps/frontend": {\n      "entry": [\n${jsonLines(
         contract.frontend.knipWorkspace.entry,
@@ -156,49 +166,11 @@ export function templateValuesFromContract(
       )}\n      ],\n      "project": [${quoteArray(contract.frontend.knipWorkspace.project)}]\n    }`
     : "";
 
-  const projectConventionPaths = [
-    ...(context.backend ? ['  - "src/**/*.ts"'] : []),
-    '  - "scripts/**/*.ts"',
-  ].join("\n");
-
-  const projectConventionTitle = context.backend
-    ? "Backend And Tooling Conventions"
-    : "Tooling Script Conventions";
-
   return {
-    PROJECT_NAME: context.projectName,
-    PACKAGE_NAME: context.packageName,
-    BIN_NAME: context.binName,
-    BACKEND_ENABLED: String(context.backend),
-    FRONTEND_PRESET: context.frontend,
-    AI_ENABLED: String(context.ai),
-    HAS_WORKSPACES: String(context.hasWorkspaces),
-    BIN_BLOCK: binBlock,
-    ROOT_LINT_PATHS: contract.rootTooling.lintPaths.join(" "),
-    ROOT_ARCH_PATHS: contract.rootTooling.archPaths.join(" "),
-    ROOT_FORMAT_GLOBS: contract.rootTooling.formatGlobs.join(" "),
-    DEV_COMMAND: contract.packageJson.scripts["dev"] ?? "",
-    TEST_COMMAND: contract.packageJson.scripts["test"] ?? "",
-    TEST_UNIT_SCRIPT: frontendUnitTestScript,
-    TEST_HOOKS_SCRIPT: testHooksScript,
-    WORKSPACES_BLOCK: workspacesBlock,
-    AI_SCRIPTS: aiScripts,
-    EFFECT_SCRIPTS: effectScripts,
-    EFFECT_DEPENDENCIES_BLOCK: effectDependenciesBlock,
-    EFFECT_DEV_DEPENDENCIES: "",
-    EFFECT_TSCONFIG_PLUGINS: tsconfigPlugins,
-    TSCONFIG_INCLUDE: tsconfigInclude,
     FRONTEND_SCRIPTS: frontendScripts,
     FRONTEND_LEFTHOOK_COMMAND: frontendLefthookCommand,
     FRONTEND_TYPECHECK_GLOB: frontendTypecheckGlob,
-    BACKEND_LEFTHOOK_GLOB: lefthookGlobLines(rootLefthookExtraGlobs),
-    CODEX_LEFTHOOK_GLOB: "",
-    KNIP_ROOT_ENTRY: knipRootEntry,
-    KNIP_ROOT_PROJECT: knipRootProject,
     KNIP_FRONTEND_WORKSPACE: knipFrontendWorkspace,
-    PROJECT_CONVENTION_PATHS: projectConventionPaths,
-    PROJECT_CONVENTION_TITLE: projectConventionTitle,
-    ROOT_DEV_DEPENDENCIES: devDependencyEntries(contract.packageJson),
     FRONTEND_PACKAGE_NAME: contract.frontend.enabled ? contract.frontend.packageJson.name : "",
     FRONTEND_PACKAGE_SCRIPTS: contract.frontend.enabled
       ? objectEntriesForTemplate(contract.frontend.packageJson.scripts)
@@ -210,6 +182,60 @@ export function templateValuesFromContract(
     FRONTEND_PACKAGE_DEV_DEPENDENCIES: contract.frontend.enabled
       ? objectEntriesForTemplate(contract.frontend.packageJson.devDependencies)
       : "",
+  };
+}
+
+function rootToolingTemplateValues(contract: GeneratedProjectContract): Record<string, string> {
+  const rootLefthookExtraGlobs = contract.rootTooling.lefthookRootGlobs.filter(
+    (glob) => glob !== "scripts/**/*.ts",
+  );
+
+  return {
+    ROOT_LINT_PATHS: contract.rootTooling.lintPaths.join(" "),
+    ROOT_ARCH_PATHS: contract.rootTooling.archPaths.join(" "),
+    ROOT_FORMAT_GLOBS: contract.rootTooling.formatGlobs.join(" "),
+    TSCONFIG_INCLUDE: quoteArray(contract.rootTooling.tsconfigInclude),
+    BACKEND_LEFTHOOK_GLOB: lefthookGlobLines(rootLefthookExtraGlobs),
+    CODEX_LEFTHOOK_GLOB: "",
+    KNIP_ROOT_ENTRY: quoteArray(contract.rootTooling.knipRootEntry),
+    KNIP_ROOT_PROJECT: quoteArray(contract.rootTooling.knipRootProject),
+  };
+}
+
+function projectConventionTemplateValues(context: TemplateContext): Record<string, string> {
+  const projectConventionPaths = [
+    ...(context.backend ? ['  - "src/**/*.ts"'] : []),
+    '  - "scripts/**/*.ts"',
+  ].join("\n");
+
+  const projectConventionTitle = context.backend
+    ? "Backend And Tooling Conventions"
+    : "Tooling Script Conventions";
+
+  return {
+    PROJECT_CONVENTION_PATHS: projectConventionPaths,
+    PROJECT_CONVENTION_TITLE: projectConventionTitle,
+  };
+}
+
+export function templateValuesFromContract(
+  contract: GeneratedProjectContract,
+): Record<string, string> {
+  const context = contract.templateContext;
+
+  return {
+    PROJECT_NAME: context.projectName,
+    PACKAGE_NAME: context.packageName,
+    BIN_NAME: context.binName,
+    BACKEND_ENABLED: String(context.backend),
+    FRONTEND_PRESET: context.frontend,
+    AI_ENABLED: String(context.ai),
+    HAS_WORKSPACES: String(context.hasWorkspaces),
+    ...packageTemplateValues(contract),
+    ...effectTemplateValues(contract),
+    ...frontendTemplateValues(contract),
+    ...rootToolingTemplateValues(contract),
+    ...projectConventionTemplateValues(context),
   };
 }
 
