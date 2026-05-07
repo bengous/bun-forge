@@ -1,6 +1,13 @@
 #!/usr/bin/env bun
 
+import type { Workspace } from "./format-and-lint-routing.ts";
 import { existsSync } from "node:fs";
+import {
+  hasFormattableExtension,
+  hasLintableExtension,
+  isProductSurface,
+  resolveLiveRepoWorkspace,
+} from "./format-and-lint-routing.ts";
 import { resolveBin, resolveProjectRoot } from "./resolve-bin";
 
 export type HookInput = {
@@ -10,56 +17,6 @@ export type HookInput = {
       file_path?: string;
     }>;
   };
-};
-
-type Workspace = {
-  readonly oxlintConfig: string;
-  readonly oxlintArgs: ReadonlyArray<string>;
-  readonly oxfmtConfig: string;
-  readonly lint: boolean;
-  readonly lintFix: boolean;
-  readonly formatMode: "write" | "check";
-};
-
-const LINTABLE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".mjs"]);
-const FORMATTABLE_EXTENSIONS = new Set([
-  ".ts",
-  ".tsx",
-  ".js",
-  ".jsx",
-  ".mjs",
-  ".cjs",
-  ".json",
-  ".jsonc",
-  ".yml",
-  ".yaml",
-  ".toml",
-  ".html",
-  ".css",
-]);
-const ROOT_WORKSPACE: Workspace = {
-  oxlintConfig: ".oxlintrc.jsonc",
-  oxlintArgs: [],
-  oxfmtConfig: ".oxfmtrc.jsonc",
-  lint: true,
-  lintFix: true,
-  formatMode: "write",
-};
-const CODEX_HOOK_WORKSPACE: Workspace = {
-  oxlintConfig: ".oxlintrc.jsonc",
-  oxlintArgs: [],
-  oxfmtConfig: ".oxfmtrc.jsonc",
-  lint: true,
-  lintFix: false,
-  formatMode: "check",
-};
-const FORMAT_ONLY_WORKSPACE: Workspace = {
-  oxlintConfig: ".oxlintrc.jsonc",
-  oxlintArgs: [],
-  oxfmtConfig: ".oxfmtrc.jsonc",
-  lint: false,
-  lintFix: false,
-  formatMode: "write",
 };
 
 const SUMMARY_LINE = /^\d+ problems?$/;
@@ -94,31 +51,7 @@ export function parseFilePaths(raw: string): string[] {
 }
 
 export function resolveWorkspace(filePath: string): Workspace | null {
-  const ext = filePath.slice(filePath.lastIndexOf("."));
-  if (!FORMATTABLE_EXTENSIONS.has(ext) && !LINTABLE_EXTENSIONS.has(ext)) {
-    return null;
-  }
-
-  const normalized = filePath.replace(`${process.cwd()}/`, "").replace(/^\.\//, "");
-  if (
-    normalized.startsWith("src/") ||
-    normalized.startsWith("scripts/") ||
-    normalized.startsWith(".claude/hooks/")
-  ) {
-    return ROOT_WORKSPACE;
-  }
-  if (normalized.startsWith(".codex/hooks/")) {
-    return CODEX_HOOK_WORKSPACE;
-  }
-  if (isProductSurface(normalized)) {
-    return FORMAT_ONLY_WORKSPACE;
-  }
-  return null;
-}
-
-function isProductSurface(filePath: string): boolean {
-  const normalized = filePath.replace(`${process.cwd()}/`, "").replace(/^\.\//, "");
-  return normalized.startsWith("templates/") || normalized.startsWith("template-sources/");
+  return resolveLiveRepoWorkspace(filePath);
 }
 
 function blockingLines(output: string): string[] {
@@ -154,19 +87,18 @@ function bucketByWorkspace(filePaths: readonly string[]): Map<Workspace, BucketE
     if (workspace === null) {
       continue;
     }
-    const ext = filePath.slice(filePath.lastIndexOf("."));
     let bucket = buckets.get(workspace);
     if (bucket === undefined) {
       bucket = { workspace, lintFixPaths: [], lintCheckPaths: [], formatPaths: [] };
       buckets.set(workspace, bucket);
     }
-    if (LINTABLE_EXTENSIONS.has(ext) && workspace.lint) {
+    if (hasLintableExtension(filePath) && workspace.lint) {
       if (workspace.lintFix) {
         bucket.lintFixPaths.push(filePath);
       }
       bucket.lintCheckPaths.push(filePath);
     }
-    if (FORMATTABLE_EXTENSIONS.has(ext)) {
+    if (hasFormattableExtension(filePath)) {
       bucket.formatPaths.push(filePath);
     }
   }
@@ -179,6 +111,31 @@ function summarizePaths(paths: readonly string[]): string {
   }
   const head = paths.slice(0, 3).join(", ");
   return `${paths.length} files: ${head}${paths.length > 3 ? ", ..." : ""}`;
+}
+
+export function formatCommandFailure(
+  label: string,
+  paths: readonly string[],
+  stdout: string,
+  stderr: string,
+  exitCode: number | null,
+): string {
+  const output = [stderr, stdout].filter(Boolean).join("\n").trim();
+  return output || `${label}: ${summarizePaths(paths)} exited with code ${exitCode}`;
+}
+
+function commandFailure(
+  label: string,
+  paths: readonly string[],
+  result: Bun.SyncSubprocess<"pipe", "pipe">,
+): string {
+  return formatCommandFailure(
+    label,
+    paths,
+    result.stdout.toString(),
+    result.stderr.toString(),
+    result.exitCode,
+  );
 }
 
 if (import.meta.main) {
@@ -205,7 +162,7 @@ if (import.meta.main) {
 
   for (const bucket of buckets.values()) {
     if (bucket.lintFixPaths.length > 0) {
-      Bun.spawnSync(
+      const lintFix = Bun.spawnSync(
         [
           oxlint,
           ...bucket.workspace.oxlintArgs,
@@ -216,10 +173,14 @@ if (import.meta.main) {
           ...bucket.lintFixPaths,
         ],
         {
-          stdout: "ignore",
-          stderr: "ignore",
+          stdout: "pipe",
+          stderr: "pipe",
         },
       );
+      if (lintFix.exitCode !== 0) {
+        failures.push(commandFailure("lint --fix", bucket.lintFixPaths, lintFix));
+        continue;
+      }
     }
 
     if (bucket.formatPaths.length > 0) {
@@ -232,14 +193,7 @@ if (import.meta.main) {
         },
       );
       if (format.exitCode !== 0) {
-        const output = [format.stderr.toString(), format.stdout.toString()]
-          .filter(Boolean)
-          .join("\n")
-          .trim();
-        failures.push(
-          output ||
-            `format: ${summarizePaths(bucket.formatPaths)} exited with code ${format.exitCode}`,
-        );
+        failures.push(commandFailure("format", bucket.formatPaths, format));
       }
     }
 

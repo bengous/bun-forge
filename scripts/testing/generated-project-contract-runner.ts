@@ -297,6 +297,7 @@ async function assertAiContract(
     assertPathMissing(root, ".mcp.json");
     assertPathMissing(root, ".codex");
     assertPathMissing(root, "scripts/validation/format-and-lint.ts");
+    assertPathMissing(root, "scripts/validation/format-and-lint-routing.ts");
     assertPathMissing(root, "scripts/validation/validate-on-stop.ts");
     assertUndefined(packageScripts["agents:sync"], "agents:sync script");
     return;
@@ -324,6 +325,7 @@ async function assertAiContract(
   assertPathExists(root, ".claude/hooks/guard-destructive.ts");
   assertPathExists(root, ".claude/hooks/guard-destructive.test.ts");
   assertPathExists(root, "scripts/validation/format-and-lint.ts");
+  assertPathExists(root, "scripts/validation/format-and-lint-routing.ts");
   assertPathExists(root, "scripts/validation/validate-on-stop.ts");
 
   await assertFileContains(root, "CLAUDE.md", "Opinionated Bun project bootstrapped");
@@ -366,6 +368,36 @@ async function assertAiContract(
     "./guard-destructive-core.ts",
   );
   await assertFileContains(root, ".codex/hooks/lib.ts", "stop_hook_active");
+  await assertFileContains(
+    root,
+    "scripts/validation/format-and-lint.ts",
+    "resolveGeneratedProjectWorkspace",
+  );
+  await assertFileContains(
+    root,
+    "scripts/validation/format-and-lint-routing.ts",
+    "resolveGeneratedProjectWorkspace",
+  );
+  await assertFileContains(
+    root,
+    "scripts/validation/format-and-lint-routing.ts",
+    "hasRoutableExtension",
+  );
+  await assertFileExcludes(
+    root,
+    "scripts/validation/format-and-lint-routing.ts",
+    "resolveLiveRepoWorkspace",
+  );
+  await assertFileExcludes(
+    root,
+    "scripts/validation/format-and-lint-routing.ts",
+    "isProductSurface",
+  );
+  await assertFileExcludes(
+    root,
+    "scripts/validation/format-and-lint-routing.ts",
+    "template-sources/",
+  );
   await assertFileContains(root, ".claude/settings.json", "$CLAUDE_PROJECT_DIR");
   await assertFileExcludes(root, ".claude/settings.json", ".codex/");
   await assertFileContains(root, "lefthook.yml", '- ".codex/hooks/**/*.ts"');
