@@ -87,7 +87,7 @@ function makeOptions(destination: string, scenario: Scenario): InitOptions {
 }
 
 async function generateScenario(scenario: Scenario): Promise<string> {
-  const destination = await mkdtemp(join(tmpdir(), `bun-forge-contract-${scenario.name}-`));
+  const destination = await mkdtemp(join(tmpdir(), `kitsmith-contract-${scenario.name}-`));
   tempDirs.push(destination);
 
   await generateProjectWithRuntime(makeOptions(destination, scenario), {

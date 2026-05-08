@@ -60,12 +60,12 @@ export const defaultInstallRuntime: InstallRuntime = {
   warn: console.warn,
 };
 
-export function bunForgeTempPath(name: string): string {
+export function kitsmithTempPath(name: string): string {
   return join(tmpdir(), name);
 }
 
 export function bunInstallEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
-  const tempPath = env["TMPDIR"] ?? bunForgeTempPath("bun-tmp");
+  const tempPath = env["TMPDIR"] ?? kitsmithTempPath("bun-tmp");
 
   return {
     ...env,

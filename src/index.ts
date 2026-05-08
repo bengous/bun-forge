@@ -109,9 +109,9 @@ export function formatCliError(error: unknown): string {
 
 export function buildProgram(runtime: CliRuntime = defaultCliRuntime): Command {
   const program = new Command()
-    .name("bun-forge")
+    .name("kitsmith")
     .version(CLI_VERSION)
-    .description("Scaffold an opinionated Bun project from Bun-forge presets")
+    .description("Scaffold an opinionated Bun-first TypeScript project")
     .showHelpAfterError()
     .configureOutput({
       writeOut: (message) => runtime.stdout.write(message),
@@ -164,7 +164,7 @@ export function buildProgram(runtime: CliRuntime = defaultCliRuntime): Command {
 
   program
     .command("adopt [destination]")
-    .description("Adopt Bun Forge tooling in an existing Bun/TypeScript project")
+    .description("Adopt Kitsmith tooling in an existing Bun/TypeScript project")
     .option("--name <projectName>", "override the adopted project name")
     .option("--frontend <preset>", "frontend preset: none | tanstack")
     .option("--ai <enabled>", "install Claude/AGENTS tooling: true | false")
@@ -199,14 +199,14 @@ export function buildProgram(runtime: CliRuntime = defaultCliRuntime): Command {
         const options = await runtime.deriveAdoptOptions(destination, partial);
         const plan = await runtime.adoptProject(options);
         if (options.rollback !== undefined) {
-          writeLine(runtime.stdout, `Rolled back Bun Forge adoption run ${options.rollback}`);
+          writeLine(runtime.stdout, `Rolled back Kitsmith adoption run ${options.rollback}`);
           return;
         }
         runtime.stdout.write(formatAdoptionPlan(plan));
         writeLine(
           runtime.stdout,
           options.apply
-            ? `Applied Bun Forge adoption at ${options.destination}`
+            ? `Applied Kitsmith adoption at ${options.destination}`
             : "Dry run only. Re-run with --apply to write changes.",
         );
       },

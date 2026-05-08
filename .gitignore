@@ -1,4 +1,5 @@
 node_modules
+dist/
 .DS_Store
 .mise/
 .playwright-cli/
@@ -10,3 +11,4 @@ plans/
 .codex/hooks.json
 .codex/.hooks/
 .omx/
+*.tgz

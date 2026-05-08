@@ -5,9 +5,9 @@ paths:
 
 ## Preset Sources Layer
 
-**Layer invariant**: `template-sources/` contains preset files that bun-forge ships into generated projects as product defaults and overlays on top of the cleaned native scaffold base.
+**Layer invariant**: `template-sources/` contains preset files that kitsmith ships into generated projects as product defaults and overlays on top of the cleaned native scaffold base.
 
-**Ownership rule**: These files are part of bun-forge's product contract. They are maintained here because bun-forge chooses to ship them, not because another repo is authoritative.
+**Ownership rule**: These files are part of kitsmith's product contract. They are maintained here because kitsmith chooses to ship them, not because another repo is authoritative.
 
 **Preset model**:
 
@@ -15,7 +15,7 @@ paths:
 - `frontend-tanstack/` is an overlay that adds frontend-specific emitted files
 - `ai/` is an overlay that adds agent/tooling-specific emitted files
 
-`base/` is not the whole generated project by itself. It is the stable bun-forge overlay applied after native bootstrap and cleanup.
+`base/` is not the whole generated project by itself. It is the stable kitsmith overlay applied after native bootstrap and cleanup.
 
 **Use preset sources when**:
 

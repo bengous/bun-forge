@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "bun-forge",
+      "name": "kitsmith",
       "dependencies": {
         "@clack/prompts": "1.3.0",
         "commander": "14.0.3",

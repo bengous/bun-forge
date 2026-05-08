@@ -11,7 +11,7 @@ afterEach(async () => {
 });
 
 function makeTempDir(): string {
-  const dir = mkdtempSync(join(tmpdir(), "bun-forge-conflicts-"));
+  const dir = mkdtempSync(join(tmpdir(), "kitsmith-conflicts-"));
   tempDirs.push(dir);
   return dir;
 }

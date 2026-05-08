@@ -16,7 +16,7 @@ import {
 } from "./lib";
 
 async function makeTestRoot(): Promise<string> {
-  return mkdtemp(path.join(tmpdir(), "bun-forge-codex-hooks-"));
+  return mkdtemp(path.join(tmpdir(), "kitsmith-codex-hooks-"));
 }
 
 async function seedFile(root: string, relPath: string, content = ""): Promise<void> {
@@ -40,7 +40,7 @@ describe("Codex hook path handling", () => {
   });
 
   test("normalizes relative paths and drops paths outside the repo", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "bun-forge-codex-hooks-"));
+    const root = await mkdtemp(path.join(tmpdir(), "kitsmith-codex-hooks-"));
     try {
       expect(normalizeProjectPath("scripts/validation/validate.ts", root)).toBe(
         "scripts/validation/validate.ts",
@@ -113,7 +113,7 @@ describe("Codex hook path handling", () => {
   });
 
   test("extracts single and multi edit path fields from hook input", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "bun-forge-codex-hooks-"));
+    const root = await mkdtemp(path.join(tmpdir(), "kitsmith-codex-hooks-"));
     try {
       expect(
         extractTouchedPaths({
@@ -154,7 +154,7 @@ describe("Codex hook path handling", () => {
         session_id: "session",
         turn_id: "turn",
       }),
-    ).toBe(path.join(tmpdir(), "bun-forge-codex-hooks", "session-turn.json"));
+    ).toBe(path.join(tmpdir(), "kitsmith-codex-hooks", "session-turn.json"));
   });
 });
 

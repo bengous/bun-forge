@@ -259,7 +259,7 @@ describe("verifyLayerContent", () => {
 const SCRIPT_PATH = `${import.meta.dir}/sync-agents-md.ts`;
 
 function canCreateFileSymlink(): boolean {
-  const dir = mkdtempSync(join(tmpdir(), "bun-forge-symlink-capability-"));
+  const dir = mkdtempSync(join(tmpdir(), "kitsmith-symlink-capability-"));
   const target = join(dir, "target.md");
   const link = join(dir, "link.md");
 
@@ -502,8 +502,8 @@ describe.if(canCreateSymlinks)("integration: preserve root mode", () => {
     symlinkSync("AI.md", `${dir}/CLAUDE.md`, "file");
     symlinkSync("AI.md", `${dir}/AGENTS.md`, "file");
     await Bun.write(
-      `${dir}/.claude/rules/bun-forge-project-conventions.md`,
-      `---\npaths:\n  - "src/**/*.ts"\n---\n\n## Bun Forge Rule\n\nAdopted rule content.\n`,
+      `${dir}/.claude/rules/kitsmith-project-conventions.md`,
+      `---\npaths:\n  - "src/**/*.ts"\n---\n\n## Kitsmith Rule\n\nAdopted rule content.\n`,
     );
     await $`mkdir -p ${dir}/src`.quiet();
   });

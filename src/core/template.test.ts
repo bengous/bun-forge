@@ -148,7 +148,7 @@ describe("renderTemplate", () => {
   test("renders frontend route content with the project title", () => {
     const rendered = renderTemplate("apps/frontend/src/routes/index.tsx.tpl", frontendAiContext);
     expect(rendered).toContain("<h1>forge-frontend</h1>");
-    expect(rendered).toContain("normalized by bun-forge");
+    expect(rendered).toContain("normalized by Kitsmith");
   });
 
   test("renders lefthook without frontend commands for backend-only projects", () => {

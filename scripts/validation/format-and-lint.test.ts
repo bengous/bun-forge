@@ -131,7 +131,7 @@ describe("format-and-lint workspace resolution", () => {
     expect(workspace?.oxfmtConfig).toBe("apps/frontend/.oxfmtrc.jsonc");
   });
 
-  test("generated project does not route bun-forge product template surfaces", () => {
+  test("generated project does not route kitsmith product template surfaces", () => {
     expect(resolveGeneratedProjectWorkspace("template-sources/ai/.codex/hooks/lib.ts")).toBeNull();
     expect(resolveGeneratedProjectWorkspace("templates/package.json.tpl")).toBeNull();
   });
@@ -146,16 +146,16 @@ describe("format-and-lint workspace resolution", () => {
   });
 
   test("normalizes Windows absolute and relative paths before routing", () => {
-    const root = String.raw`C:\repo\bun-forge`;
-    expect(repoRelativePath(String.raw`C:\repo\bun-forge\src\index.ts`, root)).toBe("src/index.ts");
+    const root = String.raw`C:\repo\kitsmith`;
+    expect(repoRelativePath(String.raw`C:\repo\kitsmith\src\index.ts`, root)).toBe("src/index.ts");
     expect(repoRelativePath(String.raw`src\index.ts`, root, root)).toBe("src/index.ts");
     expect(repoRelativePath(String.raw`C:\repo\other\src\index.ts`, root)).toBeNull();
     expect(
-      normalizeTouchedPath(String.raw`C:\repo\bun-forge\scripts\validation\validate.ts`, root),
+      normalizeTouchedPath(String.raw`C:\repo\kitsmith\scripts\validation\validate.ts`, root),
     ).toBe("scripts/validation/validate.ts");
     expect(
       resolveLiveRepoWorkspace(
-        String.raw`C:\repo\bun-forge\template-sources\ai\.codex\hooks\lib.ts`,
+        String.raw`C:\repo\kitsmith\template-sources\ai\.codex\hooks\lib.ts`,
         root,
       )?.name,
     ).toBe("product");

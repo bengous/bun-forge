@@ -129,6 +129,19 @@ export function repoRoot(input: HookInput): string {
   }
 }
 
+function stateRootName(root: string): string {
+  const packageJsonPath = path.join(root, "package.json");
+  if (!existsSync(packageJsonPath)) {
+    return "kitsmith";
+  }
+
+  const parsed = JSON.parse(readFileSync(packageJsonPath, "utf8")) as unknown;
+  if (isRecord(parsed) && typeof parsed["name"] === "string" && parsed["name"].length > 0) {
+    return parsed["name"];
+  }
+  return "kitsmith";
+}
+
 export function extractTouchedPaths(input: HookInput, root = repoRoot(input)): string[] {
   const toolInput = input.tool_input ?? {};
   const cwd = path.resolve(input.cwd ?? root);
@@ -512,7 +525,7 @@ export function localTool(
 
 export function touchedStatePath(input: HookInput): string {
   const root = repoRoot(input);
-  const repoName = sanitizeStateKey(path.basename(root));
+  const repoName = sanitizeStateKey(stateRootName(root));
   const sessionId = sanitizeStateKey(input.session_id ?? "unknown-session");
   const turnId = sanitizeStateKey(input.turn_id ?? "unknown-turn");
   return path.join(tmpdir(), `${repoName}-codex-hooks`, `${sessionId}-${turnId}.json`);

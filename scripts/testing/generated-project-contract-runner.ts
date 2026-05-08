@@ -536,7 +536,7 @@ async function assertFrontendContract(
   await assertFileContains(root, "apps/frontend/playwright.config.ts", "--strictPort");
   await assertFileContains(root, "apps/frontend/e2e/home.spec.ts", "page.getByRole");
   await assertFileContains(root, "apps/frontend/src/routes/index.tsx", projectName);
-  await assertFileContains(root, "apps/frontend/src/routes/index.tsx", "normalized by bun-forge");
+  await assertFileContains(root, "apps/frontend/src/routes/index.tsx", "normalized by Kitsmith");
   await assertFileExcludes(root, "apps/frontend/src/routes/index.tsx", "Welcome to TanStack");
   await assertFileContains(root, "lefthook.yml", "frontend-oxc:");
   await assertFileContains(root, "lefthook.yml", '- "apps/frontend/**/*.{ts,tsx}"');

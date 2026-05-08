@@ -14,13 +14,13 @@ function argValue(flag: string): string | undefined {
 
 function shouldCopy(path: string): boolean {
   const name = basename(path);
-  return name !== ".git" && name !== "node_modules" && name !== ".bun-forge";
+  return name !== ".git" && name !== "node_modules" && name !== ".kitsmith";
 }
 
 async function main(): Promise<void> {
   const source = argValue("--source") ?? DEFAULT_VEX_SOURCE;
   const destination =
-    argValue("--destination") ?? (await mkdtemp(join(tmpdir(), "bun-forge-adopt-vex-")));
+    argValue("--destination") ?? (await mkdtemp(join(tmpdir(), "kitsmith-adopt-vex-")));
 
   await cp(source, destination, {
     recursive: true,
@@ -48,8 +48,8 @@ async function main(): Promise<void> {
     { cwd: process.cwd() },
   );
 
-  if (await Bun.file(join(destination, ".bun-forge")).exists()) {
-    throw new Error("Dry-run wrote .bun-forge state");
+  if (await Bun.file(join(destination, ".kitsmith")).exists()) {
+    throw new Error("Dry-run wrote .kitsmith state");
   }
 
   await runCommand(

@@ -17,13 +17,13 @@ const PRESET_ADOPTION_REASONS = {
 } as const satisfies Record<PresetName, string>;
 
 const TEMPLATE_CREATE_REASONS: Readonly<Record<string, string>> = {
-  "README.md": "create Bun Forge README",
-  "tsconfig.json": "adopt Bun Forge TypeScript config",
-  "knip.jsonc": "adopt Bun Forge dead-code config",
-  "lefthook.yml": "adopt Bun Forge Git hooks",
+  "README.md": "create Kitsmith README",
+  "tsconfig.json": "adopt Kitsmith TypeScript config",
+  "knip.jsonc": "adopt Kitsmith dead-code config",
+  "lefthook.yml": "adopt Kitsmith Git hooks",
   "CLAUDE.md": "create Claude guidance",
-  ".claude/rules/project-conventions.md": "create Bun Forge Claude project convention rule",
-  ".claude/rules/frontend-conventions.md": "create Bun Forge Claude frontend convention rule",
+  ".claude/rules/project-conventions.md": "create Kitsmith Claude project convention rule",
+  ".claude/rules/frontend-conventions.md": "create Kitsmith Claude frontend convention rule",
   "apps/frontend/package.json": "create TanStack frontend package",
   "apps/frontend/index.html": "create TanStack frontend entry HTML",
   "apps/frontend/vite.config.ts": "create TanStack frontend Vite config",
@@ -75,7 +75,7 @@ export function shouldOmitTemplateDuringAdopt(
 }
 
 export function frontendConflictReason(): string {
-  return "Existing frontend detected; Bun Forge does not convert frontends in adopt v1";
+  return "Existing frontend detected; Kitsmith does not convert frontends in adopt v1";
 }
 
 export function presetAdoptionReason(name: PresetName): string {
@@ -107,7 +107,7 @@ export function presetMismatchPolicy(
 
   return {
     kind: "conflict",
-    reason: `Existing file differs from Bun Forge ${reason}`,
+    reason: `Existing file differs from Kitsmith ${reason}`,
   };
 }
 
@@ -120,7 +120,7 @@ export function adoptionTemplatePolicy(spec: TemplateRenderSpec): AdoptionTempla
     return {
       kind: "skip",
       path: spec.relativePath,
-      reason: "Existing project source preserved; Bun Forge starter source skipped",
+      reason: "Existing project source preserved; Kitsmith starter source skipped",
     };
   }
 
@@ -205,11 +205,11 @@ function mergeStringArrayPreservingExisting(existing: unknown, additions: unknow
 
 function templateAdoptionPath(spec: TemplateRenderSpec): string {
   if (spec.relativePath === ".claude/rules/project-conventions.md") {
-    return ".claude/rules/bun-forge-project-conventions.md";
+    return ".claude/rules/kitsmith-project-conventions.md";
   }
 
   if (spec.relativePath === ".claude/rules/frontend-conventions.md") {
-    return ".claude/rules/bun-forge-frontend-conventions.md";
+    return ".claude/rules/kitsmith-frontend-conventions.md";
   }
 
   return spec.relativePath;
@@ -218,7 +218,7 @@ function templateAdoptionPath(spec: TemplateRenderSpec): string {
 function templateCreateReason(spec: TemplateRenderSpec): string {
   return (
     TEMPLATE_CREATE_REASONS[spec.relativePath] ??
-    `create Bun Forge template output from ${spec.templateName}`
+    `create Kitsmith template output from ${spec.templateName}`
   );
 }
 
@@ -227,9 +227,9 @@ function templatePreserveReason(spec: TemplateRenderSpec): string {
     case "CLAUDE.md":
       return "Existing Claude/root guidance preserved";
     case ".claude/rules/project-conventions.md":
-      return "Existing Bun Forge Claude project convention rule preserved";
+      return "Existing Kitsmith Claude project convention rule preserved";
     case ".claude/rules/frontend-conventions.md":
-      return "Existing Bun Forge Claude frontend convention rule preserved";
+      return "Existing Kitsmith Claude frontend convention rule preserved";
     default:
       return "Existing project file preserved";
   }

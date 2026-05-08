@@ -1,17 +1,17 @@
-# bun-forge
+# kitsmith
 
-`bun-forge` is an opinionated Bun project scaffolder.
+`kitsmith` is an opinionated Bun project scaffolder.
 
-It generates projects by starting from native ecosystem bootstraps, then normalizing them into the bun-forge contract:
+It generates projects by starting from native ecosystem bootstraps, then normalizing them into the kitsmith contract:
 
 - backend starts from `bun init --yes`
 - optional frontend starts from the official TanStack Router scaffold
-- bun-forge then cleans native output, applies presets, renders templates, and finalizes install/bootstrap
+- kitsmith then cleans native output, applies presets, renders templates, and finalizes install/bootstrap
 
 ## Repository Surfaces
 
 - `src/` contains the scaffolder engine: CLI entrypoint, option collection, preset selection, template rendering, and project finalization.
-- `templates/` contains tokenized files rendered with project-specific values and bun-forge-owned normalization.
+- `templates/` contains tokenized files rendered with project-specific values and kitsmith-owned normalization.
 - `template-sources/` contains stable preset files copied into generated projects as overlays on top of the native scaffold base.
 - `scripts/` contains repo automation, validation, quality checks, AGENTS sync, and smoke tests.
 
@@ -29,6 +29,6 @@ Generated output also includes decisions about what native scaffold output is ke
 
 ## Product Invariant
 
-`bun-forge` dogfoods its own standards. A change is only complete when it keeps the scaffolder repo coherent and also preserves the quality of the projects it generates.
+`kitsmith` dogfoods its own standards. A change is only complete when it keeps the scaffolder repo coherent and also preserves the quality of the projects it generates.
 
 The generated project is part of the product contract. Visible output changes should be treated as deliberate product decisions, not as incidental side effects of internal refactors.

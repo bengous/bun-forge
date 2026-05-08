@@ -22,7 +22,7 @@
 		"AGENTS.md": {
 			"kind": "root",
 			"sourcePath": "CLAUDE.md",
-			"checksum": "sha256-05e38fbeaf06d87b11ba0c218919e71ef3440105dcc6297cb3d67af9bccbbc40"
+			"checksum": "sha256-e8bd0dd19ecae00a53f573467f1033f049775075e984771f912c5b389e95f00e"
 		},
 		"scripts/AGENTS.md": {
 			"kind": "layer",
@@ -37,17 +37,17 @@
 		"scripts/quality/AGENTS.md": {
 			"kind": "layer",
 			"sourcePath": ".claude/rules/repo-automation-scripts.md",
-			"checksum": "sha256-6bce7adfa320127206e6ba4315a82df7bc4bf420aa02fe92b44c1b7e0c84ee54"
+			"checksum": "sha256-18c9a3dbd19a26352b5a87b18ee0e1fa1749650c6eb1063e26a3428301aca397"
 		},
 		"scripts/setup/AGENTS.md": {
 			"kind": "layer",
 			"sourcePath": ".claude/rules/repo-automation-scripts.md",
-			"checksum": "sha256-6bce7adfa320127206e6ba4315a82df7bc4bf420aa02fe92b44c1b7e0c84ee54"
+			"checksum": "sha256-18c9a3dbd19a26352b5a87b18ee0e1fa1749650c6eb1063e26a3428301aca397"
 		},
 		"scripts/testing/AGENTS.md": {
 			"kind": "layer",
 			"sourcePath": ".claude/rules/repo-automation-scripts.md",
-			"checksum": "sha256-3565d6742b5e22cec50cd1911d1a3b312c2fc3deab895d9424868ec7d0414cf3"
+			"checksum": "sha256-e1de28ce1dce79a491fe7b2c67a9eefaa4a8bae59434a0dcf6a285afff0b5fa4"
 		},
 		"scripts/validation/AGENTS.md": {
 			"kind": "layer",
@@ -57,17 +57,17 @@
 		"src/AGENTS.md": {
 			"kind": "layer",
 			"sourcePath": ".claude/rules/scaffolder-source.md",
-			"checksum": "sha256-373f8f14037b70bc7a3ab0a18f3b9f32aca038f196d990105eb79aa439dba49d"
+			"checksum": "sha256-3d86f4e069acfac74f188cd9d84b156b4a951bafdd96189ce30a358fcad68301"
 		},
 		"template-sources/AGENTS.md": {
 			"kind": "layer",
 			"sourcePath": ".claude/rules/product-architecture.md",
-			"checksum": "sha256-6724dcd6c4cba43c8005e586d67f8747908af1e17637b1c39010718d1e4f4bec"
+			"checksum": "sha256-b6f89603d446945ade0222b1cdf123fa214f7da7c8e3557797901c51ae26fc53"
 		},
 		"templates/AGENTS.md": {
 			"kind": "layer",
 			"sourcePath": ".claude/rules/templates-layer.md",
-			"checksum": "sha256-d272da20e3f41063c851c69deed8964e5dbd45af6a93562f8a6fce6d3abe8bc1"
+			"checksum": "sha256-fbdf03906f8eb1225db54876f146e61c60d68fa1898355c4bdb29f4fdcf88883"
 		}
 	},
 	"sources": {
@@ -78,7 +78,7 @@
 			"checksum": "sha256-1d09b0edd84e7f651a356356a93ed48971c0c6c5e253ee4ec706626827b42c0e"
 		},
 		".claude/rules/generated-project-contract.md": {
-			"checksum": "sha256-4d5ce671bad5aa5a5d60d01b087ed8248bd27ee5ef15b5827ad00b5d296170f4"
+			"checksum": "sha256-6e5f1aa7229e1045ab511440cbedb44ddd8476b7a1396faa35295d67c20a0bc3"
 		},
 		".claude/rules/pragmatic-functional-style.md": {
 			"checksum": "sha256-69326c959f5c0775613f1f3f757a2181c0ef179295c0647e32a534a133ff73fa"
@@ -87,16 +87,16 @@
 			"checksum": "sha256-97e7b64049411b0dff27a882ed5d182aba525c65b11507ece3ed550a6cdef012"
 		},
 		".claude/rules/preset-sources-layer.md": {
-			"checksum": "sha256-bd436bcd25011f8bd5bda7f581025a68b67513fb849584b359c49145584b751b"
+			"checksum": "sha256-e888d1c2ed271683f38369035779fbcb4a022ce3906fb561361ae7bb89c17510"
 		},
 		".claude/rules/preset-topology.md": {
-			"checksum": "sha256-9b5049cda9ea08daa367f668fb12f50d0f62fc074769584e6dd1a6c2a558e53c"
+			"checksum": "sha256-6e476c6182cf5929b4f62a4883890ab55b8b736a5f5b46f5d25fbb6b435e7b20"
 		},
 		".claude/rules/product-architecture.md": {
-			"checksum": "sha256-3211c12fcfd4f728e7194c8566effcfbae17b689618b7435417095bd5f579ea4"
+			"checksum": "sha256-3421e66d5f62ca0743a53592f4c32ea4fe02b89317c2e21863b01e78bab381ce"
 		},
 		".claude/rules/repo-automation-scripts.md": {
-			"checksum": "sha256-a523e52a1758b7f72cc0b94f131f79916b07dcf9bca84438bfa26f234caa7b10"
+			"checksum": "sha256-0e01ecc58f73ad8ae89485633133d4bd944f5e530df92bad8991c838c37702c1"
 		},
 		".claude/rules/rules-conventions.md": {
 			"checksum": "sha256-ab4165cc71d4f855331ba47e66d019c43c5fe1695716434bbebba4c597a28e86"
@@ -108,13 +108,13 @@
 			"checksum": "sha256-36a428776d8483f159490cc1f5a443a696876ec19b8f04730b1e990589370722"
 		},
 		".claude/rules/templates-layer.md": {
-			"checksum": "sha256-bf051bfd720a1c0a5b644ec7d24d68aaa6912506c0c4674ad67930fdb6799802"
+			"checksum": "sha256-d7c842b11e29fcf9a5abc7edc77f232b089d327b4c598a68ea9ad946208fc413"
 		},
 		".claude/rules/validation-scripts.md": {
 			"checksum": "sha256-703b3d25a930da031f406c503d79d1e25c88becdb5c7045081ed115b389a57aa"
 		},
 		"CLAUDE.md": {
-			"checksum": "sha256-05e38fbeaf06d87b11ba0c218919e71ef3440105dcc6297cb3d67af9bccbbc40"
+			"checksum": "sha256-e8bd0dd19ecae00a53f573467f1033f049775075e984771f912c5b389e95f00e"
 		}
 	}
 }

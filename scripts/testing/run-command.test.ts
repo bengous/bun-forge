@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { bunForgeTempPath, commandTimeoutMs, runCommandEnv } from "./run-command";
+import { commandTimeoutMs, kitsmithTempPath, runCommandEnv } from "./run-command";
 
 describe("commandTimeoutMs", () => {
   test("uses the default timeout when unset or invalid", () => {
@@ -17,7 +17,7 @@ describe("commandTimeoutMs", () => {
 
 describe("runCommandEnv", () => {
   test("defaults Bun temp paths to the OS temp directory", () => {
-    expect(bunForgeTempPath("bun-tmp")).toBe(join(tmpdir(), "bun-tmp"));
+    expect(kitsmithTempPath("bun-tmp")).toBe(join(tmpdir(), "bun-tmp"));
     expect(runCommandEnv({}, {})["TMPDIR"]).toBe(join(tmpdir(), "bun-tmp"));
     expect(runCommandEnv({}, {})["BUN_TMPDIR"]).toBe(join(tmpdir(), "bun-tmp"));
     expect(runCommandEnv({}, {})["BUN_INSTALL"]).toBeUndefined();

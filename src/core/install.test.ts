@@ -4,7 +4,7 @@ import { describe, expect, test } from "bun:test";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  bunForgeTempPath,
+  kitsmithTempPath,
   bunInstallEnv,
   defaultInstallRuntime,
   finalizeProject,
@@ -105,7 +105,7 @@ describe("maybeInstallMiseWithRuntime", () => {
 
 describe("bunInstallEnv", () => {
   test("defaults Bun temp paths to the OS temp directory", () => {
-    expect(bunForgeTempPath("bun-tmp")).toBe(join(tmpdir(), "bun-tmp"));
+    expect(kitsmithTempPath("bun-tmp")).toBe(join(tmpdir(), "bun-tmp"));
     expect(bunInstallEnv({})["TMPDIR"]).toBe(join(tmpdir(), "bun-tmp"));
     expect(bunInstallEnv({})["BUN_TMPDIR"]).toBe(join(tmpdir(), "bun-tmp"));
     expect(bunInstallEnv({})["BUN_INSTALL"]).toBeUndefined();

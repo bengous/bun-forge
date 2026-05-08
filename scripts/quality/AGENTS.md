@@ -1,6 +1,6 @@
 ## Repo Automation Scripts
 
-**Layer invariant**: These scripts protect the integrity of the bun-forge repo and verify that generated projects behave as intended.
+**Layer invariant**: These scripts protect the integrity of the kitsmith repo and verify that generated projects behave as intended.
 
 **Setup scripts**: Bootstrap local repo behavior only. They should not hide product decisions or mutate generated-project content.
 

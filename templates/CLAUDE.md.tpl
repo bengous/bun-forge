@@ -1,6 +1,6 @@
 ## Project
 
-Opinionated Bun project bootstrapped from bun-forge presets.
+Opinionated Bun project bootstrapped from Kitsmith presets.
 
 ## Conventions
 

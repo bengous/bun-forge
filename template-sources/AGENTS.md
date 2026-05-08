@@ -9,9 +9,9 @@
 - scripts exposed by generated `package.json`
 - preset defaults and overlay behavior
 - AI and frontend output when those presets are enabled
-- what bun-forge keeps from native scaffold output
-- what bun-forge overwrites from native scaffold output
-- what bun-forge deletes during cleanup
+- what kitsmith keeps from native scaffold output
+- what kitsmith overwrites from native scaffold output
+- what kitsmith deletes during cleanup
 
 **Decision rule**: If a change modifies generated output, ask whether the change is intended product evolution or accidental drift from an internal refactor or from upstream native scaffold behavior.
 
@@ -35,9 +35,9 @@
 
 ## Preset Sources Layer
 
-**Layer invariant**: `template-sources/` contains preset files that bun-forge ships into generated projects as product defaults and overlays on top of the cleaned native scaffold base.
+**Layer invariant**: `template-sources/` contains preset files that kitsmith ships into generated projects as product defaults and overlays on top of the cleaned native scaffold base.
 
-**Ownership rule**: These files are part of bun-forge's product contract. They are maintained here because bun-forge chooses to ship them, not because another repo is authoritative.
+**Ownership rule**: These files are part of kitsmith's product contract. They are maintained here because kitsmith chooses to ship them, not because another repo is authoritative.
 
 **Preset model**:
 
@@ -45,7 +45,7 @@
 - `frontend-tanstack/` is an overlay that adds frontend-specific emitted files
 - `ai/` is an overlay that adds agent/tooling-specific emitted files
 
-`base/` is not the whole generated project by itself. It is the stable bun-forge overlay applied after native bootstrap and cleanup.
+`base/` is not the whole generated project by itself. It is the stable kitsmith overlay applied after native bootstrap and cleanup.
 
 **Use preset sources when**:
 
@@ -67,13 +67,13 @@
 
 ## Preset Topology
 
-**Topology rule**: bun-forge currently ships a small explicit preset set:
+**Topology rule**: kitsmith currently ships a small explicit preset set:
 
 - `base` provides the common project foundation
 - `frontend-tanstack` extends the foundation with frontend-specific output
 - `ai` extends the foundation with AI-agent and context-sync tooling
 
-**Composition rule**: These presets are additive layers over the same generated project, not separate product families. They sit on top of the native bootstrap base that bun-forge creates first.
+**Composition rule**: These presets are additive layers over the same generated project, not separate product families. They sit on top of the native bootstrap base that kitsmith creates first.
 
 **Contract rule**: Changing which preset owns a file, changing overlay expectations, or changing the topology of the preset set is a generated-project contract change.
 
@@ -81,12 +81,12 @@
 
 ## Product Architecture
 
-**Model**: `bun-forge` is a product that emits another product. The repository is organized around a fixed native-first generation pipeline:
+**Model**: `kitsmith` is a product that emits another product. The repository is organized around a fixed native-first generation pipeline:
 
 - collect and normalize options
 - bootstrap the backend with native Bun
 - optionally bootstrap the frontend with the native TanStack scaffold
-- clean native scaffold output that bun-forge does not keep
+- clean native scaffold output that kitsmith does not keep
 - copy preset sources
 - render dynamic templates
 - finalize install and bootstrap
@@ -96,7 +96,7 @@
 
 - `src/` owns orchestration, native bootstrap routing, and cleanup decisions
 - `template-sources/` owns stable copied overlays
-- `templates/` owns declared output variation and bun-forge-owned normalization
+- `templates/` owns declared output variation and kitsmith-owned normalization
 - `scripts/testing/` proves the emitted product still works
 
 **Do not collapse stages**: A stage should not quietly absorb another stage's responsibility. Native bootstrap, cleanup, preset overlays, and template rendering are separate product stages and should stay explicit.

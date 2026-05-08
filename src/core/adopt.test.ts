@@ -17,7 +17,7 @@ import { toExistingBinName, toExistingPackageName, toProjectName } from "./namin
 const tempDirs: string[] = [];
 
 function canCreateFileSymlink(): boolean {
-  const dir = mkdtempSync(join(tmpdir(), "bun-forge-symlink-capability-"));
+  const dir = mkdtempSync(join(tmpdir(), "kitsmith-symlink-capability-"));
   const target = join(dir, "target.md");
   const link = join(dir, "link.md");
 
@@ -41,13 +41,13 @@ afterEach(async () => {
 });
 
 function makeTempProject(): string {
-  const dir = mkdtempSync(join(tmpdir(), "bun-forge-adopt-test-"));
+  const dir = mkdtempSync(join(tmpdir(), "kitsmith-adopt-test-"));
   tempDirs.push(dir);
   return dir;
 }
 
 async function makeAsyncTempProject(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "bun-forge-adopt-test-"));
+  const dir = await mkdtemp(join(tmpdir(), "kitsmith-adopt-test-"));
   tempDirs.push(dir);
   return dir;
 }
@@ -418,14 +418,14 @@ describe("buildAdoptionPlan", () => {
       plan.actions.some(
         (action) =>
           action.kind === "conflict" &&
-          action.path === ".claude/rules/bun-forge-project-conventions.md" &&
+          action.path === ".claude/rules/kitsmith-project-conventions.md" &&
           action.reason.includes("Cannot create below existing non-directory path"),
       ),
     ).toBe(true);
   });
 
   test.if(canCreateSymlinks)(
-    "preserves Vex-like root AI files and adds a Bun Forge rule",
+    "preserves Vex-like root AI files and adds a Kitsmith rule",
     async () => {
       const dir = makeTempProject();
       seedBunTsProject(dir);
@@ -449,7 +449,7 @@ describe("buildAdoptionPlan", () => {
         plan.actions.some(
           (action) =>
             action.kind === "create" &&
-            action.path === ".claude/rules/bun-forge-project-conventions.md",
+            action.path === ".claude/rules/kitsmith-project-conventions.md",
         ),
       ).toBe(true);
       expect(
@@ -480,7 +480,7 @@ describe("applyAdoptionPlan and rollbackAdoption", () => {
     expect(await Bun.file(join(dir, "lefthook.yml")).exists()).toBe(true);
     expect(
       await Bun.file(
-        join(dir, ".bun-forge/backups/2026-04-24T00-00-00-000Z/manifest.json"),
+        join(dir, ".kitsmith/backups/2026-04-24T00-00-00-000Z/manifest.json"),
       ).exists(),
     ).toBe(true);
 

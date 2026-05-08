@@ -11,7 +11,7 @@ export function HomePage() {
         <p className="eyebrow">TanStack Router workspace</p>
         <h1>__PROJECT_NAME__</h1>
         <p>
-          Frontend scaffolded from the official TanStack Router CLI and normalized by bun-forge.
+          Frontend scaffolded from the official TanStack Router CLI and normalized by Kitsmith.
         </p>
       </section>
     </main>

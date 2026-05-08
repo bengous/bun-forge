@@ -17,9 +17,9 @@ paths:
 - scripts exposed by generated `package.json`
 - preset defaults and overlay behavior
 - AI and frontend output when those presets are enabled
-- what bun-forge keeps from native scaffold output
-- what bun-forge overwrites from native scaffold output
-- what bun-forge deletes during cleanup
+- what kitsmith keeps from native scaffold output
+- what kitsmith overwrites from native scaffold output
+- what kitsmith deletes during cleanup
 
 **Decision rule**: If a change modifies generated output, ask whether the change is intended product evolution or accidental drift from an internal refactor or from upstream native scaffold behavior.
 

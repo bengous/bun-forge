@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" role="img" aria-labelledby="title desc">
+  <title id="title">KitSmith social preview</title>
+  <desc id="desc">KitSmith social preview with logo mark and project positioning.</desc>
+  <rect width="1280" height="640" fill="#f7f1e7" />
+  <rect id="mark-container" x="80" y="80" width="480" height="480" rx="16" fill="#fffaf2" />
+  <svg id="social-mark" x="136" y="136" width="368" height="368" viewBox="0 0 1024 1024" overflow="visible">
+    <path id="left-chevron" fill="#172025" d="M 101.9 557.76 L 101.9 511.3 L 309.99 429.4 L 309.99 478.62 L 153.48 534.73 L 309.99 590.44 L 309.99 639.46 Z" />
+    <path id="k-remainder" fill="#172025" d="M 363.99219 301.75781 L 444.65625 301.75781 L 444.65625 463.08594 L 533.52344 462.53906 L 666.96094 710 L 577.27344 710 L 480.47656 526.25 L 444.65625 571.64062 L 444.65625 710 L 363.99219 710 Z" />
+    <path id="k-upper-branch-extended" fill="#c9793f" d="M 444.66 463.09 L 570.98 301.76 L 662.31 301.76 L 533.52 462.54 L 444.66 571.64 Z" />
+    <path id="right-chevron" fill="#172025" d="M 720.96 590.44 L 877.48 534.73 L 720.96 478.62 L 720.96 429.4 L 929.06 511.3 L 929.06 557.76 L 720.96 639.46 Z" />
+  </svg>
+  <text id="social-title" x="648" y="260" fill="#172025" font-family="Liberation Sans, Arial, sans-serif" font-size="118" font-weight="700" letter-spacing="-5">KitSmith</text>
+  <text id="social-line-1" x="648" y="340" fill="#62665f" font-family="Liberation Sans, Arial, sans-serif" font-size="30" font-weight="400">Bun-first project generator</text>
+  <text id="social-line-2" x="648" y="386" fill="#62665f" font-family="Liberation Sans, Arial, sans-serif" font-size="30" font-weight="400">for TypeScript repos</text>
+  <text id="social-line-3" x="648" y="432" fill="#62665f" font-family="Liberation Sans, Arial, sans-serif" font-size="30" font-weight="400">with AI-agent guardrails.</text>
+</svg>

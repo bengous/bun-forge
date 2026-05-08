@@ -1,10 +1,10 @@
-<h1 align="center">bun-forge</h1>
+<h1 align="center">kitsmith</h1>
 
 <p align="center">
-  <img src="./assets/brand/bun-forge-logo-full-640.png" alt="bun-forge logo: a smiling bun holding a forge hammer behind a code anvil" width="360" />
+  <img src="./assets/brand/kitsmith-logo-full-640.png" alt="kitsmith logo: a fused K code mark with wordmark" width="360" />
 </p>
 
-An opinionated Bun project starter for people who code with AI agents and want stronger guardrails from the first commit.
+An opinionated Bun-first project generator for people who code with AI agents and want stronger guardrails from the first commit.
 
 It will not eliminate AI slop. No scaffold can. What it can do is catch obvious bugs earlier, enforce a shared set of conventions, and give agents a project shape that is harder to damage by accident.
 
@@ -42,19 +42,69 @@ This is not a guarantee of good code. It will not replace judgment, review, test
 
 It is a starting point that makes the easy mistakes harder, keeps conventions visible, and reduces the amount of cleanup needed before real work can begin.
 
+## Installation
+
+Run without installing globally:
+
+```bash
+bunx kitsmith@0.1.0 --help
+```
+
+Bun is required. Install it from the [official Bun website](https://bun.com/) if it is not already available. The published CLI uses a Bun shebang and is not a Node-only executable.
+
+Note: `npx kitsmith` works only if Bun is installed and available in `PATH`.
+
 ## Start a new project
 
 ```bash
-bunx bun-forge@0.1.0 my-app --yes
+bunx kitsmith@0.1.0 my-app --yes
 ```
 
 ## Adopt an existing project
 
-Apply the `bun-forge` baseline to an existing Bun/TypeScript project.
+Apply the `kitsmith` baseline to an existing Bun/TypeScript project.
 
 ```bash
-bunx bun-forge@0.1.0 adopt . --apply --yes
+bunx kitsmith@0.1.0 adopt . --apply --yes
 ```
+
+Preview adoption changes without writing:
+
+```bash
+bunx kitsmith@0.1.0 adopt .
+```
+
+## CLI Options
+
+```text
+kitsmith [destination]
+  --name <projectName>
+  --backend <true|false>
+  --frontend <none|tanstack>
+  --ai <true|false>
+  --effect <true|false>
+  --install <true|false>
+  --git-init <true|false>
+  --yes
+
+kitsmith adopt [destination]
+  --name <projectName>
+  --frontend <none|tanstack>
+  --ai <true|false>
+  --effect <true|false>
+  --install <true|false>
+  --apply
+  --rollback <runId>
+  --yes
+```
+
+## Scope
+
+- Bun/TypeScript backend baseline
+- Optional TanStack Router frontend preset
+- Optional Effect starter
+- Optional Claude/Codex agent guardrails
+- Repo validation, formatting, linting, and safety hooks
 
 ## In short
 

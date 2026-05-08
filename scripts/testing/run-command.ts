@@ -20,7 +20,7 @@ export function commandTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_TIMEOUT_MS;
 }
 
-export function bunForgeTempPath(name: string): string {
+export function kitsmithTempPath(name: string): string {
   return join(tmpdir(), name);
 }
 
@@ -28,7 +28,7 @@ export function runCommandEnv(
   env: NodeJS.ProcessEnv = {},
   baseEnv: NodeJS.ProcessEnv = process.env,
 ): NodeJS.ProcessEnv {
-  const tempPath = env["TMPDIR"] ?? baseEnv["TMPDIR"] ?? bunForgeTempPath("bun-tmp");
+  const tempPath = env["TMPDIR"] ?? baseEnv["TMPDIR"] ?? kitsmithTempPath("bun-tmp");
 
   return {
     ...baseEnv,

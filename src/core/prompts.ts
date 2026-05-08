@@ -74,7 +74,7 @@ export async function collectOptionsWithRuntime(
   flags: InitOptionsInput,
   runtime: PromptRuntime = defaultPromptRuntime,
 ): Promise<InitOptions> {
-  runtime.intro("bun-forge");
+  runtime.intro("kitsmith");
 
   const defaultName = defaultProjectName(flags.destination ?? destinationArg);
 

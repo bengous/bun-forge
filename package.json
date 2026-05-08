@@ -1,33 +1,51 @@
 {
-  "name": "bun-forge",
+  "name": "kitsmith",
   "version": "0.1.0",
-  "description": "Opinionated Bun project scaffolder.",
+  "description": "Bun-first project generator for TypeScript repos with AI-agent guardrails.",
   "type": "module",
   "private": false,
+  "keywords": [
+    "bun",
+    "scaffolder",
+    "project-generator",
+    "typescript",
+    "cli",
+    "starter",
+    "template",
+    "ai-agents"
+  ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/bengous/bun-forge.git"
+    "url": "git+https://github.com/bengous/kitsmith.git"
   },
   "bugs": {
-    "url": "https://github.com/bengous/bun-forge/issues"
+    "url": "https://github.com/bengous/kitsmith/issues"
   },
-  "homepage": "https://github.com/bengous/bun-forge#readme",
+  "homepage": "https://github.com/bengous/kitsmith#readme",
   "bin": {
-    "bun-forge": "./src/index.ts"
+    "kitsmith": "dist/index.js"
   },
   "engines": {
     "bun": ">=1.3.13"
   },
+  "packageManager": "bun@1.3.13",
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
-    "assets/brand/bun-forge-logo-full-640.png",
-    "src/**/*.ts",
-    "!src/**/*.test.ts",
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "assets/brand/kitsmith-logo-full-640.png",
     "templates/**/*",
     "!templates/AGENTS.md",
     "template-sources/**/*",
     "!template-sources/AGENTS.md"
   ],
   "scripts": {
+    "build": "bun scripts/build-package.ts",
+    "prepack": "bun run build",
     "dev": "bun run src/index.ts",
     "lint": "oxlint -c .oxlintrc.jsonc --format=unix src/ scripts/ .codex/hooks/ .claude/hooks/",
     "lint:errors": "oxlint -c .oxlintrc.jsonc --quiet --format=unix src/ scripts/ .codex/hooks/ .claude/hooks/",

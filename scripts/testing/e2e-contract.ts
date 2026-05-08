@@ -28,8 +28,8 @@ export async function e2eContract(
   scenario: E2eContractScenario,
   config: ScenarioConfig,
 ): Promise<void> {
-  const dir = await mkdtemp(join(tmpdir(), `bun-forge-e2e-contract-${scenario}-`));
-  const envDir = await mkdtemp(join(tmpdir(), `bun-forge-e2e-env-${scenario}-`));
+  const dir = await mkdtemp(join(tmpdir(), `kitsmith-e2e-contract-${scenario}-`));
+  const envDir = await mkdtemp(join(tmpdir(), `kitsmith-e2e-env-${scenario}-`));
   const projectName = `forge-e2e-${scenario}`;
   const bunTmpDir = join(envDir, "bun-tmp");
   const bunCacheDir = join(envDir, "bun-cache");

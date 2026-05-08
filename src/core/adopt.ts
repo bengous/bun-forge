@@ -98,7 +98,7 @@ export const defaultAdoptRuntime: AdoptRuntime = {
 };
 
 function backupRoot(destination: string, runId: BackupRunId): string {
-  return join(destination, ".bun-forge", "backups", runId);
+  return join(destination, ".kitsmith", "backups", runId);
 }
 
 function backupFilePath(relativePath: SafeRelativePath): SafeRelativePath {
@@ -278,14 +278,14 @@ async function planPackageJson(
     return {
       kind: "skip",
       path: relativePath,
-      reason: "package.json already has Bun Forge wiring",
+      reason: "package.json already has Kitsmith wiring",
     };
   }
 
   return {
     kind: "modify",
     path: relativePath,
-    reason: "Merge Bun Forge scripts and dependencies without overwriting existing entries",
+    reason: "Merge Kitsmith scripts and dependencies without overwriting existing entries",
     content,
   };
 }
@@ -366,10 +366,10 @@ async function planFileContent(
 
   const existing = await readText(target);
   if (existing === content) {
-    return { kind: "skip", path: safePath, reason: "Already matches Bun Forge output" };
+    return { kind: "skip", path: safePath, reason: "Already matches Kitsmith output" };
   }
 
-  return { ...mismatch("Existing file differs from Bun Forge output"), path: safePath };
+  return { ...mismatch("Existing file differs from Kitsmith output"), path: safePath };
 }
 
 function hasExistingFrontend(

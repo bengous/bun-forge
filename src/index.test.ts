@@ -160,7 +160,7 @@ describe("formatCliError", () => {
 describe("runCli", () => {
   test("prints version and exits cleanly", async () => {
     const { runtime, stdout, stderr } = createRuntime();
-    const exitCode = await runCli(["bun", "bun-forge", "--version"], runtime);
+    const exitCode = await runCli(["bun", "kitsmith", "--version"], runtime);
 
     expect(exitCode).toBe(0);
     expect(stdout.join("")).toContain(CLI_VERSION);
@@ -169,7 +169,7 @@ describe("runCli", () => {
 
   test("prints a clean message for invalid boolean values", async () => {
     const { runtime, stderr } = createRuntime();
-    const exitCode = await runCli(["bun", "bun-forge", "--ai", "maybe"], runtime);
+    const exitCode = await runCli(["bun", "kitsmith", "--ai", "maybe"], runtime);
 
     expect(exitCode).toBe(1);
     expect(stderr.join("")).toContain(
@@ -186,7 +186,7 @@ describe("runCli", () => {
       },
     });
 
-    const exitCode = await runCli(["bun", "bun-forge", "--yes", "/tmp/existing"], runtime);
+    const exitCode = await runCli(["bun", "kitsmith", "--yes", "/tmp/existing"], runtime);
 
     expect(exitCode).toBe(1);
     expect(stderr.join("")).toContain(
@@ -202,7 +202,7 @@ describe("runCli", () => {
       },
     });
 
-    const exitCode = await runCli(["bun", "bun-forge"], runtime);
+    const exitCode = await runCli(["bun", "kitsmith"], runtime);
 
     expect(exitCode).toBe(1);
     expect(stderr.join("")).toContain("error: Scaffolding cancelled.");
@@ -230,14 +230,14 @@ describe("runCli", () => {
           {
             kind: "modify",
             path: toSafeRelativePath("package.json"),
-            reason: "Merge Bun Forge scripts and dependencies without overwriting existing entries",
+            reason: "Merge Kitsmith scripts and dependencies without overwriting existing entries",
             content: "{}",
           },
         ],
       }),
     });
 
-    const exitCode = await runCli(["bun", "bun-forge", "adopt", "/tmp/vex-copy", "--yes"], runtime);
+    const exitCode = await runCli(["bun", "kitsmith", "adopt", "/tmp/vex-copy", "--yes"], runtime);
 
     expect(exitCode).toBe(0);
     expect(stdout.join("")).toContain("Adoption plan for /tmp/vex-copy");
@@ -273,7 +273,7 @@ describe("runCli", () => {
     });
 
     const exitCode = await runCli(
-      ["bun", "bun-forge", "adopt", "/tmp/vex-copy", "--yes", "--apply", "--install", "true"],
+      ["bun", "kitsmith", "adopt", "/tmp/vex-copy", "--yes", "--apply", "--install", "true"],
       runtime,
     );
 

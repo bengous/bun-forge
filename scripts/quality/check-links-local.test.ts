@@ -32,7 +32,7 @@ describe("filesContainLinks", () => {
 });
 
 function makeTempDir(): string {
-  const dir = mkdtempSync(join(tmpdir(), "bun-forge-links-"));
+  const dir = mkdtempSync(join(tmpdir(), "kitsmith-links-"));
   tempDirs.push(dir);
   return dir;
 }

@@ -18,7 +18,7 @@ export function smokeScenariosFromArgv(argv: readonly string[]): SmokeScenario[]
 }
 
 export async function smoke(scenario: SmokeScenario, config: ScenarioConfig): Promise<void> {
-  const dir = await mkdtemp(join(tmpdir(), `bun-forge-${scenario}-`));
+  const dir = await mkdtemp(join(tmpdir(), `kitsmith-${scenario}-`));
   try {
     await runCommand(
       [
