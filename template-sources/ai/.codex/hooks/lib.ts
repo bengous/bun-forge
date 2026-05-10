@@ -33,13 +33,14 @@ type Workspace = {
   readonly lintArgs: readonly string[];
   readonly lintConfig: string;
   readonly formatConfig: string;
+  readonly lint: boolean;
+  readonly lintFix: boolean;
+  readonly formatMode: "write" | "check";
 };
 
-const generatedPathPatterns = [
-  /^\.agents\/agents-md-manifest\.json$/,
-  /^apps\/frontend\/src\/routeTree\.gen\.ts$/,
-];
+const generatedPathPatterns = [/^\.agents\/agents-md-manifest\.json$/];
 const generatedAgentPathFallbackPatterns = [/^(?:.+\/)?AGENTS\.md$/];
+
 const lintExtensions = new Set([".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"]);
 const formatExtensions = new Set([
   ".js",
@@ -55,8 +56,6 @@ const formatExtensions = new Set([
   ".toml",
   ".html",
   ".css",
-  ".md",
-  ".mdx",
 ]);
 
 const rootWorkspace: Workspace = {
@@ -64,13 +63,29 @@ const rootWorkspace: Workspace = {
   lintArgs: [],
   lintConfig: ".oxlintrc.jsonc",
   formatConfig: ".oxfmtrc.jsonc",
+  lint: true,
+  lintFix: true,
+  formatMode: "write",
 };
 
-const frontendWorkspace: Workspace = {
-  name: "frontend",
-  lintArgs: ["--type-aware"],
-  lintConfig: "apps/frontend/.oxlintrc.jsonc",
-  formatConfig: "apps/frontend/.oxfmtrc.jsonc",
+const codexHookWorkspace: Workspace = {
+  name: "codex-hooks",
+  lintArgs: [],
+  lintConfig: ".oxlintrc.jsonc",
+  formatConfig: ".oxfmtrc.jsonc",
+  lint: true,
+  lintFix: false,
+  formatMode: "check",
+};
+
+const formatOnlyWorkspace: Workspace = {
+  name: "format-only",
+  lintArgs: [],
+  lintConfig: ".oxlintrc.jsonc",
+  formatConfig: ".oxfmtrc.jsonc",
+  lint: false,
+  lintFix: false,
+  formatMode: "write",
 };
 
 export async function readHookInput(): Promise<HookInput> {
@@ -129,46 +144,18 @@ function stateRootName(root: string): string {
 
 export function extractTouchedPaths(input: HookInput, root = repoRoot(input)): string[] {
   const toolInput = input.tool_input ?? {};
-  const candidates = new Set<string>();
   const cwd = path.resolve(input.cwd ?? root);
 
-  const command = valueAsString(toolInput["command"]);
-  if (command !== undefined) {
-    for (const filePath of extractApplyPatchPaths(command)) {
-      candidates.add(filePath);
-    }
-  }
-
-  for (const key of ["file_path", "filePath", "path"]) {
-    const value = valueAsString(toolInput[key]);
-    if (value !== undefined) {
-      candidates.add(value);
-    }
-  }
-
-  const edits = toolInput["edits"];
-  if (Array.isArray(edits)) {
-    for (const edit of edits) {
-      if (!isRecord(edit)) {
-        continue;
-      }
-      const value = valueAsString(edit["file_path"] ?? edit["filePath"] ?? edit["path"]);
-      if (value !== undefined) {
-        candidates.add(value);
-      }
-    }
-  }
-
-  return [...candidates]
+  return [...new Set(candidateTouchedPaths(toolInput))]
     .map((filePath) => normalizeProjectPath(filePath, root, cwd))
     .filter((filePath): filePath is string => filePath !== null)
-    .sort();
+    .toSorted();
 }
 
 export function extractApplyPatchPaths(patch: string): string[] {
-  const paths = new Set<string>();
   const prefixes = ["*** Add File: ", "*** Update File: ", "*** Delete File: ", "*** Move to: "];
 
+  const paths = new Set<string>();
   for (const rawLine of patch.split(/\r?\n/)) {
     for (const prefix of prefixes) {
       if (rawLine.startsWith(prefix)) {
@@ -178,6 +165,45 @@ export function extractApplyPatchPaths(patch: string): string[] {
   }
 
   return [...paths];
+}
+
+function candidateTouchedPaths(toolInput: Record<string, unknown>): readonly string[] {
+  const command = valueAsString(toolInput["command"]);
+  return [
+    ...(command === undefined ? [] : extractApplyPatchPaths(command)),
+    ...singlePathFields(toolInput),
+    ...editPathFields(toolInput),
+  ];
+}
+
+function singlePathFields(toolInput: Record<string, unknown>): readonly string[] {
+  const paths: string[] = [];
+  for (const key of ["file_path", "filePath", "path"]) {
+    const value = valueAsString(toolInput[key]);
+    if (value !== undefined) {
+      paths.push(value);
+    }
+  }
+  return paths;
+}
+
+function editPathFields(toolInput: Record<string, unknown>): readonly string[] {
+  const edits = toolInput["edits"];
+  if (!Array.isArray(edits)) {
+    return [];
+  }
+
+  const paths: string[] = [];
+  for (const edit of edits) {
+    if (!isRecord(edit)) {
+      continue;
+    }
+    const value = valueAsString(edit["file_path"] ?? edit["filePath"] ?? edit["path"]);
+    if (value !== undefined) {
+      paths.push(value);
+    }
+  }
+  return paths;
 }
 
 export function normalizeProjectPath(filePath: string, root: string, cwd = root): string | null {
@@ -216,7 +242,7 @@ export async function recordTouchedPaths(
 
   const filePath = touchedStatePath(input);
   await mkdir(path.dirname(filePath), { recursive: true });
-  const next = [...new Set([...(await readTouchedPaths(input)), ...paths])].sort();
+  const next = [...new Set([...(await readTouchedPaths(input)), ...paths])].toSorted();
   await writeFile(filePath, `${JSON.stringify(next, null, 2)}\n`, "utf8");
 }
 
@@ -228,7 +254,7 @@ export async function readTouchedPaths(input: HookInput): Promise<string[]> {
 
   const parsed = JSON.parse(await readFile(filePath, "utf8")) as unknown;
   return Array.isArray(parsed)
-    ? parsed.filter((value): value is string => typeof value === "string").sort()
+    ? parsed.filter((value): value is string => typeof value === "string").toSorted()
     : [];
 }
 
@@ -268,62 +294,22 @@ export async function runPostEditQuality(
   }
 
   const existingPaths = paths.filter((filePath) => existsSync(path.join(root, filePath)));
+  const needsProductContract = existingPaths.some((filePath) => isProductSurface(filePath));
   const buckets = bucketByWorkspace(existingPaths);
-  const failures: string[] = [];
+  const failures = (
+    await Promise.all(
+      [...buckets.values()].map(async (bucket) => runBucketQuality(root, bucket, runner)),
+    )
+  ).flat();
 
-  for (const bucket of buckets.values()) {
-    if (bucket.lintFixPaths.length > 0) {
-      const lintFix = await runner(
-        [
-          localTool(root, "oxlint"),
-          ...bucket.workspace.lintArgs,
-          "-c",
-          bucket.workspace.lintConfig,
-          "--fix",
-          "--quiet",
-          ...bucket.lintFixPaths,
-        ],
-        { cwd: root },
+  if (needsProductContract) {
+    const contract = await runner(["bun", "run", "--silent", "test:project-contract"], {
+      cwd: root,
+    });
+    if (contract.code !== 0) {
+      failures.push(
+        batchedCommandFailure("product-contract", ["templates/template-sources"], contract),
       );
-      if (lintFix.code !== 0) {
-        failures.push(batchedCommandFailure("lint --fix", bucket.lintFixPaths, lintFix));
-        continue;
-      }
-    }
-
-    if (bucket.formatPaths.length > 0) {
-      const format = await runner(
-        [
-          localTool(root, "oxfmt"),
-          "--write",
-          "-c",
-          bucket.workspace.formatConfig,
-          ...bucket.formatPaths,
-        ],
-        { cwd: root },
-      );
-      if (format.code !== 0) {
-        failures.push(batchedCommandFailure("format", bucket.formatPaths, format));
-        continue;
-      }
-    }
-
-    if (bucket.lintCheckPaths.length > 0) {
-      const lint = await runner(
-        [
-          localTool(root, "oxlint"),
-          ...bucket.workspace.lintArgs,
-          "-c",
-          bucket.workspace.lintConfig,
-          "--quiet",
-          "--format=unix",
-          ...bucket.lintCheckPaths,
-        ],
-        { cwd: root },
-      );
-      if (lint.code !== 0) {
-        failures.push(batchedCommandFailure("lint", bucket.lintCheckPaths, lint));
-      }
     }
   }
 
@@ -334,6 +320,92 @@ export async function runPostEditQuality(
   // report autofixed content through that channel instead of relying only on
   // filesystem mutation. Avoid echoing whole files into context meanwhile.
   return {};
+}
+
+async function runBucketQuality(
+  root: string,
+  bucket: BucketEntry,
+  runner: CommandRunner,
+): Promise<string[]> {
+  const lintFixFailure = await runLintFix(root, bucket, runner);
+  if (lintFixFailure !== null) {
+    return [lintFixFailure];
+  }
+
+  const formatFailure = await runFormat(root, bucket, runner);
+  if (formatFailure !== null) {
+    return [formatFailure];
+  }
+
+  const lintFailure = await runLintCheck(root, bucket, runner);
+  return lintFailure === null ? [] : [lintFailure];
+}
+
+async function runLintFix(
+  root: string,
+  bucket: BucketEntry,
+  runner: CommandRunner,
+): Promise<string | null> {
+  if (bucket.lintFixPaths.length === 0) {
+    return null;
+  }
+
+  const lintFix = await runner(
+    [
+      localTool(root, "oxlint"),
+      ...bucket.workspace.lintArgs,
+      "-c",
+      bucket.workspace.lintConfig,
+      "--fix",
+      "--quiet",
+      ...bucket.lintFixPaths,
+    ],
+    { cwd: root },
+  );
+  return lintFix.code === 0
+    ? null
+    : batchedCommandFailure("lint --fix", bucket.lintFixPaths, lintFix);
+}
+
+async function runFormat(
+  root: string,
+  bucket: BucketEntry,
+  runner: CommandRunner,
+): Promise<string | null> {
+  if (bucket.formatPaths.length === 0) {
+    return null;
+  }
+
+  const mode = bucket.workspace.formatMode === "write" ? "--write" : "--check";
+  const format = await runner(
+    [localTool(root, "oxfmt"), mode, "-c", bucket.workspace.formatConfig, ...bucket.formatPaths],
+    { cwd: root },
+  );
+  return format.code === 0 ? null : batchedCommandFailure("format", bucket.formatPaths, format);
+}
+
+async function runLintCheck(
+  root: string,
+  bucket: BucketEntry,
+  runner: CommandRunner,
+): Promise<string | null> {
+  if (bucket.lintCheckPaths.length === 0) {
+    return null;
+  }
+
+  const lint = await runner(
+    [
+      localTool(root, "oxlint"),
+      ...bucket.workspace.lintArgs,
+      "-c",
+      bucket.workspace.lintConfig,
+      "--quiet",
+      "--format=unix",
+      ...bucket.lintCheckPaths,
+    ],
+    { cwd: root },
+  );
+  return lint.code === 0 ? null : batchedCommandFailure("lint", bucket.lintCheckPaths, lint);
 }
 
 export async function runStopValidation(
@@ -379,16 +451,23 @@ function workspaceForPath(filePath: string): Workspace | null {
   if (filePath.startsWith("scripts/")) {
     return rootWorkspace;
   }
-  if (filePath.startsWith("apps/frontend/")) {
-    return frontendWorkspace;
+  if (filePath.startsWith(".codex/hooks/")) {
+    return codexHookWorkspace;
   }
-  if (filePath.startsWith("docs/") && formatExtensions.has(extension)) {
+  if (filePath.startsWith(".claude/hooks/")) {
     return rootWorkspace;
   }
-  if (filePath.startsWith(".codex/") && formatExtensions.has(extension)) {
-    return rootWorkspace;
+  if (filePath.startsWith("templates/")) {
+    return formatOnlyWorkspace;
+  }
+  if (filePath.startsWith("template-sources/")) {
+    return formatOnlyWorkspace;
   }
   return null;
+}
+
+function isProductSurface(filePath: string): boolean {
+  return filePath.startsWith("templates/") || filePath.startsWith("template-sources/");
 }
 
 function bucketByWorkspace(filePaths: readonly string[]): Map<Workspace, BucketEntry> {
@@ -404,8 +483,10 @@ function bucketByWorkspace(filePaths: readonly string[]): Map<Workspace, BucketE
       bucket = { workspace, lintFixPaths: [], lintCheckPaths: [], formatPaths: [] };
       buckets.set(workspace, bucket);
     }
-    if (lintExtensions.has(extension)) {
-      bucket.lintFixPaths.push(filePath);
+    if (lintExtensions.has(extension) && workspace.lint) {
+      if (workspace.lintFix) {
+        bucket.lintFixPaths.push(filePath);
+      }
       bucket.lintCheckPaths.push(filePath);
     }
     if (formatExtensions.has(extension)) {
@@ -453,7 +534,7 @@ export function touchedStatePath(input: HookInput): string {
 function generatedPathMessage(paths: readonly string[]): string {
   return `Generated files must not be edited directly: ${paths.join(
     ", ",
-  )}. Edit CLAUDE.md, .claude/rules/*.md, or route files, then run the matching generator.`;
+  )}. Edit CLAUDE.md or .claude/rules/*.md, then run bun run agents:sync.`;
 }
 
 function generatedAgentPathsFromManifest(root: string): {
@@ -493,7 +574,7 @@ function tail(text: string, lines: number): string {
 }
 
 function sanitizeStateKey(value: string): string {
-  return value.replace(/[^a-zA-Z0-9._-]/g, "_");
+  return value.replaceAll(/[^a-zA-Z0-9._-]/g, "_");
 }
 
 function valueAsString(value: unknown): string | undefined {

@@ -32,3 +32,8 @@ Generated output also includes decisions about what native scaffold output is ke
 `kitsmith` dogfoods its own standards. A change is only complete when it keeps the scaffolder repo coherent and also preserves the quality of the projects it generates.
 
 The generated project is part of the product contract. Visible output changes should be treated as deliberate product decisions, not as incidental side effects of internal refactors.
+
+## Quality Output Defaults
+
+`jscpd` uses the `ai` reporter and `noTips: true` intentionally in both the repo and generated projects.
+The duplicate-code gate should emit stable check output for humans, CI, and agents; `noTips` only removes post-run promotional/tip lines and must not hide clone findings, errors, or exit codes.

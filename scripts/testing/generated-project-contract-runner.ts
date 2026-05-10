@@ -534,6 +534,7 @@ async function assertFrontendContract(
   assertPathExists(root, "apps/frontend/playwright.config.ts");
   assertPathExists(root, "apps/frontend/e2e/home.spec.ts");
   await assertFileContains(root, "apps/frontend/playwright.config.ts", "--strictPort");
+  await assertFileContains(root, "apps/frontend/playwright.config.ts", "PLAYWRIGHT_PORT");
   await assertFileContains(root, "apps/frontend/e2e/home.spec.ts", "page.getByRole");
   await assertFileContains(root, "apps/frontend/src/routes/index.tsx", projectName);
   await assertFileContains(root, "apps/frontend/src/routes/index.tsx", "normalized by Kitsmith");
@@ -544,6 +545,11 @@ async function assertFrontendContract(
     root,
     "apps/frontend/.oxlintrc.jsonc",
     '"files": ["vite.config.ts", "playwright.config.ts"]',
+  );
+  await assertFileContains(
+    root,
+    "apps/frontend/tsconfig.node.json",
+    '"include": ["vite.config.ts", "playwright.config.ts"]',
   );
   await assertFileContains(
     root,

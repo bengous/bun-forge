@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
 
+import type { Workspace } from "./format-and-lint-routing.ts";
 import { existsSync } from "node:fs";
 import {
   hasRoutableExtension,
   resolveGeneratedProjectWorkspace,
-  type Workspace,
 } from "./format-and-lint-routing.ts";
 import { resolveBin, resolveProjectRoot } from "./resolve-bin";
 

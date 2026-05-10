@@ -10,9 +10,7 @@ export function HomePage() {
       <section className="hero-card">
         <p className="eyebrow">TanStack Router workspace</p>
         <h1>__PROJECT_NAME__</h1>
-        <p>
-          Frontend scaffolded from the official TanStack Router CLI and normalized by Kitsmith.
-        </p>
+        <p>Frontend scaffolded from the official TanStack Router CLI and normalized by Kitsmith.</p>
       </section>
     </main>
   );

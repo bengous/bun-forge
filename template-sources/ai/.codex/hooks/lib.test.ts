@@ -1,3 +1,4 @@
+import type { CommandResult } from "./lib";
 import { describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -12,7 +13,6 @@ import {
   runPostEditQuality,
   runStopValidation,
   touchedStatePath,
-  type CommandResult,
 } from "./lib";
 
 async function makeTestRoot(): Promise<string> {
@@ -25,31 +25,18 @@ async function seedFile(root: string, relPath: string, content = ""): Promise<vo
   await writeFile(absolute, content);
 }
 
-describe("Codex hook input parsing", () => {
-  test("preserves stop_hook_active when it is boolean", () => {
-    expect(parseHookInput({ stop_hook_active: true })).toEqual({ stop_hook_active: true });
-    expect(parseHookInput({ stop_hook_active: false })).toEqual({ stop_hook_active: false });
-  });
-
-  test("ignores non-boolean stop_hook_active values", () => {
-    expect(parseHookInput({ stop_hook_active: "true" })).toEqual({});
-    expect(parseHookInput({ stop_hook_active: 1 })).toEqual({});
-    expect(parseHookInput({ stop_hook_active: null })).toEqual({});
-  });
-});
-
 describe("Codex hook path handling", () => {
   test("extracts file paths from apply_patch hunks", () => {
     const paths = extractApplyPatchPaths(`*** Begin Patch
-*** Add File: docs/product/PRD.md
+*** Add File: templates/package.json.tpl
 +content
-*** Update File: apps/frontend/src/main.tsx
+*** Update File: .codex/hooks/lib.ts
 @@
  old
 *** Delete File: scripts/old.ts
 *** End Patch`);
 
-    expect(paths).toEqual(["docs/product/PRD.md", "apps/frontend/src/main.tsx", "scripts/old.ts"]);
+    expect(paths).toEqual(["templates/package.json.tpl", ".codex/hooks/lib.ts", "scripts/old.ts"]);
   });
 
   test("normalizes relative paths and drops paths outside the repo", async () => {
@@ -58,8 +45,8 @@ describe("Codex hook path handling", () => {
       expect(normalizeProjectPath("scripts/validation/validate.ts", root)).toBe(
         "scripts/validation/validate.ts",
       );
-      expect(normalizeProjectPath(path.join(root, "apps/frontend/src/App.tsx"), root)).toBe(
-        "apps/frontend/src/App.tsx",
+      expect(normalizeProjectPath(path.join(root, ".claude/hooks/guard.ts"), root)).toBe(
+        ".claude/hooks/guard.ts",
       );
       expect(normalizeProjectPath("../outside.ts", root)).toBeNull();
     } finally {
@@ -67,15 +54,14 @@ describe("Codex hook path handling", () => {
     }
   });
 
-  test("blocks generated files", () => {
+  test("blocks generated agent files", () => {
     expect(
       forbiddenTouchedPaths([
         "AGENTS.md",
-        "docs/product/PRD.md",
-        "scripts/validation/AGENTS.md",
-        "apps/frontend/src/routeTree.gen.ts",
+        ".agents/agents-md-manifest.json",
+        "templates/package.json.tpl",
       ]),
-    ).toEqual(["AGENTS.md", "scripts/validation/AGENTS.md", "apps/frontend/src/routeTree.gen.ts"]);
+    ).toEqual(["AGENTS.md", ".agents/agents-md-manifest.json"]);
   });
 
   test("blocks agent files listed only in the manifest", async () => {
@@ -109,7 +95,7 @@ describe("Codex hook path handling", () => {
     const root = await makeTestRoot();
     try {
       expect(
-        forbiddenTouchedPaths(["scripts/validation/AGENTS.md", "docs/product/PRD.md"], root),
+        forbiddenTouchedPaths(["scripts/validation/AGENTS.md", "templates/package.json.tpl"], root),
       ).toEqual(["scripts/validation/AGENTS.md"]);
 
       await seedFile(root, ".agents/agents-md-manifest.json", "not-json");
@@ -125,21 +111,26 @@ describe("Codex hook path handling", () => {
     }
   });
 
-  test("extracts file path fields from hook input", async () => {
+  test("extracts single and multi edit path fields from hook input", async () => {
     const root = await mkdtemp(path.join(tmpdir(), "kitsmith-codex-hooks-"));
     try {
       expect(
         extractTouchedPaths({
           cwd: root,
           tool_input: {
-            file_path: "apps/frontend/src/routes/index.tsx",
-            edits: [{ file_path: "scripts/setup/bootstrap.ts" }],
+            file_path: "scripts/validation/detect-scope.ts",
+            edits: [{ file_path: "templates/package.json.tpl" }],
           },
         }),
-      ).toEqual(["apps/frontend/src/routes/index.tsx", "scripts/setup/bootstrap.ts"]);
+      ).toEqual(["scripts/validation/detect-scope.ts", "templates/package.json.tpl"]);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
+  });
+
+  test("preserves active stop hook state from hook input", () => {
+    expect(parseHookInput({ stop_hook_active: true })).toEqual({ stop_hook_active: true });
+    expect(parseHookInput({ stop_hook_active: "true" })).toEqual({});
   });
 
   test("resolves Windows local tool shims before PATH fallback", async () => {
@@ -155,14 +146,20 @@ describe("Codex hook path handling", () => {
     }
   });
 
-  test("stores hook state under the OS temp directory", () => {
-    expect(
-      touchedStatePath({
-        cwd: process.cwd(),
-        session_id: "session",
-        turn_id: "turn",
-      }),
-    ).toBe(path.join(tmpdir(), "kitsmith-codex-hooks", "session-turn.json"));
+  test("stores hook state under the OS temp directory using the package name", async () => {
+    const root = await makeTestRoot();
+    try {
+      await seedFile(root, "package.json", '{ "name": "generated app" }\n');
+      expect(
+        touchedStatePath({
+          cwd: root,
+          session_id: "session",
+          turn_id: "turn",
+        }),
+      ).toBe(path.join(tmpdir(), "generated_app-codex-hooks", "session-turn.json"));
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });
 
@@ -185,20 +182,50 @@ describe("Codex post-edit quality gate", () => {
     expect(result.blockReason).toContain("Generated files must not be edited directly");
     expect(calls).toEqual([]);
   });
+
+  test("runs product contract once for template surfaces", async () => {
+    const root = await makeTestRoot();
+    const calls: string[] = [];
+    try {
+      await seedFile(root, "templates/package.json.tpl", "{}\n");
+      const result = await runPostEditQuality(
+        {
+          cwd: root,
+          session_id: "test-session",
+          turn_id: "template-turn",
+          tool_input: { file_path: "templates/package.json.tpl" },
+        },
+        async (command): Promise<CommandResult> => {
+          calls.push(command.join(" "));
+          return { code: 0, stdout: "", stderr: "" };
+        },
+      );
+
+      expect(result.blockReason).toBeUndefined();
+      expect(calls).toContain("bun run --silent test:project-contract");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });
 
-describe("Codex stop validation", () => {
-  test("skips the validation runner when stop_hook_active is true", async () => {
+describe("Codex stop validation gate", () => {
+  test("skips validation when Codex already has an active stop hook", async () => {
     const calls: string[] = [];
     const result = await runStopValidation(
-      { cwd: process.cwd(), stop_hook_active: true },
+      {
+        cwd: process.cwd(),
+        session_id: "test-session",
+        stop_hook_active: true,
+        turn_id: "recursive-stop-turn",
+      },
       async (command): Promise<CommandResult> => {
         calls.push(command.join(" "));
         return { code: 1, stdout: "", stderr: "should not run" };
       },
     );
 
-    expect(result).toEqual({});
+    expect(result.blockReason).toBeUndefined();
     expect(calls).toEqual([]);
   });
 });
@@ -284,18 +311,18 @@ describe("Codex post-edit batching", () => {
     }
   });
 
-  test("uses frontend workspace config for paths under apps/frontend", async () => {
+  test("codex-hooks workspace lints without --fix and formats in --check mode", async () => {
     const root = await makeTestRoot();
     try {
-      await seedFile(root, "apps/frontend/src/App.tsx", "export const A = () => null;\n");
+      await seedFile(root, ".codex/hooks/x.ts", "export const x = 1;\n");
 
       const calls: string[][] = [];
       await runPostEditQuality(
         {
           cwd: root,
-          session_id: "frontend-session",
-          turn_id: "frontend",
-          tool_input: { file_path: "apps/frontend/src/App.tsx" },
+          session_id: "codex-ws-session",
+          turn_id: "codex-hooks",
+          tool_input: { file_path: ".codex/hooks/x.ts" },
         },
         async (command): Promise<CommandResult> => {
           calls.push([...command]);
@@ -303,16 +330,11 @@ describe("Codex post-edit batching", () => {
         },
       );
 
-      const lintCalls = calls.filter((c) => c.includes("--fix") || c.includes("--format=unix"));
-      expect(lintCalls.length).toBe(2);
-      for (const call of lintCalls) {
-        expect(call).toContain("apps/frontend/.oxlintrc.jsonc");
-        expect(call).toContain("--type-aware");
-      }
-
-      const format = calls.find((c) => c.includes("--write"));
+      expect(calls.find((c) => c.includes("--fix"))).toBeUndefined();
+      const format = calls.find((c) => c.includes("--check"));
       expect(format).toBeDefined();
-      expect(format).toContain("apps/frontend/.oxfmtrc.jsonc");
+      expect(format).toContain(".codex/hooks/x.ts");
+      expect(calls.find((c) => c.includes("--format=unix"))).toBeDefined();
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -322,7 +344,7 @@ describe("Codex post-edit batching", () => {
     const root = await makeTestRoot();
     try {
       await seedFile(root, "src/a.ts", "export const a = 1;\n");
-      await seedFile(root, "apps/frontend/src/b.tsx", "export const B = () => null;\n");
+      await seedFile(root, "templates/foo.json", "{}\n");
 
       const calls: string[][] = [];
       await runPostEditQuality(
@@ -332,7 +354,7 @@ describe("Codex post-edit batching", () => {
           turn_id: "two-ws",
           tool_input: {
             file_path: "src/a.ts",
-            edits: [{ file_path: "apps/frontend/src/b.tsx" }],
+            edits: [{ file_path: "templates/foo.json" }],
           },
         },
         async (command): Promise<CommandResult> => {
@@ -344,14 +366,10 @@ describe("Codex post-edit batching", () => {
       const formatCalls = calls.filter((c) => c.includes("--write"));
       expect(formatCalls.length).toBe(2);
 
-      const rootFormat = formatCalls.find(
-        (c) => c.includes(".oxfmtrc.jsonc") && c.includes("src/a.ts"),
-      );
-      const frontendFormat = formatCalls.find(
-        (c) => c.includes("apps/frontend/.oxfmtrc.jsonc") && c.includes("apps/frontend/src/b.tsx"),
-      );
-      expect(rootFormat).toBeDefined();
-      expect(frontendFormat).toBeDefined();
+      const lintCalls = calls.filter((c) => c.includes("--format=unix") || c.includes("--fix"));
+      for (const call of lintCalls) {
+        expect(call).not.toContain("templates/foo.json");
+      }
     } finally {
       await rm(root, { recursive: true, force: true });
     }

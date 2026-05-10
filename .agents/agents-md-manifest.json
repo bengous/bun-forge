@@ -22,7 +22,7 @@
 		"AGENTS.md": {
 			"kind": "root",
 			"sourcePath": "CLAUDE.md",
-			"checksum": "sha256-e8bd0dd19ecae00a53f573467f1033f049775075e984771f912c5b389e95f00e"
+			"checksum": "sha256-7215a129f49fa1afdbc96232786d71f85031f4f291eb103d063fe873a4b40ab6"
 		},
 		"scripts/AGENTS.md": {
 			"kind": "layer",
@@ -62,7 +62,7 @@
 		"template-sources/AGENTS.md": {
 			"kind": "layer",
 			"sourcePath": ".claude/rules/product-architecture.md",
-			"checksum": "sha256-b6f89603d446945ade0222b1cdf123fa214f7da7c8e3557797901c51ae26fc53"
+			"checksum": "sha256-ec47c6a44e909ba130d27c443caba964969a468c04ef9af2a57178c945cf9896"
 		},
 		"templates/AGENTS.md": {
 			"kind": "layer",
@@ -87,7 +87,7 @@
 			"checksum": "sha256-97e7b64049411b0dff27a882ed5d182aba525c65b11507ece3ed550a6cdef012"
 		},
 		".claude/rules/preset-sources-layer.md": {
-			"checksum": "sha256-e888d1c2ed271683f38369035779fbcb4a022ce3906fb561361ae7bb89c17510"
+			"checksum": "sha256-e080a88f95c7bcfd4a56afd5354050ef03dc791978a69a162304a5ff947a2fc7"
 		},
 		".claude/rules/preset-topology.md": {
 			"checksum": "sha256-6e476c6182cf5929b4f62a4883890ab55b8b736a5f5b46f5d25fbb6b435e7b20"
@@ -114,7 +114,7 @@
 			"checksum": "sha256-703b3d25a930da031f406c503d79d1e25c88becdb5c7045081ed115b389a57aa"
 		},
 		"CLAUDE.md": {
-			"checksum": "sha256-e8bd0dd19ecae00a53f573467f1033f049775075e984771f912c5b389e95f00e"
+			"checksum": "sha256-7215a129f49fa1afdbc96232786d71f85031f4f291eb103d063fe873a4b40ab6"
 		}
 	}
 }

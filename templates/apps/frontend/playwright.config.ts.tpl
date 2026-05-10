@@ -1,15 +1,18 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const port = process.env["PLAYWRIGHT_PORT"] ?? "3000";
+const baseURL = `http://127.0.0.1:${port}`;
+
 export default defineConfig({
   testDir: "./e2e",
   reporter: "list",
   use: {
-    baseURL: "http://127.0.0.1:3000",
+    baseURL,
     trace: "retain-on-failure",
   },
   webServer: {
-    command: "bun run dev -- --host 127.0.0.1 --strictPort",
-    url: "http://127.0.0.1:3000",
+    command: `bun run dev -- --host 127.0.0.1 --port ${port} --strictPort`,
+    url: baseURL,
     reuseExistingServer: !process.env["CI"],
     timeout: 120_000,
   },

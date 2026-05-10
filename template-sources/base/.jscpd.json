@@ -11,6 +11,7 @@
   ],
   "minLines": 20,
   "minTokens": 100,
-  "reporters": ["console"],
+  "noTips": true,
+  "reporters": ["ai"],
   "threshold": 2
 }

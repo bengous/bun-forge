@@ -61,6 +61,8 @@
 
 **Manifest discipline**: When the copied preset surface changes, keep `template-sources/manifest.json` aligned with reality.
 
+**Quality output defaults**: Keep copied quality-tool configs explainable as product defaults. For `.jscpd.json`, `reporters: ["ai"]` and `noTips: true` are intentional: generated projects should get compact duplicate-code output without post-run promotional/tip lines, while preserving findings, errors, and exit codes.
+
 **Destructive guard sync**: After editing any `guard-destructive*.ts`, run `bun run guard-destructive:sync` then `bun run guard-destructive:check`.
 
 **Product bias**: Treat copied presets as owned product defaults. Review them in terms of the generated-project contract, not in terms of historical provenance.
