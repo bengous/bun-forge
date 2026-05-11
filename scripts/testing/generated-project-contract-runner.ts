@@ -140,6 +140,7 @@ async function assertRootContract(
   assertPathExists(root, "package.json");
   assertPathExists(root, "README.md");
   assertPathExists(root, "bunfig.toml");
+  assertPathExists(root, ".oxlintrc.jsonc");
   assertPathExists(root, "scripts/validation/validate.ts");
   const validationPlanPath = "scripts/validation/validation-plan.ts";
   assertPathExists(root, validationPlanPath);
@@ -151,6 +152,7 @@ async function assertRootContract(
   await assertFileContains(root, "README.md", "Hooks and validation");
   await assertFileContains(root, "README.md", "glob_matcher: doublestar");
   await assertFileContains(root, "lefthook.yml", "glob_matcher: doublestar");
+  await assertFileContains(root, ".oxlintrc.jsonc", '"correctness": "error"');
   await assertFileContains(
     root,
     "lefthook.yml",
@@ -546,6 +548,7 @@ async function assertFrontendContract(
     "apps/frontend/.oxlintrc.jsonc",
     '"files": ["vite.config.ts", "playwright.config.ts"]',
   );
+  await assertFileContains(root, "apps/frontend/.oxlintrc.jsonc", '"correctness": "error"');
   await assertFileContains(
     root,
     "apps/frontend/tsconfig.node.json",

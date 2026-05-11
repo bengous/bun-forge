@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.2 - 2026-05-12
+
+### Added
+
+- Add `--lint-severity` for adoption workflows.
+
+### Changed
+
+- Make `kitsmith adopt --yes` copy OXLint rules as warnings by default, so existing projects can adopt Kitsmith without immediately failing on a strict lint baseline.
+- Keep newly scaffolded projects on the strict OXLint baseline.
+
 ## 0.1.1 - 2026-05-10
 
 ### Fixed

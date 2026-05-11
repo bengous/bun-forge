@@ -1,12 +1,12 @@
 #!/usr/bin/env bun
 
-import type { AdoptOptionsInput, FrontendPreset, InitOptionsInput } from "./types.ts";
+import type { AdoptOptionsInput, FrontendPreset, InitOptionsInput, LintSeverity } from "./types.ts";
 import { Command, CommanderError } from "commander";
 import { readFileSync } from "node:fs";
 import { adoptProject, deriveAdoptOptions, formatAdoptionPlan } from "./core/adopt.ts";
 import { generateProject } from "./core/generator.ts";
 import { isJsonObject } from "./core/json.ts";
-import { collectOptions, normalizeFlagOptions } from "./core/prompts.ts";
+import { collectAdoptOptions, collectOptions, normalizeFlagOptions } from "./core/prompts.ts";
 
 type Writer = {
   readonly write: (chunk: string) => void;
@@ -14,6 +14,7 @@ type Writer = {
 
 export type CliRuntime = {
   readonly collectOptions: typeof collectOptions;
+  readonly collectAdoptOptions: typeof collectAdoptOptions;
   readonly normalizeFlagOptions: typeof normalizeFlagOptions;
   readonly generateProject: typeof generateProject;
   readonly deriveAdoptOptions: typeof deriveAdoptOptions;
@@ -38,6 +39,7 @@ export const CLI_VERSION = readCliVersion();
 
 export const defaultCliRuntime: CliRuntime = {
   collectOptions,
+  collectAdoptOptions,
   normalizeFlagOptions,
   generateProject,
   deriveAdoptOptions,
@@ -67,6 +69,13 @@ export function parseFrontendPreset(value: string): FrontendPreset {
   throw new Error(`Expected frontend preset none|tanstack, got ${value}`);
 }
 
+export function parseLintSeverity(value: string): LintSeverity {
+  if (value === "warn" || value === "error") {
+    return value;
+  }
+  throw new Error(`Expected lint severity warn|error, got ${value}`);
+}
+
 export function formatCliError(error: unknown): string {
   if (error instanceof Error) {
     if (error.message === "Cancelled") {
@@ -81,6 +90,11 @@ export function formatCliError(error: unknown): string {
     if (error.message.startsWith("Expected frontend preset none|tanstack, got ")) {
       const value = error.message.slice("Expected frontend preset none|tanstack, got ".length);
       return `Invalid frontend preset: expected none or tanstack, got "${value}".`;
+    }
+
+    if (error.message.startsWith("Expected lint severity warn|error, got ")) {
+      const value = error.message.slice("Expected lint severity warn|error, got ".length);
+      return `Invalid lint severity: expected warn or error, got "${value}".`;
     }
 
     if (error.message === "Backend cannot be disabled without a frontend preset") {
@@ -170,6 +184,7 @@ export function buildProgram(runtime: CliRuntime = defaultCliRuntime): Command {
     .option("--ai <enabled>", "install Claude/AGENTS tooling: true | false")
     .option("--effect <enabled>", "install Effect runtime and tooling: true | false")
     .option("--install <enabled>", "run bun install and prepare steps after apply: true | false")
+    .option("--lint-severity <severity>", "adopted OXLint rule severity: warn | error")
     .option("--apply", "apply the adoption plan")
     .option("--rollback <runId>", "rollback a previous adoption run")
     .option("--yes", "skip prompts and use defaults from the destination package")
@@ -193,10 +208,16 @@ export function buildProgram(runtime: CliRuntime = defaultCliRuntime): Command {
           ...(typeof flags["install"] === "string"
             ? { install: parseBoolean(flags["install"]) }
             : {}),
+          ...(typeof flags["lintSeverity"] === "string"
+            ? { lintSeverity: parseLintSeverity(flags["lintSeverity"]) }
+            : {}),
           ...(typeof flags["rollback"] === "string" ? { rollback: flags["rollback"] } : {}),
         };
 
-        const options = await runtime.deriveAdoptOptions(destination, partial);
+        const options =
+          partial.yes === true
+            ? await runtime.deriveAdoptOptions(destination, partial)
+            : await runtime.collectAdoptOptions(destination, partial);
         const plan = await runtime.adoptProject(options);
         if (options.rollback !== undefined) {
           writeLine(runtime.stdout, `Rolled back Kitsmith adoption run ${options.rollback}`);

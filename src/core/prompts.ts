@@ -1,6 +1,14 @@
-import type { FrontendPreset, InitOptions, InitOptionsInput } from "../types.ts";
+import type {
+  AdoptOptions,
+  AdoptOptionsInput,
+  FrontendPreset,
+  InitOptions,
+  InitOptionsInput,
+  LintSeverity,
+} from "../types.ts";
 import { confirm, intro, isCancel, outro, select, text } from "@clack/prompts";
 import { basename, resolve } from "node:path";
+import { deriveAdoptOptions } from "./adopt.ts";
 import { toBinName, toKebabCase, toPackageName, toProjectName } from "./naming.ts";
 
 export type PromptRuntime = {
@@ -43,6 +51,10 @@ function assertNotCancelled<T>(runtime: PromptRuntime, value: T | symbol): T {
 
 function isFrontendPreset(value: string): value is FrontendPreset {
   return value === "none" || value === "tanstack";
+}
+
+function isLintSeverity(value: string): value is LintSeverity {
+  return value === "warn" || value === "error";
 }
 
 function normalizeProjectNameInput(value: string): string {
@@ -228,4 +240,43 @@ export function normalizeFlagOptions(
     gitInit: flags.gitInit ?? true,
     yes: flags.yes ?? false,
   };
+}
+
+export async function collectAdoptOptions(
+  destinationArg: string | undefined,
+  flags: AdoptOptionsInput,
+): Promise<AdoptOptions> {
+  return collectAdoptOptionsWithRuntime(destinationArg, flags);
+}
+
+export async function collectAdoptOptionsWithRuntime(
+  destinationArg: string | undefined,
+  flags: AdoptOptionsInput,
+  runtime: PromptRuntime = defaultPromptRuntime,
+): Promise<AdoptOptions> {
+  runtime.intro("kitsmith adopt");
+
+  let lintSeverity = flags.lintSeverity;
+  if (lintSeverity === undefined) {
+    const selectedSeverity = assertNotCancelled(
+      runtime,
+      await runtime.select({
+        message: "Adopt OXLint rules as",
+        initialValue: "warn",
+        options: [
+          { label: "Warnings", value: "warn" },
+          { label: "Errors", value: "error" },
+        ],
+      }),
+    );
+    lintSeverity = isLintSeverity(selectedSeverity) ? selectedSeverity : "warn";
+  }
+
+  const options = await deriveAdoptOptions(destinationArg, {
+    ...flags,
+    lintSeverity,
+  });
+  runtime.outro(`Planning adoption for ${options.destination}`);
+
+  return options;
 }

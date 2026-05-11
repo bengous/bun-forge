@@ -9,6 +9,7 @@ import {
   formatCliError,
   parseBoolean,
   parseFrontendPreset,
+  parseLintSeverity,
   runCli,
 } from "./index.ts";
 
@@ -23,6 +24,9 @@ function createRuntime(overrides: Partial<CliRuntime> = {}): {
   const runtime: CliRuntime = {
     collectOptions: async () => {
       throw new Error("collectOptions should not be called");
+    },
+    collectAdoptOptions: async () => {
+      throw new Error("collectAdoptOptions should not be called");
     },
     normalizeFlagOptions: () => {
       throw new Error("normalizeFlagOptions should not be called");
@@ -93,6 +97,17 @@ describe("parseFrontendPreset", () => {
   });
 });
 
+describe("parseLintSeverity", () => {
+  test("accepts known severities", () => {
+    expect(parseLintSeverity("warn")).toBe("warn");
+    expect(parseLintSeverity("error")).toBe("error");
+  });
+
+  test("rejects unsupported values", () => {
+    expect(() => parseLintSeverity("off")).toThrow("Expected lint severity warn|error");
+  });
+});
+
 describe("buildProgram", () => {
   test("registers the expected CLI flags", () => {
     const optionNames = buildProgram().options.map((option) => option.long);
@@ -138,6 +153,12 @@ describe("formatCliError", () => {
   test("maps invalid frontend presets to a clean message", () => {
     expect(formatCliError(new Error("Expected frontend preset none|tanstack, got react"))).toBe(
       'Invalid frontend preset: expected none or tanstack, got "react".',
+    );
+  });
+
+  test("maps invalid lint severity to a clean message", () => {
+    expect(formatCliError(new Error("Expected lint severity warn|error, got off"))).toBe(
+      'Invalid lint severity: expected warn or error, got "off".',
     );
   });
 
@@ -219,6 +240,7 @@ describe("runCli", () => {
         ai: true,
         effect: true,
         install: false,
+        lintSeverity: "warn",
         apply: false,
         rollback: undefined,
         yes: true,
@@ -247,10 +269,12 @@ describe("runCli", () => {
   test("parses adoption apply and install flags", async () => {
     let observedApply = false;
     let observedInstall = false;
+    let observedLintSeverity = "";
     const { runtime } = createRuntime({
       deriveAdoptOptions: async (_destination, partial) => {
         observedApply = partial.apply ?? false;
         observedInstall = partial.install ?? false;
+        observedLintSeverity = partial.lintSeverity ?? "";
         return {
           destination: "/tmp/vex-copy",
           projectName: toProjectName("vex"),
@@ -260,6 +284,7 @@ describe("runCli", () => {
           ai: true,
           effect: true,
           install: partial.install ?? false,
+          lintSeverity: partial.lintSeverity ?? "warn",
           apply: partial.apply ?? false,
           rollback: undefined,
           yes: true,
@@ -273,12 +298,57 @@ describe("runCli", () => {
     });
 
     const exitCode = await runCli(
-      ["bun", "kitsmith", "adopt", "/tmp/vex-copy", "--yes", "--apply", "--install", "true"],
+      [
+        "bun",
+        "kitsmith",
+        "adopt",
+        "/tmp/vex-copy",
+        "--yes",
+        "--apply",
+        "--install",
+        "true",
+        "--lint-severity",
+        "error",
+      ],
       runtime,
     );
 
     expect(exitCode).toBe(0);
     expect(observedApply).toBe(true);
     expect(observedInstall).toBe(true);
+    expect(observedLintSeverity).toBe("error");
+  });
+
+  test("uses interactive adoption option collection without --yes", async () => {
+    let usedCollectAdoptOptions = false;
+    const { runtime } = createRuntime({
+      collectAdoptOptions: async (_destination, partial) => {
+        usedCollectAdoptOptions = true;
+        return {
+          destination: "/tmp/vex-copy",
+          projectName: toProjectName("vex"),
+          packageName: toExistingPackageName("vex"),
+          binName: toExistingBinName("vex"),
+          frontend: "none",
+          ai: true,
+          effect: true,
+          install: partial.install ?? false,
+          lintSeverity: partial.lintSeverity ?? "warn",
+          apply: partial.apply ?? false,
+          rollback: undefined,
+          yes: false,
+        };
+      },
+      adoptProject: async (options) => ({
+        destination: options.destination,
+        runId: toBackupRunId("2026-04-24T00-00-00-000Z"),
+        actions: [],
+      }),
+    });
+
+    const exitCode = await runCli(["bun", "kitsmith", "adopt", "/tmp/vex-copy"], runtime);
+
+    expect(exitCode).toBe(0);
+    expect(usedCollectAdoptOptions).toBe(true);
   });
 });

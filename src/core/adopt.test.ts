@@ -103,6 +103,7 @@ function makeOptions(destination: string, overrides: Partial<AdoptOptions> = {})
     ai: true,
     effect: true,
     install: false,
+    lintSeverity: "warn",
     apply: false,
     rollback: undefined,
     yes: true,
@@ -161,6 +162,7 @@ describe("deriveAdoptOptions", () => {
     expect(String(options.binName)).toBe("vex");
     expect(options.frontend).toBe("none");
     expect(options.install).toBe(false);
+    expect(options.lintSeverity).toBe("warn");
   });
 
   test("rejects non-Bun TypeScript packages", async () => {
@@ -321,6 +323,46 @@ describe("buildAdoptionPlan", () => {
     expect(
       plan.actions.some((action) => action.kind === "create" && action.path === ".gitkeep"),
     ).toBe(true);
+  });
+
+  test("downgrades adopted OXLint configs to warnings by default", async () => {
+    const dir = makeTempProject();
+    seedBunTsProject(dir);
+
+    const plan = await buildAdoptionPlan(
+      makeOptions(dir, { frontend: "tanstack", ai: false, lintSeverity: "warn" }),
+    );
+    const lintActions = plan.actions.filter(
+      (action) =>
+        action.kind === "create" &&
+        (action.path === ".oxlintrc.jsonc" || action.path === "apps/frontend/.oxlintrc.jsonc"),
+    );
+
+    expect(lintActions).toHaveLength(2);
+    for (const action of lintActions) {
+      expect(action.kind).toBe("create");
+      if (action.kind !== "create") {
+        throw new Error("Expected create action");
+      }
+      expect(action.content).not.toContain('"error"');
+      expect(action.content).toContain('"warn"');
+    }
+  });
+
+  test("preserves strict adopted OXLint configs when requested", async () => {
+    const dir = makeTempProject();
+    seedBunTsProject(dir);
+
+    const plan = await buildAdoptionPlan(makeOptions(dir, { lintSeverity: "error" }));
+    const lintAction = plan.actions.find(
+      (action) => action.kind === "create" && action.path === ".oxlintrc.jsonc",
+    );
+
+    expect(lintAction?.kind).toBe("create");
+    if (lintAction?.kind !== "create") {
+      throw new Error("Expected .oxlintrc.jsonc create action");
+    }
+    expect(lintAction.content).toContain('"error"');
   });
 
   test("plans the full frontend contract when adopting a new frontend", async () => {

@@ -1,4 +1,5 @@
 export type FrontendPreset = "none" | "tanstack";
+export type LintSeverity = "warn" | "error";
 
 declare const brand: unique symbol;
 
@@ -40,6 +41,7 @@ export type AdoptOptionsInput = {
   readonly ai?: boolean;
   readonly effect?: boolean;
   readonly install?: boolean;
+  readonly lintSeverity?: LintSeverity;
   readonly apply?: boolean;
   readonly rollback?: string;
   readonly yes?: boolean;
@@ -68,6 +70,7 @@ export type AdoptOptions = {
   readonly ai: boolean;
   readonly effect: boolean;
   readonly install: boolean;
+  readonly lintSeverity: LintSeverity;
   readonly apply: boolean;
   readonly rollback: BackupRunId | undefined;
   readonly yes: boolean;

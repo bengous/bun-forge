@@ -3,6 +3,7 @@ import type {
   AdoptOptionsInput,
   BackupRunId,
   BinName,
+  LintSeverity,
   PackageName,
   SafeRelativePath,
   TemplateContext,
@@ -241,9 +242,11 @@ async function planStaticFile(
   sourceRoot: string,
   relativePath: string,
   reason: string,
+  lintSeverity: LintSeverity,
 ): Promise<AdoptionAction> {
   const safePath = toSafeRelativePath(relativePath);
-  const content = await readText(join(sourceRoot, safePath));
+  const raw = await readText(join(sourceRoot, safePath));
+  const content = adoptionStaticFileContent(relativePath, raw, lintSeverity);
   return planFileContent(destination, safePath, content, reason, (mismatchReason) =>
     presetMismatchPolicy(relativePath, reason, mismatchReason),
   );
@@ -252,13 +255,26 @@ async function planStaticFile(
 async function planPresetCopySpec(
   destination: string,
   spec: PresetCopySpec,
+  lintSeverity: LintSeverity,
 ): Promise<AdoptionAction[]> {
   const reason = presetAdoptionReason(spec.name);
   return Promise.all(
     spec.relativePaths.map(async (path) =>
-      planStaticFile(destination, spec.sourceDir, path, reason),
+      planStaticFile(destination, spec.sourceDir, path, reason, lintSeverity),
     ),
   );
+}
+
+function adoptionStaticFileContent(
+  relativePath: string,
+  content: string,
+  lintSeverity: LintSeverity,
+): string {
+  if (lintSeverity === "error" || !relativePath.endsWith(".oxlintrc.jsonc")) {
+    return content;
+  }
+
+  return content.replaceAll('"error"', '"warn"');
 }
 
 async function planPackageJson(
@@ -384,13 +400,14 @@ function hasExistingFrontend(
 async function planPresetCopySpecs(
   destination: string,
   description: GeneratedProjectDescription,
+  lintSeverity: LintSeverity,
 ): Promise<AdoptionAction[]> {
   const preserveExistingFrontend = hasExistingFrontend(destination, description);
   const specs = description.presetCopySpecs.filter(
     (spec) => !shouldOmitPresetDuringAdopt(spec, preserveExistingFrontend),
   );
   const actionSets = await Promise.all(
-    specs.map(async (spec) => planPresetCopySpec(destination, spec)),
+    specs.map(async (spec) => planPresetCopySpec(destination, spec, lintSeverity)),
   );
   return actionSets.flat();
 }
@@ -486,6 +503,7 @@ export function normalizeAdoptOptions(
     ai: flags.ai ?? true,
     effect: flags.effect ?? false,
     install: flags.install ?? false,
+    lintSeverity: flags.lintSeverity ?? "warn",
     apply: flags.apply ?? false,
     rollback: flags.rollback !== undefined ? toBackupRunId(flags.rollback) : undefined,
     yes: flags.yes ?? false,
@@ -516,7 +534,7 @@ export async function buildAdoptionPlan(
   await assertAdoptableProject(options.destination);
   const description = describeAdoptedProject(options);
   const actions: AdoptionAction[] = [
-    ...(await planPresetCopySpecs(options.destination, description)),
+    ...(await planPresetCopySpecs(options.destination, description, options.lintSeverity)),
     ...(await planTemplateRenderSpecs(options.destination, description)),
     ...planExistingFrontendConflict(options.destination, description),
   ];

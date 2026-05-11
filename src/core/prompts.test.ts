@@ -1,8 +1,10 @@
 import type { FrontendPreset, InitOptions } from "../types.ts";
 import type { PromptRuntime } from "./prompts.ts";
 import { describe, expect, test } from "bun:test";
+import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import {
+  collectAdoptOptionsWithRuntime,
   collectOptionsWithRuntime,
   defaultPromptRuntime,
   normalizeFlagOptions,
@@ -29,7 +31,7 @@ function plainOptions(options: InitOptions): Omit<
 function createPromptRuntime(
   responses: {
     readonly texts?: Array<string | symbol>;
-    readonly selects?: Array<FrontendPreset | symbol>;
+    readonly selects?: Array<FrontendPreset | "warn" | "error" | symbol>;
     readonly confirms?: Array<boolean | symbol>;
   },
   resolvedPrefix = "/tmp",
@@ -250,5 +252,43 @@ describe("collectOptionsWithRuntime", () => {
       }
       expect(error.message).toContain("Project name must not be empty");
     }
+  });
+});
+
+describe("collectAdoptOptionsWithRuntime", () => {
+  test("prompts for adoption lint severity", async () => {
+    const root = "/tmp/adopt-prompts";
+    mkdirSync(root, { recursive: true });
+    await Bun.write(
+      `${root}/package.json`,
+      JSON.stringify({ name: "adopt-prompts", scripts: { dev: "bun src/index.ts" } }),
+    );
+    await Bun.write(`${root}/tsconfig.json`, '{"compilerOptions":{}}\n');
+
+    const options = await collectAdoptOptionsWithRuntime(
+      root,
+      { yes: false },
+      createPromptRuntime({ selects: ["error"] }),
+    );
+
+    expect(options.lintSeverity).toBe("error");
+  });
+
+  test("uses explicit adoption lint severity without prompting", async () => {
+    const root = "/tmp/adopt-prompts-explicit";
+    mkdirSync(root, { recursive: true });
+    await Bun.write(
+      `${root}/package.json`,
+      JSON.stringify({ name: "adopt-prompts-explicit", scripts: { dev: "bun src/index.ts" } }),
+    );
+    await Bun.write(`${root}/tsconfig.json`, '{"compilerOptions":{}}\n');
+
+    const options = await collectAdoptOptionsWithRuntime(
+      root,
+      { lintSeverity: "warn", yes: false },
+      createPromptRuntime({}),
+    );
+
+    expect(options.lintSeverity).toBe("warn");
   });
 });
