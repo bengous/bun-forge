@@ -476,6 +476,8 @@ function packageJsonContractForContext(
       : {}),
     devDependencies: {
       ...(context.effect ? { "@effect/language-service": "0.85.1" } : {}),
+      "@commitlint/cli": "21.0.0",
+      "@commitlint/config-conventional": "21.0.0",
       "@types/bun": "1.3.13",
       "dependency-cruiser": "17.4.0",
       jscpd: "4.1.1",
@@ -502,6 +504,7 @@ function rootToolingContractForContext(context: TemplateContext): RootToolingCon
     ...(context.ai ? ["./.codex/hooks", "./.claude/hooks"] : []),
   ];
   const formatGlobs = [
+    "'commitlint.config.js'",
     ...(context.backend ? ["'src/**/*.{ts,tsx,js,jsx,mjs}'"] : []),
     "'scripts/**/*.{ts,tsx,js,jsx,mjs}'",
     ...(context.ai

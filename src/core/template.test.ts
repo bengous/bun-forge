@@ -178,6 +178,8 @@ describe("renderTemplate", () => {
     expect(tsconfig).toContain('".claude/hooks/**/*.ts"');
     expect(tsconfig).not.toContain('"src/**/*.ts"');
     expect(knip).toContain('"apps/frontend"');
+    expect(knip).toContain('"@commitlint/cli"');
+    expect(knip).toContain('"lefthook"');
     expect(knip).toContain('".codex/hooks/**/*.ts"');
     expect(knip).toContain('".claude/hooks/**/*.ts"');
     expect(knip).not.toContain('"src/index.ts"');

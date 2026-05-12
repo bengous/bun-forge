@@ -17,11 +17,13 @@
 
     // `template-sources` files are copied into generated projects by
     // `template-sources/manifest.json`; they are product assets, not imports.
+    "template-sources/base/commitlint.config.js",
     "template-sources/base/.dependency-cruiser.cjs",
     "template-sources/base/scripts/quality/audit-oxlint-rules.ts",
     "template-sources/base/scripts/quality/check-links-local.ts",
     "template-sources/base/scripts/setup/bootstrap-git-config.ts",
     "template-sources/base/scripts/setup/bootstrap-prepare.ts",
+    "template-sources/base/scripts/validation/commit-message.ts",
     "template-sources/base/scripts/validation/detect-scope.ts",
     "template-sources/base/scripts/validation/resolve-bin.ts",
     "template-sources/base/scripts/validation/typecheck-staged.ts",
@@ -49,5 +51,7 @@
     ".codex/hooks/**/*.{ts,tsx,js,jsx,mjs,cjs}",
     ".claude/hooks/**/*.{ts,tsx,js,jsx,mjs,cjs}",
     "template-sources/**/*.{ts,tsx,js,jsx,mjs,cjs}"
-  ]
+  ],
+  // commitlint is invoked by the Git commit-msg hook.
+  "ignoreDependencies": ["@commitlint/cli"]
 }

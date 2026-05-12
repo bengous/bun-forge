@@ -26,5 +26,6 @@ bun run prepare
 ## Hooks and validation
 
 - `lefthook.yml` protects the repo surfaces that Kitsmith generated for this project.
+- Commit messages are checked with Conventional Commits through the `commit-msg` hook.
 - If you move code to new directories, update `lefthook.yml` globs and the validation scripts together.
 - `glob_matcher: doublestar` is enabled so patterns like `src/**/*.ts` still match files directly under `src/`.

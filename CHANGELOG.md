@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.0 - 2026-05-12
+
+### Added
+
+- Add Conventional Commits enforcement to Kitsmith and generated projects through
+  Lefthook `commit-msg` hooks.
+- Add agent-readable commit-message feedback so vague titles such as
+  `Release 0.2.0` are rejected with actionable guidance.
+- Add Cocogitto configuration and maintainer release documentation for Kitsmith
+  itself, while keeping Cocogitto out of generated projects.
+
+### Changed
+
+- Make `kitsmith adopt` install the same Conventional Commits guard as new
+  projects without rewriting existing commit history.
+- Include `commitlint.config.js` in format checks for Kitsmith and generated
+  projects.
+
 ## 0.1.3 - 2026-05-12
 
 ### Changed

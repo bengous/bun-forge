@@ -142,6 +142,8 @@ async function assertRootContract(
   assertPathExists(root, "bunfig.toml");
   assertPathExists(root, ".oxlintrc.jsonc");
   assertPathExists(root, "scripts/validation/validate.ts");
+  assertPathExists(root, "scripts/validation/commit-message.ts");
+  assertPathExists(root, "commitlint.config.js");
   const validationPlanPath = "scripts/validation/validation-plan.ts";
   assertPathExists(root, validationPlanPath);
   assertPathExists(root, "scripts/validation/validation-runner.ts");
@@ -150,8 +152,13 @@ async function assertRootContract(
 
   await assertFileContains(root, "README.md", `# ${projectName}`);
   await assertFileContains(root, "README.md", "Hooks and validation");
+  await assertFileContains(root, "README.md", "Conventional Commits");
   await assertFileContains(root, "README.md", "glob_matcher: doublestar");
   await assertFileContains(root, "lefthook.yml", "glob_matcher: doublestar");
+  await assertFileContains(root, "lefthook.yml", "commit-msg:");
+  await assertFileContains(root, "lefthook.yml", "bun scripts/validation/commit-message.ts {1}");
+  await assertFileContains(root, "commitlint.config.js", "@commitlint/config-conventional");
+  await assertFileContains(root, "knip.jsonc", '"@commitlint/cli"');
   await assertFileContains(root, ".oxlintrc.jsonc", '"correctness": "error"');
   await assertFileContains(
     root,

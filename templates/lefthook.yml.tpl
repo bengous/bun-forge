@@ -26,6 +26,11 @@ __FRONTEND_TYPECHECK_GLOB__      run: bun scripts/validation/typecheck-staged.ts
     gitleaks:
       run: gitleaks protect --staged --no-banner
 
+commit-msg:
+  commands:
+    commitlint:
+      run: bun scripts/validation/commit-message.ts {1}
+
 pre-push:
   commands:
     validate:
