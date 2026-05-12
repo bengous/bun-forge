@@ -6,9 +6,9 @@ paths:
 
 ## Antipattern Coverage
 
-Last audit: 2026-05-07 | OXLint 1.63.0 | TypeScript 6.0.3 | Bun 1.3.13
+Last audit: 2026-05-12 | OXLint 1.64.0 | TypeScript 6.0.3 | Bun 1.3.13
 
-Active rules: 249 | Available candidates: 455
+Active rules: 250 | Available candidates: 456
 
 When upgrading OXLint, TypeScript, or Bun, run `/antipattern-audit`.
 
@@ -16,7 +16,7 @@ When upgrading OXLint, TypeScript, or Bun, run `/antipattern-audit`.
 
 | Plugin     | Active | Focus                                                                          |
 | ---------- | ------ | ------------------------------------------------------------------------------ |
-| eslint     | 96     | Correctness, best practices, no-unused-vars at error                           |
+| eslint     | 97     | Correctness, best practices, no-unused-vars at error                           |
 | typescript | 73     | Type safety, no-explicit-any, no-unsafe-* flow, strict-boolean-expressions     |
 | unicorn    | 40     | Modern JS idioms, array method safety                                          |
 | oxc        | 21     | Oxc-specific: bad comparisons, const analysis, erasing ops                     |
@@ -38,6 +38,7 @@ When upgrading OXLint, TypeScript, or Bun, run `/antipattern-audit`.
 | Invalid regex              | no-invalid-regexp                                    | error |
 | Duplicate keys/cases       | no-dupe-keys, no-duplicate-case                      | error |
 | Constant conditions        | no-constant-condition, no-constant-binary-expression | error |
+| Regex literals             | prefer-regex-literals                               | error |
 | Import cycles              | import/no-cycle                                      | warn  |
 | Shared branch code         | branches-sharing-code                                | warn  |
 | Inefficient set lookup     | prefer-set-has                                       | warn  |
@@ -62,8 +63,8 @@ need human judgment.
 | Error handling         | only-throw-error, missing-throw, no-promise-executor-return                                             | unicorn/error-message, prefer-type-error                                                            | repo, scaffold base, frontend | Throw real errors and avoid swallowed throws.   |
 | Exhaustiveness/flow    | switch-exhaustiveness-check, consistent-return, no-fallthrough, no-unreachable                          | branches-sharing-code, complexity/complexity                                                        | repo, scaffold base, frontend | Block ambiguous control flow; keep refactor smells advisory. |
 | Import hygiene         | no-default-export, first, no-duplicates, consistent-type-specifier-style, consistent-type-imports        | no-cycle, extensions, no-commonjs, no-dynamic-require, unambiguous                                  | repo, scaffold base, frontend | Normalize module shape; keep layout-dependent rules advisory. |
-| Mechanical conventions | logical-assignment-operators, object-shorthand, no-unnecessary-template-expression, prefer-set-has       | prefer-array-find, prefer-array-flat-map, prefer-string-replace-all, prefer-optional-chain          | repo, scaffold base, frontend | Enforce simple low-ambiguity conventions; keep taste/perf calls advisory. |
-| Frontend accessibility | alt-text, aria-props, heading-has-content, interactive-supports-focus, label-has-associated-control     | none currently                                                                                      | scaffold frontend           | Generated frontends must be keyboard/a11y safe. |
+| Mechanical conventions | logical-assignment-operators, object-shorthand, no-unnecessary-template-expression, prefer-set-has, prefer-regex-literals | prefer-array-find, prefer-array-flat-map, prefer-string-replace-all, prefer-optional-chain          | repo, scaffold base, frontend | Enforce simple low-ambiguity conventions; keep taste/perf calls advisory. |
+| Frontend accessibility | alt-text, aria-props, heading-has-content, interactive-supports-focus, label-has-associated-control, no-noninteractive-element-to-interactive-role, no-redundant-roles, prefer-tag-over-role | none currently                                                                                      | scaffold frontend           | Generated frontends must be keyboard/a11y safe. |
 | React correctness      | button-has-type, no-did-update-set-state, jsx-key, jsx-no-duplicate-props, jsx-no-undef                 | self-closing-comp                                                                                   | scaffold frontend           | Block React correctness bugs; keep presentation style advisory. |
 
 ### Known gaps

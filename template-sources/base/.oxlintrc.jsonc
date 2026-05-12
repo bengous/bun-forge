@@ -125,6 +125,7 @@
     "eslint/prefer-const": "warn",
     "eslint/prefer-object-has-own": "warn",
     "eslint/prefer-object-spread": "warn",
+    "eslint/prefer-regex-literals": "error",
     "eslint/prefer-template": "warn",
     "eslint/default-case-last": "warn",
     "typescript/no-empty-object-type": "warn",

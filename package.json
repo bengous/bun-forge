@@ -1,6 +1,6 @@
 {
   "name": "kitsmith",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Bun-first project generator for TypeScript repos with AI-agent guardrails.",
   "type": "module",
   "private": false,
@@ -73,17 +73,17 @@
     "validate:scale": "bun run --silent validate && bun run --silent lint:dead && bun run --silent lint:dupes && bun run --silent check:links && bun run --silent test:e2e-contract && bun run --silent test:smoke"
   },
   "dependencies": {
-    "@clack/prompts": "1.3.0",
+    "@clack/prompts": "1.4.0",
     "commander": "14.0.3"
   },
   "devDependencies": {
     "@types/bun": "1.3.13",
     "dependency-cruiser": "17.4.0",
-    "jscpd": "4.1.0",
-    "knip": "6.12.2",
+    "jscpd": "4.1.1",
+    "knip": "6.13.0",
     "lefthook": "2.1.6",
-    "oxfmt": "0.48.0",
-    "oxlint": "1.63.0",
+    "oxfmt": "0.49.0",
+    "oxlint": "1.64.0",
     "oxlint-plugin-complexity": "2.1.2",
     "oxlint-tsgolint": "0.22.1",
     "typescript": "6.0.3"
