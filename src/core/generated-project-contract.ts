@@ -396,64 +396,43 @@ function generatedFileSpecsForDescription(
   ];
 }
 
+function commandInWorkspace(workspace: string, script: string): string {
+  return `bun --cwd ${workspace} run ${script}`;
+}
+
+function devCommandForContext(context: TemplateContext): string {
+  return context.backend ? "bun run src/index.ts" : commandInWorkspace("apps/frontend", "dev");
+}
+
+function testCommandForContext(context: TemplateContext): string {
+  return [
+    ...(context.backend ? ["bun test ./src"] : []),
+    ...(context.frontend === "tanstack" ? [commandInWorkspace("apps/frontend", "test")] : []),
+    ...(context.ai ? ["bun test ./.codex/hooks ./.claude/hooks"] : []),
+  ].join(" && ");
+}
+
 function packageJsonContractForContext(
   context: TemplateContext,
   rootTooling: RootToolingContract,
 ): PackageJsonContract {
   const lintPaths = rootTooling.lintPaths.join(" ");
-  const archPaths = rootTooling.archPaths.join(" ");
   const formatGlobs = rootTooling.formatGlobs.join(" ");
   const scripts: Record<string, string> = {
-    dev: context.backend ? "bun run src/index.ts" : "bun run dev:frontend",
-    typecheck: "tsc --noEmit --pretty false",
-    lint: `oxlint -c .oxlintrc.jsonc --format=unix ${lintPaths}`,
-    "lint:errors": `oxlint -c .oxlintrc.jsonc --quiet --format=unix ${lintPaths}`,
-    "lint:arch": `dependency-cruiser --config .dependency-cruiser.cjs --output-type err ${archPaths}`,
-    "lint:dead": "knip --include files,dependencies,unlisted,binaries --reporter compact",
-    "lint:dupes": "jscpd --config .jscpd.json",
-    format: `oxfmt --write -c .oxfmtrc.jsonc ${formatGlobs}`,
-    "format:check": `oxfmt --check -c .oxfmtrc.jsonc ${formatGlobs}`,
+    dev: devCommandForContext(context),
+    test: testCommandForContext(context),
     autofix: `oxlint -c .oxlintrc.jsonc --fix ${lintPaths} && oxfmt --write -c .oxfmtrc.jsonc ${formatGlobs}`,
-    test: context.backend
-      ? context.ai
-        ? "bun test ./src && bun run test:hooks"
-        : "bun test ./src"
-      : context.ai
-        ? "bun run test:unit && bun run test:hooks"
-        : "bun run test:unit",
-    "lint:audit": "bun scripts/quality/audit-oxlint-rules.ts",
-    "check:links": "bun scripts/quality/check-links-local.ts",
-    "repo:bootstrap": "bun scripts/setup/bootstrap-git-config.ts",
-    prepare: "bun scripts/setup/bootstrap-prepare.ts",
+    check: "bun scripts/validation/validate.ts --plan check",
+    setup: "bun scripts/setup/bootstrap-git-config.ts && bun scripts/setup/bootstrap-prepare.ts",
     validate: "bun scripts/validation/validate.ts",
-    "validate:scale":
-      "bun run --silent validate && bun run --silent lint:dead && bun run --silent lint:arch && bun run --silent lint:dupes && bun run --silent check:links",
   };
 
   if (context.frontend === "tanstack") {
-    scripts["test:unit"] = "cd apps/frontend && bun run test";
-    scripts["dev:frontend"] = "cd apps/frontend && bun run dev";
-    scripts["typecheck:frontend"] = "cd apps/frontend && bun run typecheck";
-    scripts["lint:frontend"] = "cd apps/frontend && bun run lint";
-    scripts["format:check:frontend"] = "cd apps/frontend && bun run format:check";
-    scripts["lint:arch:frontend"] =
-      "cd apps/frontend && dependency-cruiser --config .dependency-cruiser.cjs --output-type err src e2e playwright.config.ts vite.config.ts";
-    scripts["lint:css:frontend"] = "cd apps/frontend && bun run lint:css";
-    scripts["build:frontend"] = "cd apps/frontend && bun run build";
-    scripts["test:e2e"] = "cd apps/frontend && bunx playwright test";
-    scripts["validate:frontend"] =
-      "bun run --silent typecheck:frontend && cd apps/frontend && bun run --silent test && cd ../.. && bun run --silent lint:frontend && bun run --silent format:check:frontend && bun run --silent lint:arch:frontend && bun run --silent lint:css:frontend && bun run --silent build:frontend && bun run --silent test:e2e";
+    scripts["build"] = commandInWorkspace("apps/frontend", "build");
   }
 
   if (context.ai) {
-    scripts["test:hooks"] = "bun test ./.codex/hooks ./.claude/hooks";
     scripts["agents:sync"] = "bun scripts/agents/sync-agents-md.ts --write";
-    scripts["agents:check"] = "bun scripts/agents/sync-agents-md.ts --check";
-  }
-
-  if (context.effect) {
-    scripts["effect:diagnose"] = "effect-language-service diagnostics --project tsconfig.json";
-    scripts["effect:quickfixes"] = "effect-language-service quickfixes --project tsconfig.json";
   }
 
   return {
@@ -467,7 +446,6 @@ function packageJsonContractForContext(
     ...(context.effect
       ? {
           dependencies: {
-            "@effect/cli": "0.75.1",
             "@effect/platform": "0.96.1",
             "@effect/platform-bun": "0.89.0",
             effect: "3.21.2",

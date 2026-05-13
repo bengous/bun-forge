@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.3.0 - 2026-05-13
+
+### Added
+
+- Add sandboxed release preparation that builds a clean work copy, inspects the exact packed
+  tarball, writes a release manifest, and smoke-tests the packed CLI before publish approval.
+- Add sandboxed generated-project smoke coverage for install, validation, tarball, and supply-chain
+  probe paths.
+- Add explicit validation lanes for `check`, `validate`, `validate:deep`, `validate:generated`, and
+  `validate:sandbox`.
+- Add regression coverage for generated command surfaces, read-only commands, package execution
+  guardrails, routing policy, and sandbox runners.
+
+### Changed
+
+- Simplify generated-project command surfaces by removing maintainer-only sandbox and release
+  commands from scaffolded projects.
+- Route validation through a shared policy so repo-only, generated-project, hook, and sandbox checks
+  stay separated.
+- Harden generated install and smoke workflows so external package execution is constrained to the
+  intended sandbox paths.
+
 ## 0.2.0 - 2026-05-12
 
 ### Added

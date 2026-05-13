@@ -2,24 +2,16 @@
 
 import { CODE_PATTERN, classifyScopes, expandConfigScope, getChangedFiles } from "./detect-scope";
 import { resolveProjectRoot } from "./resolve-bin";
+import { runGeneratedValidationStep } from "./validation-runner.ts";
 
 type StopHookInput = {
   readonly stop_hook_active?: boolean;
 };
 
-function run(label: string, cmd: string[], cwd: string, errors: string[]): void {
-  const result = Bun.spawnSync(cmd, {
-    cwd,
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-
-  if (result.exitCode !== 0) {
-    const output = [result.stderr.toString(), result.stdout.toString()]
-      .filter(Boolean)
-      .join("\n")
-      .trim();
-    errors.push(`[${label}] ${output || `exited with code ${result.exitCode}`}`);
+function runGeneratedStep(step: string, cwd: string, errors: string[]): void {
+  const result = runGeneratedValidationStep(step, cwd);
+  if (result.exit !== 0) {
+    errors.push(`[${result.step}] ${result.output || `exited with code ${result.exit}`}`);
   }
 }
 
@@ -46,20 +38,8 @@ async function readStopHookInput(): Promise<StopHookInput> {
   return {};
 }
 
-async function hasPackageScript(projectRoot: string, scriptName: string): Promise<boolean> {
-  try {
-    const packageJson = (await Bun.file(`${projectRoot}/package.json`).json()) as unknown;
-    return (
-      typeof packageJson === "object" &&
-      packageJson !== null &&
-      "scripts" in packageJson &&
-      typeof packageJson.scripts === "object" &&
-      packageJson.scripts !== null &&
-      scriptName in packageJson.scripts
-    );
-  } catch {
-    return false;
-  }
+async function hasAgentSync(projectRoot: string): Promise<boolean> {
+  return Bun.file(`${projectRoot}/scripts/agents/sync-agents-md.ts`).exists();
 }
 
 async function main(): Promise<void> {
@@ -80,28 +60,20 @@ async function main(): Promise<void> {
   const errors: string[] = [];
 
   if (scopes.has("backend") || scopes.has("scripts")) {
-    run("lint:errors", ["bun", "run", "--silent", "lint:errors"], projectRoot, errors);
-    run("format:check", ["bun", "run", "--silent", "format:check"], projectRoot, errors);
+    runGeneratedStep("format:check", projectRoot, errors);
+    runGeneratedStep("lint:errors", projectRoot, errors);
+    runGeneratedStep("typecheck", projectRoot, errors);
+    runGeneratedStep("test", projectRoot, errors);
   }
   if (scopes.has("frontend")) {
-    run(
-      "typecheck:frontend",
-      ["bun", "run", "--silent", "typecheck:frontend"],
-      projectRoot,
-      errors,
-    );
-    run("lint:frontend", ["bun", "run", "--silent", "lint:frontend"], projectRoot, errors);
-    run("lint:css:frontend", ["bun", "run", "--silent", "lint:css:frontend"], projectRoot, errors);
-    run(
-      "format:check:frontend",
-      ["bun", "run", "--silent", "format:check:frontend"],
-      projectRoot,
-      errors,
-    );
+    runGeneratedStep("typecheck:frontend", projectRoot, errors);
+    runGeneratedStep("lint:frontend", projectRoot, errors);
+    runGeneratedStep("lint:css:frontend", projectRoot, errors);
+    runGeneratedStep("format:check:frontend", projectRoot, errors);
   }
 
-  if (scopes.has("config") && (await hasPackageScript(projectRoot, "agents:check"))) {
-    run("agents:check", ["bun", "run", "--silent", "agents:check"], projectRoot, errors);
+  if (scopes.has("config") && (await hasAgentSync(projectRoot))) {
+    runGeneratedStep("agents:check", projectRoot, errors);
   }
 
   if (errors.length > 0) {

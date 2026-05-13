@@ -1,14 +1,22 @@
 #!/usr/bin/env bun
 
-import type { ScaffoldScenario, ScenarioConfig } from "./scenarios.ts";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import type { SandboxPaths } from "./sandbox-runner.ts";
+import type { ScaffoldScenario } from "./scenarios.ts";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildGeneratedProjectContract } from "../../src/core/generated-project-contract.ts";
-import { toBinName, toPackageName, toProjectName } from "../../src/core/naming.ts";
-import { assertGeneratedProjectContract } from "./generated-project-contract-runner.ts";
-import { runCommand } from "./run-command.ts";
-import { parseScenariosFromArgv, SCAFFOLD_SCENARIO_CONFIG } from "./scenarios.ts";
+import {
+  buildSandboxCommand,
+  createSandboxPaths,
+  hostSecretAbsenceChecks,
+  prepareSandboxRoot,
+  requireLinuxBubblewrap,
+  runSandboxCommand,
+  sandboxTimeoutMs,
+  SANDBOX_ROOT,
+  shellQuote,
+} from "./sandbox-runner.ts";
+import { parseScenariosFromArgv } from "./scenarios.ts";
 
 export type E2eContractScenario = ScaffoldScenario;
 
@@ -20,84 +28,92 @@ const DEFAULT_E2E_CONTRACT_SCENARIOS = [
   "tanstack-ai-effect",
 ] as const satisfies readonly E2eContractScenario[];
 
+const DEFAULT_E2E_CONTRACT_TIMEOUT_MS = 600_000;
+const SANDBOX_PROJECT = `${SANDBOX_ROOT}/project`;
+
+export type E2eContractOptions = {
+  readonly scenarios: readonly E2eContractScenario[];
+  readonly keep: boolean;
+};
+
 export function e2eContractScenariosFromArgv(argv: readonly string[]): E2eContractScenario[] {
   return parseScenariosFromArgv(argv, DEFAULT_E2E_CONTRACT_SCENARIOS);
 }
 
+export function e2eContractOptionsFromArgv(argv: readonly string[]): E2eContractOptions {
+  return {
+    scenarios: e2eContractScenariosFromArgv(argv),
+    keep: argv.includes("--keep"),
+  };
+}
+
+export function e2eContractTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
+  return sandboxTimeoutMs(env, "KITSMITH_E2E_CONTRACT_TIMEOUT_MS", DEFAULT_E2E_CONTRACT_TIMEOUT_MS);
+}
+
+function buildInnerScript(paths: SandboxPaths, scenario: E2eContractScenario): string {
+  const scenarioRunner = shellQuote(
+    join(paths.repoRoot, "scripts/testing/e2e-contract-scenario.ts"),
+  );
+
+  return [
+    "set -euo pipefail",
+    ...hostSecretAbsenceChecks(paths.hostHome),
+    `bun run ${scenarioRunner} --scenario ${shellQuote(scenario)} --project-dir ${shellQuote(
+      SANDBOX_PROJECT,
+    )}`,
+  ].join("\n");
+}
+
+export function buildE2eContractSandboxCommand(
+  paths: SandboxPaths,
+  scenario: E2eContractScenario,
+): string[] {
+  return buildSandboxCommand({
+    paths,
+    chdir: paths.repoRoot,
+    innerScript: buildInnerScript(paths, scenario),
+    mounts: [{ kind: "read-only", source: paths.repoRoot, target: paths.repoRoot }],
+    network: "enabled",
+  });
+}
+
 export async function e2eContract(
   scenario: E2eContractScenario,
-  config: ScenarioConfig,
+  options: { readonly keep: boolean } = { keep: false },
 ): Promise<void> {
-  const dir = await mkdtemp(join(tmpdir(), `kitsmith-e2e-contract-${scenario}-`));
-  const envDir = await mkdtemp(join(tmpdir(), `kitsmith-e2e-env-${scenario}-`));
-  const projectName = `forge-e2e-${scenario}`;
-  const bunTmpDir = join(envDir, "bun-tmp");
-  const bunCacheDir = join(envDir, "bun-cache");
+  requireLinuxBubblewrap("e2e contract");
+
+  const hostSandboxRoot = await mkdtemp(join(tmpdir(), `kitsmith-e2e-contract-${scenario}-`));
+  const paths = await createSandboxPaths(hostSandboxRoot);
 
   try {
-    await mkdir(bunTmpDir, { recursive: true });
-    await mkdir(bunCacheDir, { recursive: true });
+    await prepareSandboxRoot(hostSandboxRoot, ["project"]);
 
-    await runCommand(
-      [
-        "bun",
-        "run",
-        "src/index.ts",
-        dir,
-        "--yes",
-        "--name",
-        projectName,
-        "--backend",
-        String(config.backend),
-        "--frontend",
-        config.frontend,
-        "--ai",
-        String(config.ai),
-        "--effect",
-        String(config.effect),
-        "--git-init",
-        "false",
-        "--install",
-        "false",
-      ],
-      {
-        cwd: process.cwd(),
-        env: {
-          BUN_INSTALL_CACHE_DIR: bunCacheDir,
-          BUN_TMPDIR: bunTmpDir,
-          TMPDIR: bunTmpDir,
-        },
-      },
-    );
+    console.log(`E2E contract sandbox: ${hostSandboxRoot}`);
+    console.log(`E2E contract scenario: ${scenario}`);
 
-    await assertGeneratedProjectContract(
-      dir,
-      buildGeneratedProjectContract({
-        destination: dir,
-        projectName: toProjectName(projectName),
-        packageName: toPackageName(projectName),
-        binName: toBinName(projectName),
-        backend: config.backend,
-        frontend: config.frontend,
-        ai: config.ai,
-        effect: config.effect,
-        install: false,
-        gitInit: false,
-        yes: true,
-      }),
+    await runSandboxCommand(
+      buildE2eContractSandboxCommand(paths, scenario),
+      e2eContractTimeoutMs(),
+      `e2e contract ${scenario}`,
     );
   } finally {
-    await Promise.all([
-      rm(dir, { recursive: true, force: true }),
-      rm(envDir, { recursive: true, force: true }),
-    ]);
+    if (options.keep) {
+      console.log(`E2E contract kept sandbox: ${hostSandboxRoot}`);
+    } else {
+      await rm(hostSandboxRoot, { recursive: true, force: true });
+    }
   }
 }
 
-if (import.meta.main) {
+export async function runE2eContract(options: E2eContractOptions): Promise<void> {
+  requireLinuxBubblewrap("e2e contract");
   await Promise.all(
-    e2eContractScenariosFromArgv(process.argv).map(async (scenario) =>
-      e2eContract(scenario, SCAFFOLD_SCENARIO_CONFIG[scenario]),
-    ),
+    options.scenarios.map(async (scenario) => e2eContract(scenario, { keep: options.keep })),
   );
+}
+
+if (import.meta.main) {
+  await runE2eContract(e2eContractOptionsFromArgv(process.argv));
 }

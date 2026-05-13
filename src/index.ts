@@ -138,7 +138,7 @@ export function buildProgram(runtime: CliRuntime = defaultCliRuntime): Command {
     .option("--frontend <preset>", "frontend preset: none | tanstack")
     .option("--ai <enabled>", "install Claude/AGENTS tooling: true | false")
     .option("--effect <enabled>", "install Effect runtime and tooling: true | false")
-    .option("--install <enabled>", "run bun install and prepare steps: true | false")
+    .option("--install <enabled>", "run bun install and setup steps: true | false")
     .option("--git-init <enabled>", "initialize a git repository: true | false")
     .option("--yes", "skip prompts and use defaults from the destination basename")
     .action(
@@ -183,7 +183,7 @@ export function buildProgram(runtime: CliRuntime = defaultCliRuntime): Command {
     .option("--frontend <preset>", "frontend preset: none | tanstack")
     .option("--ai <enabled>", "install Claude/AGENTS tooling: true | false")
     .option("--effect <enabled>", "install Effect runtime and tooling: true | false")
-    .option("--install <enabled>", "run bun install and prepare steps after apply: true | false")
+    .option("--install <enabled>", "run bun install and setup steps after apply: true | false")
     .option("--lint-severity <severity>", "adopted OXLint rule severity: warn | error")
     .option("--apply", "apply the adoption plan")
     .option("--rollback <runId>", "rollback a previous adoption run")

@@ -273,7 +273,8 @@ describe("buildAdoptionPlan", () => {
 
     const packageJson = packageJsonShape(JSON.parse(packageAction.content) as unknown);
     expect(packageJson.scripts["lint"]).toBe("biome check src/");
-    expect(packageJson.scripts["lint:arch"]).toBeDefined();
+    expect(packageJson.scripts["check"]).toBeDefined();
+    expect(packageJson.scripts["lint:arch"]).toBeUndefined();
     expect(packageJson.dependencies["effect"]).toBe("^3.19.15");
     expect(packageJson.dependencies["@effect/platform-bun"]).toBe("^0.87.1");
     expect(packageJson.dependencies["@effect/platform"]).toBe("0.96.1");
@@ -298,9 +299,7 @@ describe("buildAdoptionPlan", () => {
     expect(packageJson.scripts["agents:sync"]).toBe(
       "bun scripts/agents/sync-agents-md.ts --write --preserve-root",
     );
-    expect(packageJson.scripts["agents:check"]).toBe(
-      "bun scripts/agents/sync-agents-md.ts --check --preserve-root",
-    );
+    expect(packageJson.scripts["agents:check"]).toBeUndefined();
   });
 
   test("plans generated contract preset outputs for AI and Effect adoption", async () => {

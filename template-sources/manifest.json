@@ -15,6 +15,7 @@
       "scripts/validation/detect-scope.ts",
       "scripts/validation/commit-message.ts",
       "scripts/validation/resolve-bin.ts",
+      "scripts/validation/routing-policy.ts",
       "scripts/validation/typecheck-staged.ts",
       "scripts/validation/validate-push.ts",
       "scripts/validation/validate.ts",

@@ -1,14 +1,59 @@
 #!/usr/bin/env bun
 
+import type { Scope } from "./detect-scope";
 import { CODE_PATTERN, classifyScopes, expandConfigScope, getChangedFiles } from "./detect-scope";
 import { resolveProjectRoot } from "./resolve-bin";
+import { LIVE_STOP_VALIDATION_POLICY } from "./validation-plan.ts";
 
 type StopHookInput = {
   readonly stop_hook_active?: boolean;
 };
 
-function run(label: string, cmd: string[], cwd: string, errors: string[]): void {
-  const result = Bun.spawnSync(cmd, {
+function addUnique(steps: string[], nextSteps: readonly string[]): void {
+  for (const step of nextSteps) {
+    if (!steps.includes(step)) {
+      steps.push(step);
+    }
+  }
+}
+
+export function stopValidationSteps(
+  scopes: Set<Scope>,
+  options: {
+    readonly hasAgentsCheck: boolean;
+    readonly hasGuardDestructiveCheck: boolean;
+  },
+): string[] {
+  const steps: string[] = [];
+
+  if (scopes.has("backend") || scopes.has("scripts")) {
+    addUnique(steps, LIVE_STOP_VALIDATION_POLICY.codeSteps);
+  }
+
+  if (scopes.has("product")) {
+    addUnique(steps, LIVE_STOP_VALIDATION_POLICY.productSteps);
+  }
+
+  if (scopes.has("config")) {
+    addUnique(
+      steps,
+      LIVE_STOP_VALIDATION_POLICY.configSteps.filter((step) => {
+        if (step === "agents:check") {
+          return options.hasAgentsCheck;
+        }
+        if (step === "guard-destructive:check") {
+          return options.hasGuardDestructiveCheck;
+        }
+        return true;
+      }),
+    );
+  }
+
+  return steps;
+}
+
+function runStep(step: string, cwd: string, errors: string[]): void {
+  const result = Bun.spawnSync(["bun", "run", "--silent", step], {
     cwd,
     stdout: "pipe",
     stderr: "pipe",
@@ -19,7 +64,7 @@ function run(label: string, cmd: string[], cwd: string, errors: string[]): void 
       .filter(Boolean)
       .join("\n")
       .trim();
-    errors.push(`[${label}] ${output || `exited with code ${result.exitCode}`}`);
+    errors.push(`[${step}] ${output || `exited with code ${result.exitCode}`}`);
   }
 }
 
@@ -78,27 +123,13 @@ async function main(): Promise<void> {
 
   const scopes = expandConfigScope(classifyScopes(codeFiles));
   const errors: string[] = [];
+  const steps = stopValidationSteps(scopes, {
+    hasAgentsCheck: await hasPackageScript(projectRoot, "agents:check"),
+    hasGuardDestructiveCheck: await hasPackageScript(projectRoot, "guard-destructive:check"),
+  });
 
-  if (scopes.has("backend") || scopes.has("scripts")) {
-    run("typecheck", ["bun", "run", "--silent", "typecheck"], projectRoot, errors);
-    run("lint:errors", ["bun", "run", "--silent", "lint:errors"], projectRoot, errors);
-  }
-
-  if (scopes.has("backend") || scopes.has("scripts") || scopes.has("product")) {
-    run("format:check", ["bun", "run", "--silent", "format:check"], projectRoot, errors);
-  }
-
-  if (scopes.has("product")) {
-    run(
-      "test:project-contract",
-      ["bun", "run", "--silent", "test:project-contract"],
-      projectRoot,
-      errors,
-    );
-  }
-
-  if (scopes.has("config") && (await hasPackageScript(projectRoot, "agents:check"))) {
-    run("agents:check", ["bun", "run", "--silent", "agents:check"], projectRoot, errors);
+  for (const step of steps) {
+    runStep(step, projectRoot, errors);
   }
 
   if (errors.length > 0) {

@@ -162,7 +162,6 @@ function withAdoptionPackageScripts(expected: JsonObject, context: TemplateConte
     scripts: {
       ...objectField(expected, "scripts"),
       "agents:sync": "bun scripts/agents/sync-agents-md.ts --write --preserve-root",
-      "agents:check": "bun scripts/agents/sync-agents-md.ts --check --preserve-root",
     },
   };
 }

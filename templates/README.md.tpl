@@ -4,11 +4,13 @@ Opinionated Bun starter generated from Kitsmith presets.
 
 ## Commands
 
-```bash
-bun run dev
-bun run validate
-bun run lint:audit
-```
+- `bun run dev` - starts the local development workflow.
+- `bun run test` - runs fast to medium behavior tests.
+- `bun run autofix` - applies mechanical fixes and mutates files.
+- `bun run check` - runs the fast read-only local gate.
+- `bun run validate` - runs the broader daily read-only gate.
+- `bun run setup` - applies local bootstrap side effects such as Git hook setup.
+__CONDITIONAL_COMMANDS_README__
 
 ## Options selected
 
@@ -20,7 +22,7 @@ bun run lint:audit
 
 ```bash
 bun install
-bun run prepare
+bun run setup
 ```
 
 ## Hooks and validation

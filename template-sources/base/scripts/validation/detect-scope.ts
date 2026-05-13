@@ -1,28 +1,13 @@
+import type { RoutingPresence, RoutingScope } from "./routing-policy.ts";
 import { $ } from "bun";
 import { existsSync } from "node:fs";
+import { classifyRoutingPath, expandConfigRoutingScope } from "./routing-policy.ts";
 
-export type Scope = "backend" | "frontend" | "scripts" | "config";
+export type Scope = RoutingScope;
 
-type WorkspacePresence = {
-  readonly backend: boolean;
-  readonly frontend: boolean;
-};
+type WorkspacePresence = RoutingPresence;
 
 export const CODE_PATTERN = /\.(ts|tsx|js|mjs|cjs|css|html|json|jsonc|md|mdx|toml|ya?ml)$/;
-
-const CONFIG_FILES = new Set([
-  "tsconfig.json",
-  "package.json",
-  "bun.lock",
-  "bunfig.toml",
-  ".oxlintrc.jsonc",
-  ".oxfmtrc.jsonc",
-  "lefthook.yml",
-  ".dependency-cruiser.cjs",
-  ".jscpd.json",
-  "knip.jsonc",
-  "mise.toml",
-]);
 
 function hasFrontendWorkspace(): boolean {
   return existsSync("apps/frontend/package.json");
@@ -40,42 +25,7 @@ function workspacePresence(): WorkspacePresence {
 }
 
 function classifyFileWithWorkspace(filePath: string, presence: WorkspacePresence): Scope | null {
-  const normalized = filePath.replaceAll("\\", "/").replaceAll(/^\.\//g, "");
-
-  if (normalized.startsWith("apps/frontend/") && presence.frontend) {
-    return "frontend";
-  }
-  if (normalized.startsWith("src/") && presence.backend) {
-    return "backend";
-  }
-  if (normalized.startsWith("scripts/")) {
-    return "scripts";
-  }
-  if (normalized.startsWith(".codex/hooks/")) {
-    return "scripts";
-  }
-  if (normalized.startsWith(".claude/hooks/")) {
-    return "scripts";
-  }
-  if (
-    normalized === ".codex/config.toml" ||
-    normalized === ".claude/settings.json" ||
-    normalized === ".agents/agents-md-manifest.json" ||
-    normalized === "CLAUDE.md" ||
-    normalized === "AGENTS.md" ||
-    normalized.startsWith(".claude/rules/")
-  ) {
-    return "config";
-  }
-
-  const basename = normalized.includes("/")
-    ? normalized.slice(normalized.lastIndexOf("/") + 1)
-    : normalized;
-  if (CONFIG_FILES.has(basename)) {
-    return "config";
-  }
-
-  return null;
+  return classifyRoutingPath(filePath, { kind: "generated-project", presence });
 }
 
 export function classifyFile(filePath: string): Scope | null {
@@ -95,19 +45,11 @@ export function classifyScopes(files: string[]): Set<Scope> {
 }
 
 export function expandConfigScope(scopes: Set<Scope>): Set<Scope> {
-  if (!scopes.has("config")) {
-    return scopes;
-  }
-  const expanded = new Set(scopes);
   const presence = workspacePresence();
-  if (presence.backend) {
-    expanded.add("backend");
-  }
-  expanded.add("scripts");
-  if (presence.frontend) {
-    expanded.add("frontend");
-  }
-  return expanded;
+  return expandConfigRoutingScope(scopes, {
+    kind: "generated-project",
+    presence,
+  });
 }
 
 function parseFileList(output: string): string[] {

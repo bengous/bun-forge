@@ -31,7 +31,7 @@ cog commit chore "update release workflow" release
 Use `--edit` when the commit needs a body:
 
 ```bash
-cog commit chore --edit "publish kitsmith 0.2.0" release
+cog commit chore --edit "publish kitsmith 0.3.0" release
 ```
 
 Release commits should explain what changed and why the version is releasable.
@@ -45,8 +45,11 @@ bun run release:prepare
 ```
 
 This command checks the current version, tag availability, npm availability, Cocogitto state,
-repo validation, npm dry-run publishing, package creation, and packed CLI version. It does not
-publish, push, tag, or scaffold temporary generated projects.
+and repo validation. It then builds a clean work copy in a sandbox, creates a scriptless package
+with `npm pack --ignore-scripts`, inspects the exact tarball without network access, writes a
+release manifest, and runs tarball smoke against the packed CLI. Tarball smoke installs the
+packed CLI and scaffolds a minimal generated project inside a disposable sandbox. It does not
+publish, push, tag, or run `npm publish --dry-run`.
 
 Run Cocogitto checks manually when debugging release state:
 
@@ -59,7 +62,7 @@ cog bump --auto --dry-run
 `cog.toml` is configured for `v`-prefixed tags, GitHub links, and `CHANGELOG.md`.
 
 `cog bump --auto --dry-run` follows Conventional Commit SemVer. A `feat(...)` commit proposes the
-next minor version, so a feature commit after `v0.1.3` proposes `v0.2.0`. Use an explicit increment
+next minor version, so a feature commit after `v0.2.0` proposes `v0.3.0`. Use an explicit increment
 only when the maintainer deliberately wants to override the conventional release level.
 
 Do not run non-dry-run `cog bump` as part of routine work yet. Treat version bumping, changelog
@@ -95,9 +98,9 @@ After `bun run release:prepare` passes and the release has explicit human approv
 
 ```bash
 npm publish --access public
-git tag -m "Release 0.2.0" v0.2.0
+git tag -m "Release 0.3.0" v0.3.0
 git push origin main
-git push origin v0.2.0
+git push origin v0.3.0
 npm view kitsmith version dist-tags --json
 ```
 

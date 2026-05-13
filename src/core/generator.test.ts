@@ -12,6 +12,8 @@ import {
   cleanupPathsForOptions,
   enabledPresets,
   generateProjectWithRuntime,
+  TANSTACK_CLI_PACKAGE,
+  tanStackFrontendBootstrapCommand,
   templateFilesForContext,
 } from "./generator.ts";
 import { toBinName, toPackageName, toProjectName } from "./naming.ts";
@@ -169,6 +171,7 @@ describe("describeGeneratedProject", () => {
           "scripts/validation/detect-scope.ts",
           "scripts/validation/commit-message.ts",
           "scripts/validation/resolve-bin.ts",
+          "scripts/validation/routing-policy.ts",
           "scripts/validation/typecheck-staged.ts",
           "scripts/validation/validate-push.ts",
           "scripts/validation/validate.ts",
@@ -346,6 +349,32 @@ describe("enabledPresets", () => {
       "base",
       "effect",
     ]);
+  });
+});
+
+describe("tanStackFrontendBootstrapCommand", () => {
+  test("uses an explicit TanStack CLI version for native frontend scaffolding", () => {
+    const command = tanStackFrontendBootstrapCommand();
+    const floatingTanStackCliPackage = "@tanstack/cli@" + "latest";
+
+    expect(TANSTACK_CLI_PACKAGE).toMatch(/^@tanstack\/cli@\d+\.\d+\.\d+$/);
+    expect(command).toEqual([
+      "bun",
+      "x",
+      "--yes",
+      TANSTACK_CLI_PACKAGE,
+      "create",
+      "frontend",
+      "--router-only",
+      "--package-manager",
+      "bun",
+      "--framework",
+      "React",
+      "--no-install",
+      "--no-git",
+      "--no-examples",
+    ]);
+    expect(command).not.toContain(floatingTanStackCliPackage);
   });
 });
 

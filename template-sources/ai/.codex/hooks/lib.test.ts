@@ -16,7 +16,9 @@ import {
 } from "./lib";
 
 async function makeTestRoot(): Promise<string> {
-  return mkdtemp(path.join(tmpdir(), "kitsmith-codex-hooks-"));
+  const root = await mkdtemp(path.join(tmpdir(), "kitsmith-codex-hooks-"));
+  await seedFile(root, "src/index.ts", "export const main = true;\n");
+  return root;
 }
 
 async function seedFile(root: string, relPath: string, content = ""): Promise<void> {
@@ -183,28 +185,33 @@ describe("Codex post-edit quality gate", () => {
     expect(calls).toEqual([]);
   });
 
-  test("runs product contract once for template surfaces", async () => {
-    const root = await makeTestRoot();
-    const calls: string[] = [];
-    try {
-      await seedFile(root, "templates/package.json.tpl", "{}\n");
-      const result = await runPostEditQuality(
-        {
-          cwd: root,
-          session_id: "test-session",
-          turn_id: "template-turn",
-          tool_input: { file_path: "templates/package.json.tpl" },
-        },
-        async (command): Promise<CommandResult> => {
-          calls.push(command.join(" "));
-          return { code: 0, stdout: "", stderr: "" };
-        },
-      );
+  test("does not route Kitsmith template surfaces in generated projects", async () => {
+    for (const filePath of [
+      "templates/package.json.tpl",
+      "template-sources/ai/.codex/hooks/lib.ts",
+    ]) {
+      const root = await makeTestRoot();
+      const calls: string[] = [];
+      try {
+        await seedFile(root, filePath, "{}\n");
+        const result = await runPostEditQuality(
+          {
+            cwd: root,
+            session_id: "test-session",
+            turn_id: filePath.replaceAll("/", "-"),
+            tool_input: { file_path: filePath },
+          },
+          async (command): Promise<CommandResult> => {
+            calls.push(command.join(" "));
+            return { code: 0, stdout: "", stderr: "" };
+          },
+        );
 
-      expect(result.blockReason).toBeUndefined();
-      expect(calls).toContain("bun run --silent test:project-contract");
-    } finally {
-      await rm(root, { recursive: true, force: true });
+        expect(result.blockReason).toBeUndefined();
+        expect(calls).toEqual([]);
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
     }
   });
 });
@@ -268,7 +275,7 @@ describe("Codex post-edit batching", () => {
       expect(format).toBeDefined();
       expect(format).toContain("src/a.ts");
       expect(format).toContain("src/b.ts");
-      expect(format).toContain("src/c.json");
+      expect(format).not.toContain("src/c.json");
 
       const lintCheck = calls.find((c) => c.includes("--format=unix"));
       expect(lintCheck).toBeDefined();
@@ -364,7 +371,9 @@ describe("Codex post-edit batching", () => {
       );
 
       const formatCalls = calls.filter((c) => c.includes("--write"));
-      expect(formatCalls.length).toBe(2);
+      expect(formatCalls.length).toBe(1);
+      expect(formatCalls[0]).toContain("src/a.ts");
+      expect(formatCalls[0]).not.toContain("templates/foo.json");
 
       const lintCalls = calls.filter((c) => c.includes("--format=unix") || c.includes("--fix"));
       for (const call of lintCalls) {

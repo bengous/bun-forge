@@ -67,6 +67,47 @@ function assertJsonRecordExact(
   }
 }
 
+function assertNoExternalPackageExecutorScripts(scripts: JsonObject, label: string): void {
+  const forbiddenExecutorPattern = /\b(?:bun\s+x|bunx|npx)\b/;
+
+  for (const [scriptName, script] of Object.entries(scripts)) {
+    if (typeof script !== "string") {
+      continue;
+    }
+    if (forbiddenExecutorPattern.test(script)) {
+      throw new Error(
+        `Expected ${label} script ${scriptName} to avoid package executors, got ${JSON.stringify(
+          script,
+        )}`,
+      );
+    }
+  }
+}
+
+async function assertGeneratedValidationRunnerAvoidsPackageExecutors(root: string): Promise<void> {
+  const relativePath = "scripts/validation/validation-runner.ts";
+  const content = await Bun.file(join(root, relativePath)).text();
+  const forbiddenSnippets = [
+    "bun x",
+    "bunx",
+    "npx",
+    '[process.execPath, "x"',
+    '[process.execPath,"x"',
+    '"bun", "x"',
+    '"bun","x"',
+  ];
+
+  for (const snippet of forbiddenSnippets) {
+    if (content.includes(snippet)) {
+      throw new Error(
+        `Expected ${relativePath} hidden validation commands to avoid package executors, found ${JSON.stringify(
+          snippet,
+        )}`,
+      );
+    }
+  }
+}
+
 function assertOptionalJsonRecordExact(
   source: unknown,
   expected: Readonly<Record<string, string>> | undefined,
@@ -149,6 +190,8 @@ async function assertRootContract(
   assertPathExists(root, "scripts/validation/validation-runner.ts");
   assertPathExists(root, "knip.jsonc");
   assertPathExists(root, "scripts/quality/check-links-local.ts");
+  assertNoExternalPackageExecutorScripts(packageScripts, "root package");
+  await assertGeneratedValidationRunnerAvoidsPackageExecutors(root);
 
   await assertFileContains(root, "README.md", `# ${projectName}`);
   await assertFileContains(root, "README.md", "Hooks and validation");
@@ -158,7 +201,9 @@ async function assertRootContract(
   await assertFileContains(root, "lefthook.yml", "commit-msg:");
   await assertFileContains(root, "lefthook.yml", "bun scripts/validation/commit-message.ts {1}");
   await assertFileContains(root, "commitlint.config.js", "@commitlint/config-conventional");
+  assertPathExists(root, "scripts/validation/routing-policy.ts");
   await assertFileContains(root, "knip.jsonc", '"@commitlint/cli"');
+  await assertFileContains(root, "knip.jsonc", '"jscpd"');
   await assertFileContains(root, ".oxlintrc.jsonc", '"correctness": "error"');
   await assertFileContains(
     root,
@@ -199,7 +244,8 @@ async function assertRootContract(
   assertPathMissing(root, "node_modules");
   await assertFileContains(root, validationPlanPath, "GENERATED_PROJECT_VALIDATE_PLAN");
   await assertFileContains(root, validationPlanPath, "GENERATED_PROJECT_PUSH_VALIDATION_POLICY");
-  await assertFileContains(root, validationPlanPath, "validate:frontend");
+  await assertFileContains(root, validationPlanPath, "build:frontend");
+  await assertFileExcludes(root, validationPlanPath, "validate:frontend");
   await assertFileExcludes(root, validationPlanPath, "guard-destructive:check");
   await assertFileExcludes(root, validationPlanPath, "test:project-contract");
 }
@@ -247,11 +293,7 @@ async function assertBackendContract(
     contract.packageJson.scripts["test"],
     "frontend-only test script",
   );
-  assertEqual(
-    packageScripts["test:unit"],
-    contract.packageJson.scripts["test:unit"],
-    "test:unit script",
-  );
+  assertUndefined(packageScripts["test:unit"], "test:unit script");
   assertPathMissing(root, "src/index.ts");
   assertPathMissing(root, "src/index.test.ts");
   if (lefthook.includes('- "src/**/*.ts"')) {
@@ -275,7 +317,7 @@ async function assertEffectContract(
   if (contract.shape.effect) {
     assertPathExists(root, ".gitkeep");
     assertObjectHasKey(dependencies, "effect", "dependencies");
-    assertObjectHasKey(dependencies, "@effect/cli", "dependencies");
+    assertUndefined(dependencies["@effect/cli"], "@effect/cli dependency");
     assertObjectHasKey(dependencies, "@effect/platform", "dependencies");
     assertObjectHasKey(dependencies, "@effect/platform-bun", "dependencies");
     assertObjectHasKey(devDependencies, "@effect/language-service", "devDependencies");
@@ -285,8 +327,8 @@ async function assertEffectContract(
       "dependencies",
     );
     assertJsonRecordExact(devDependencies, contract.packageJson.devDependencies, "devDependencies");
-    assertDefined(packageScripts["effect:diagnose"], "effect:diagnose script");
-    assertDefined(packageScripts["effect:quickfixes"], "effect:quickfixes script");
+    assertUndefined(packageScripts["effect:diagnose"], "effect:diagnose script");
+    assertUndefined(packageScripts["effect:quickfixes"], "effect:quickfixes script");
     if (!tsconfig.includes("@effect/language-service")) {
       throw new Error("Expected tsconfig to include @effect/language-service");
     }
@@ -316,6 +358,7 @@ async function assertAiContract(
     assertPathMissing(root, "scripts/validation/format-and-lint-routing.ts");
     assertPathMissing(root, "scripts/validation/validate-on-stop.ts");
     assertUndefined(packageScripts["agents:sync"], "agents:sync script");
+    assertUndefined(packageScripts["agents:check"], "agents:check script");
     return;
   }
 
@@ -456,12 +499,8 @@ async function assertAiContract(
   await assertFileExcludes(root, ".dependency-cruiser.cjs", '"^\\\\.codex/hooks/",');
 
   assertDefined(packageScripts["agents:sync"], "agents:sync script");
-  assertDefined(packageScripts["agents:check"], "agents:check script");
-  assertEqual(
-    packageScripts["test:hooks"],
-    contract.packageJson.scripts["test:hooks"],
-    "test:hooks script",
-  );
+  assertUndefined(packageScripts["agents:check"], "agents:check script");
+  assertUndefined(packageScripts["test:hooks"], "test:hooks script");
 }
 
 async function assertGeneratedAgentsManifest(
@@ -513,6 +552,7 @@ async function assertFrontendContract(
     await assertFileExcludes(root, "lefthook.yml", "apps/frontend/**/*.{ts,tsx}");
     assertUndefined(packageJson["workspaces"], "workspaces");
     assertUndefined(packageScripts["validate:frontend"], "validate:frontend script");
+    assertUndefined(packageScripts["build"], "root build script");
     return;
   }
 
@@ -524,15 +564,16 @@ async function assertFrontendContract(
   if (!Array.isArray(workspaces) || workspaces.length !== 1 || workspaces[0] !== "apps/*") {
     throw new Error('Expected root workspaces to equal ["apps/*"] for TanStack scenario');
   }
-  const validateFrontend = packageScripts["validate:frontend"];
-  if (typeof validateFrontend !== "string") {
-    throw new TypeError("Expected validate:frontend script for TanStack scenario");
+  assertEqual(packageScripts["build"], contract.packageJson.scripts["build"], "root build script");
+  assertUndefined(packageScripts["validate:frontend"], "validate:frontend script");
+  assertUndefined(packageScripts["test:e2e"], "test:e2e script");
+  assertUndefined(packageScripts["build:frontend"], "build:frontend script");
+  assertUndefined(packageScripts["typecheck:frontend"], "typecheck:frontend script");
+  if (String(packageScripts["test"]).includes("build")) {
+    throw new Error("Expected root test script not to hide frontend build");
   }
-  if (!validateFrontend.includes("bun run --silent test")) {
-    throw new Error("Expected validate:frontend to run frontend tests");
-  }
-  if (!validateFrontend.includes("bun run --silent test:e2e")) {
-    throw new Error("Expected validate:frontend to include Playwright e2e");
+  if (String(packageScripts["test"]).includes("test:e2e")) {
+    throw new Error("Expected root test script not to hide frontend e2e");
   }
 
   assertPathExists(root, "apps/frontend/package.json");
@@ -542,8 +583,14 @@ async function assertFrontendContract(
   assertPathExists(root, "apps/frontend/src/testing/setup.ts");
   assertPathExists(root, "apps/frontend/playwright.config.ts");
   assertPathExists(root, "apps/frontend/e2e/home.spec.ts");
+  assertNoExternalPackageExecutorScripts(frontendScripts, "frontend package");
   await assertFileContains(root, "apps/frontend/playwright.config.ts", "--strictPort");
   await assertFileContains(root, "apps/frontend/playwright.config.ts", "PLAYWRIGHT_PORT");
+  await assertFileContains(
+    root,
+    "apps/frontend/playwright.config.ts",
+    "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH",
+  );
   await assertFileContains(root, "apps/frontend/e2e/home.spec.ts", "page.getByRole");
   await assertFileContains(root, "apps/frontend/src/routes/index.tsx", projectName);
   await assertFileContains(root, "apps/frontend/src/routes/index.tsx", "normalized by Kitsmith");

@@ -71,18 +71,19 @@ describe("templateValues", () => {
     const values = templateValues(frontendAiContext);
     expect(values["WORKSPACES_BLOCK"]).toContain('"workspaces": [');
     expect(values["WORKSPACES_BLOCK"]).toContain('"apps/*"');
-    expect(values["AI_SCRIPTS"]).toContain('"agents:check"');
-    expect(values["FRONTEND_SCRIPTS"]).toContain('"validate:frontend"');
+    expect(values["AI_SCRIPTS"]).toContain('"agents:sync"');
+    expect(values["AI_SCRIPTS"]).not.toContain('"agents:check"');
+    expect(values["FRONTEND_SCRIPTS"]).toContain('"build"');
+    expect(values["FRONTEND_SCRIPTS"]).not.toContain('"validate:frontend"');
     expect(values["BIN_BLOCK"]).toBe("");
     expect(values["ROOT_LINT_PATHS"]).toBe("scripts/ .codex/hooks/ .claude/hooks/");
   });
 
   test("includes Effect tokens when effect is enabled", () => {
     const values = templateValues(effectContext);
-    expect(values["EFFECT_SCRIPTS"]).toContain('"effect:diagnose"');
-    expect(values["EFFECT_SCRIPTS"]).toContain('"effect:quickfixes"');
+    expect(values["EFFECT_SCRIPTS"]).toBe("");
     expect(values["EFFECT_DEPENDENCIES_BLOCK"]).toContain('"effect"');
-    expect(values["EFFECT_DEPENDENCIES_BLOCK"]).toContain('"@effect/cli"');
+    expect(values["EFFECT_DEPENDENCIES_BLOCK"]).not.toContain('"@effect/cli"');
     expect(values["EFFECT_DEPENDENCIES_BLOCK"]).toContain('"@effect/platform"');
     expect(values["EFFECT_DEPENDENCIES_BLOCK"]).toContain('"@effect/platform-bun"');
     expect(values["ROOT_DEV_DEPENDENCIES"]).toContain('"@effect/language-service"');
@@ -110,22 +111,18 @@ describe("templateValuesFromContract characterization", () => {
     expect(values["WORKSPACES_BLOCK"]).toBe('  "workspaces": [\n    "apps/*"\n  ],\n');
     expect(values["FRONTEND_PACKAGE_NAME"]).toBe("@forge-frontend/frontend");
     expect(values["FRONTEND_SCRIPTS"]).toContain(
-      '    "dev:frontend": "cd apps/frontend && bun run dev",\n',
+      '    "build": "bun --cwd apps/frontend run build",\n',
     );
-    expect(values["FRONTEND_SCRIPTS"]).toContain(
-      '    "test:e2e": "cd apps/frontend && bunx playwright test",\n',
-    );
+    expect(values["FRONTEND_SCRIPTS"]).not.toContain("test:e2e");
     expect(values["FRONTEND_LEFTHOOK_COMMAND"]).toContain("frontend-oxc:");
     expect(values["FRONTEND_TYPECHECK_GLOB"]).toBe('        - "apps/frontend/**/*.{ts,tsx}"\n');
     expect(values["FRONTEND_PACKAGE_SCRIPTS"]).toContain('    "dev": "vite dev --port 3000"');
   });
 
-  test("projects Effect script, dependency, and tsconfig plugin tokens", () => {
+  test("projects Effect dependency and tsconfig plugin tokens without public scripts", () => {
     const values = templateValuesFromContract(contractFor(effectContext));
 
-    expect(values["EFFECT_SCRIPTS"]).toBe(
-      '    "effect:diagnose": "effect-language-service diagnostics --project tsconfig.json",\n    "effect:quickfixes": "effect-language-service quickfixes --project tsconfig.json",\n',
-    );
+    expect(values["EFFECT_SCRIPTS"]).toBe("");
     expect(values["EFFECT_DEPENDENCIES_BLOCK"]).toContain('  "dependencies": {');
     expect(values["EFFECT_DEPENDENCIES_BLOCK"]).toContain('    "effect": ');
     expect(values["ROOT_DEV_DEPENDENCIES"]).toContain('    "@effect/language-service": "0.85.1"');
@@ -139,9 +136,14 @@ describe("renderTemplate", () => {
     const rendered = renderTemplate("package.json.tpl", frontendAiContext);
     expect(rendered).toContain('"name": "forge-frontend"');
     expect(rendered).toContain('"agents:sync"');
-    expect(rendered).toContain('"validate:frontend"');
-    expect(rendered).toContain('"dev": "bun run dev:frontend"');
-    expect(rendered).toContain('"test:hooks": "bun test ./.codex/hooks ./.claude/hooks"');
+    expect(rendered).toContain('"build": "bun --cwd apps/frontend run build"');
+    expect(rendered).toContain('"dev": "bun --cwd apps/frontend run dev"');
+    expect(rendered).toContain(
+      '"test": "bun --cwd apps/frontend run test && bun test ./.codex/hooks ./.claude/hooks"',
+    );
+    expect(rendered).not.toContain('"validate:frontend"');
+    expect(rendered).not.toContain('"test:hooks"');
+    expect(rendered).not.toContain('"agents:check"');
     expect(rendered).not.toContain("__");
   });
 
@@ -179,6 +181,7 @@ describe("renderTemplate", () => {
     expect(tsconfig).not.toContain('"src/**/*.ts"');
     expect(knip).toContain('"apps/frontend"');
     expect(knip).toContain('"@commitlint/cli"');
+    expect(knip).toContain('"jscpd"');
     expect(knip).toContain('"lefthook"');
     expect(knip).toContain('".codex/hooks/**/*.ts"');
     expect(knip).toContain('".claude/hooks/**/*.ts"');
@@ -189,7 +192,7 @@ describe("renderTemplate", () => {
     const rendered = renderTemplate("package.json.tpl", effectContext);
     expect(rendered).toContain('"effect"');
     expect(rendered).toContain('"@effect/language-service"');
-    expect(rendered).toContain('"effect:diagnose"');
+    expect(rendered).not.toContain('"effect:diagnose"');
     expect(rendered).not.toContain("__");
   });
 

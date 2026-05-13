@@ -74,7 +74,9 @@ async function main(): Promise<void> {
   );
 
   await runCommand(["bun", "run", "agents:sync"], { cwd: destination });
-  await runCommand(["bun", "run", "agents:check"], { cwd: destination });
+  await runCommand(["bun", "scripts/agents/sync-agents-md.ts", "--check", "--preserve-root"], {
+    cwd: destination,
+  });
   await runCommand(["bun", "install"], { cwd: destination });
   await runCommand(["bun", "run", "typecheck"], { cwd: destination });
   await runCommand(["bun", "test", "src/", "--ignore", "**/*e2e*/**"], { cwd: destination });

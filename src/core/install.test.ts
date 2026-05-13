@@ -147,7 +147,7 @@ describe("finalizeProject", () => {
       ["bun", "scripts/agents/sync-agents-md.ts", "--write"],
       ["git", "init"],
       ["bun", "install"],
-      ["bun", "run", "prepare"],
+      ["bun", "run", "setup"],
       ["mise", "install"],
     ]);
   });
