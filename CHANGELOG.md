@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1 - 2026-05-13
+
+### Changed
+
+- Update the quality-tooling patch baseline: `@commitlint/cli` 21.0.1,
+  `@commitlint/config-conventional` 21.0.1, and `knip` 6.13.1.
+
 ## 0.3.0 - 2026-05-13
 
 ### Added
