@@ -16,7 +16,9 @@ import {
 } from "./lib";
 
 async function makeTestRoot(): Promise<string> {
-  return mkdtemp(path.join(tmpdir(), "kitsmith-codex-hooks-"));
+  const root = await mkdtemp(path.join(tmpdir(), "kitsmith-codex-hooks-"));
+  await seedFile(root, "src/index.ts", "export const main = true;\n");
+  return root;
 }
 
 async function seedFile(root: string, relPath: string, content = ""): Promise<void> {
@@ -178,7 +180,7 @@ describe("Codex post-edit quality gate", () => {
     expect(calls).toEqual([]);
   });
 
-  test("runs product contract once for template surfaces", async () => {
+  test("does not run product contract checks during post-edit repair", async () => {
     const calls: string[] = [];
     const result = await runPostEditQuality(
       {
@@ -194,7 +196,7 @@ describe("Codex post-edit quality gate", () => {
     );
 
     expect(result.blockReason).toBeUndefined();
-    expect(calls).toContain("bun run --silent test:project-contract");
+    expect(calls).not.toContain("bun run --silent test:project-contract");
   });
 });
 

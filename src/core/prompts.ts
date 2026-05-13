@@ -165,7 +165,7 @@ export async function collectOptionsWithRuntime(
     assertNotCancelled(
       runtime,
       await runtime.confirm({
-        message: "Run bun install, prepare, and mise install when available?",
+        message: "Run bun install, setup, and mise install when available?",
         initialValue: true,
       }),
     );

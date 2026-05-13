@@ -1,10 +1,21 @@
 #!/usr/bin/env bun
 
+import type { SandboxPaths } from "./sandbox-runner.ts";
 import type { ScaffoldScenario, ScenarioConfig } from "./scenarios.ts";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runCommand } from "./run-command.ts";
+import {
+  buildSandboxCommand,
+  createSandboxPaths,
+  hostSecretAbsenceChecks,
+  prepareSandboxRoot,
+  requireLinuxBubblewrap,
+  runSandboxCommand,
+  sandboxTimeoutMs,
+  SANDBOX_ROOT,
+  shellQuote,
+} from "./sandbox-runner.ts";
 import {
   ALL_SCAFFOLD_SCENARIOS,
   parseScenariosFromArgv,
@@ -12,6 +23,14 @@ import {
 } from "./scenarios.ts";
 
 export type SmokeScenario = ScaffoldScenario;
+
+const DEFAULT_SMOKE_TIMEOUT_MS = 900_000;
+const SANDBOX_PROJECT = `${SANDBOX_ROOT}/project`;
+
+export type SmokeOptions = {
+  readonly scenarios: readonly SmokeScenario[];
+  readonly keep: boolean;
+};
 
 function smokePortForScenario(scenario: SmokeScenario): string {
   return String(3100 + ALL_SCAFFOLD_SCENARIOS.indexOf(scenario));
@@ -21,63 +40,107 @@ export function smokeScenariosFromArgv(argv: readonly string[]): SmokeScenario[]
   return parseScenariosFromArgv(argv, ALL_SCAFFOLD_SCENARIOS);
 }
 
-export async function smoke(scenario: SmokeScenario, config: ScenarioConfig): Promise<void> {
-  const dir = await mkdtemp(join(tmpdir(), `kitsmith-${scenario}-`));
-  const envDir = await mkdtemp(join(tmpdir(), `kitsmith-smoke-env-${scenario}-`));
-  const bunTmpDir = join(envDir, "bun-tmp");
-  const bunCacheDir = join(envDir, "bun-cache");
-  const env = {
-    BUN_INSTALL_CACHE_DIR: bunCacheDir,
-    BUN_TMPDIR: bunTmpDir,
-    TMPDIR: bunTmpDir,
+export function smokeOptionsFromArgv(argv: readonly string[]): SmokeOptions {
+  return {
+    scenarios: smokeScenariosFromArgv(argv),
+    keep: argv.includes("--keep"),
   };
+}
+
+export function smokeTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
+  return sandboxTimeoutMs(env, "KITSMITH_SMOKE_TIMEOUT_MS", DEFAULT_SMOKE_TIMEOUT_MS);
+}
+
+function scenarioArgs(config: ScenarioConfig): string[] {
+  return [
+    "--backend",
+    String(config.backend),
+    "--frontend",
+    config.frontend,
+    "--ai",
+    String(config.ai),
+    "--effect",
+    String(config.effect),
+  ];
+}
+
+function buildInnerScript(
+  paths: SandboxPaths,
+  scenario: SmokeScenario,
+  config: ScenarioConfig,
+): string {
+  const cliPath = shellQuote(join(paths.repoRoot, "src/index.ts"));
+  const probePath = shellQuote(join(paths.repoRoot, "scripts/testing/supply-chain-probe.ts"));
+  const scenarioArguments = scenarioArgs(config).map(shellQuote).join(" ");
+
+  return [
+    "set -euo pipefail",
+    ...hostSecretAbsenceChecks(paths.hostHome),
+    `bun run ${cliPath} ${SANDBOX_PROJECT} --yes --name ${shellQuote(
+      `kitsmith-smoke-${scenario}`,
+    )} ${scenarioArguments} --git-init false --install false`,
+    `cd ${SANDBOX_PROJECT}`,
+    "bun install",
+    `bun run ${probePath} ${SANDBOX_PROJECT}`,
+    `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium PLAYWRIGHT_PORT=${shellQuote(
+      smokePortForScenario(scenario),
+    )} bun run validate`,
+  ].join("\n");
+}
+
+export function buildSmokeSandboxCommand(
+  paths: SandboxPaths,
+  scenario: SmokeScenario,
+  config: ScenarioConfig,
+): string[] {
+  return buildSandboxCommand({
+    paths,
+    chdir: paths.repoRoot,
+    innerScript: buildInnerScript(paths, scenario, config),
+    mounts: [{ kind: "read-only", source: paths.repoRoot, target: paths.repoRoot }],
+    network: "enabled",
+  });
+}
+
+export async function smoke(
+  scenario: SmokeScenario,
+  config: ScenarioConfig,
+  options: { readonly keep: boolean } = { keep: false },
+): Promise<void> {
+  requireLinuxBubblewrap("smoke test");
+
+  const hostSandboxRoot = await mkdtemp(join(tmpdir(), `kitsmith-smoke-${scenario}-`));
+  const paths = await createSandboxPaths(hostSandboxRoot);
 
   try {
-    await mkdir(bunTmpDir, { recursive: true });
-    await mkdir(bunCacheDir, { recursive: true });
+    await prepareSandboxRoot(hostSandboxRoot, ["project"]);
 
-    await runCommand(
-      [
-        "bun",
-        "run",
-        "src/index.ts",
-        dir,
-        "--yes",
-        "--backend",
-        String(config.backend),
-        "--frontend",
-        config.frontend,
-        "--ai",
-        String(config.ai),
-        "--effect",
-        String(config.effect),
-        "--git-init",
-        "false",
-        "--install",
-        "false",
-      ],
-      {
-        cwd: process.cwd(),
-        env,
-      },
+    console.log(`Smoke sandbox: ${hostSandboxRoot}`);
+    console.log(`Smoke scenario: ${scenario}`);
+
+    await runSandboxCommand(
+      buildSmokeSandboxCommand(paths, scenario, config),
+      smokeTimeoutMs(),
+      `smoke ${scenario}`,
     );
-    await runCommand(["bun", "install"], { cwd: dir, env });
-    await runCommand(["bun", "run", "validate"], {
-      cwd: dir,
-      env: { ...env, PLAYWRIGHT_PORT: smokePortForScenario(scenario) },
-    });
   } finally {
-    await Promise.all([
-      rm(dir, { recursive: true, force: true }),
-      rm(envDir, { recursive: true, force: true }),
-    ]);
+    if (options.keep) {
+      console.log(`Smoke kept sandbox: ${hostSandboxRoot}`);
+    } else {
+      await rm(hostSandboxRoot, { recursive: true, force: true });
+    }
   }
 }
 
-if (import.meta.main) {
+export async function runSmoke(options: SmokeOptions): Promise<void> {
+  requireLinuxBubblewrap("smoke test");
   await Promise.all(
-    smokeScenariosFromArgv(process.argv).map(async (scenario) =>
-      smoke(scenario, SCAFFOLD_SCENARIO_CONFIG[scenario]),
+    options.scenarios.map(async (scenario) =>
+      smoke(scenario, SCAFFOLD_SCENARIO_CONFIG[scenario], { keep: options.keep }),
     ),
   );
+}
+
+if (import.meta.main) {
+  await runSmoke(smokeOptionsFromArgv(process.argv));
 }

@@ -13,6 +13,8 @@ import { bunInstallEnv, finalizeProject, runCommand } from "./install.ts";
 import { PRESETS } from "./presets.ts";
 import { renderTemplateFromContract } from "./template.ts";
 
+export const TANSTACK_CLI_PACKAGE = "@tanstack/cli@0.68.0";
+
 export type TemplateFile = readonly [templateName: string, relativePath: string];
 
 export type GenerationRuntime = {
@@ -68,31 +70,32 @@ async function bootstrapBackendNative(destination: string): Promise<void> {
   });
 }
 
+export function tanStackFrontendBootstrapCommand(): string[] {
+  return [
+    "bun",
+    "x",
+    "--yes",
+    TANSTACK_CLI_PACKAGE,
+    "create",
+    "frontend",
+    "--router-only",
+    "--package-manager",
+    "bun",
+    "--framework",
+    "React",
+    "--no-install",
+    "--no-git",
+    "--no-examples",
+  ];
+}
+
 async function bootstrapFrontendNative(destination: string): Promise<void> {
   const appsDir = join(destination, "apps");
   await mkdir(appsDir, { recursive: true });
 
-  await runCommand(
-    [
-      "bunx",
-      "-y",
-      "@tanstack/cli@latest",
-      "create",
-      "frontend",
-      "--router-only",
-      "--package-manager",
-      "bun",
-      "--framework",
-      "React",
-      "--no-install",
-      "--no-git",
-      "--no-examples",
-    ],
-    appsDir,
-    {
-      env: bunInstallEnv(),
-    },
-  );
+  await runCommand(tanStackFrontendBootstrapCommand(), appsDir, {
+    env: bunInstallEnv(),
+  });
 }
 
 export function cleanupPathsForOptions(options: InitOptions): string[] {

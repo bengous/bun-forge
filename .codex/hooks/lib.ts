@@ -1,8 +1,14 @@
+import type { Workspace } from "../../scripts/validation/format-and-lint-routing.ts";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import {
+  hasFormattableExtension,
+  hasLintableExtension,
+  resolveLiveRepoWorkspace,
+} from "../../scripts/validation/format-and-lint-routing.ts";
 
 export type HookInput = {
   readonly session_id?: string;
@@ -28,65 +34,8 @@ export type HookResult = {
   readonly systemMessage?: string;
 };
 
-type Workspace = {
-  readonly name: string;
-  readonly lintArgs: readonly string[];
-  readonly lintConfig: string;
-  readonly formatConfig: string;
-  readonly lint: boolean;
-  readonly lintFix: boolean;
-  readonly formatMode: "write" | "check";
-};
-
 const generatedPathPatterns = [/^\.agents\/agents-md-manifest\.json$/];
 const generatedAgentPathFallbackPatterns = [/^(?:.+\/)?AGENTS\.md$/];
-
-const lintExtensions = new Set([".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"]);
-const formatExtensions = new Set([
-  ".js",
-  ".jsx",
-  ".ts",
-  ".tsx",
-  ".mjs",
-  ".cjs",
-  ".json",
-  ".jsonc",
-  ".yml",
-  ".yaml",
-  ".toml",
-  ".html",
-  ".css",
-]);
-
-const rootWorkspace: Workspace = {
-  name: "root",
-  lintArgs: [],
-  lintConfig: ".oxlintrc.jsonc",
-  formatConfig: ".oxfmtrc.jsonc",
-  lint: true,
-  lintFix: true,
-  formatMode: "write",
-};
-
-const codexHookWorkspace: Workspace = {
-  name: "codex-hooks",
-  lintArgs: [],
-  lintConfig: ".oxlintrc.jsonc",
-  formatConfig: ".oxfmtrc.jsonc",
-  lint: true,
-  lintFix: false,
-  formatMode: "check",
-};
-
-const formatOnlyWorkspace: Workspace = {
-  name: "format-only",
-  lintArgs: [],
-  lintConfig: ".oxlintrc.jsonc",
-  formatConfig: ".oxfmtrc.jsonc",
-  lint: false,
-  lintFix: false,
-  formatMode: "write",
-};
 
 export async function readHookInput(): Promise<HookInput> {
   const text = await Bun.stdin.text();
@@ -294,24 +243,12 @@ export async function runPostEditQuality(
   }
 
   const existingPaths = paths.filter((filePath) => existsSync(path.join(root, filePath)));
-  const needsProductContract = existingPaths.some((filePath) => isProductSurface(filePath));
-  const buckets = bucketByWorkspace(existingPaths);
+  const buckets = bucketByWorkspace(existingPaths, root);
   const failures = (
     await Promise.all(
       [...buckets.values()].map(async (bucket) => runBucketQuality(root, bucket, runner)),
     )
   ).flat();
-
-  if (needsProductContract) {
-    const contract = await runner(["bun", "run", "--silent", "test:project-contract"], {
-      cwd: root,
-    });
-    if (contract.code !== 0) {
-      failures.push(
-        batchedCommandFailure("product-contract", ["templates/template-sources"], contract),
-      );
-    }
-  }
 
   if (failures.length > 0) {
     return { blockReason: `Codex post-edit quality gate failed:\n${failures.join("\n\n")}` };
@@ -353,9 +290,9 @@ async function runLintFix(
   const lintFix = await runner(
     [
       localTool(root, "oxlint"),
-      ...bucket.workspace.lintArgs,
+      ...bucket.workspace.oxlintArgs,
       "-c",
-      bucket.workspace.lintConfig,
+      bucket.workspace.oxlintConfig,
       "--fix",
       "--quiet",
       ...bucket.lintFixPaths,
@@ -378,7 +315,7 @@ async function runFormat(
 
   const mode = bucket.workspace.formatMode === "write" ? "--write" : "--check";
   const format = await runner(
-    [localTool(root, "oxfmt"), mode, "-c", bucket.workspace.formatConfig, ...bucket.formatPaths],
+    [localTool(root, "oxfmt"), mode, "-c", bucket.workspace.oxfmtConfig, ...bucket.formatPaths],
     { cwd: root },
   );
   return format.code === 0 ? null : batchedCommandFailure("format", bucket.formatPaths, format);
@@ -396,9 +333,9 @@ async function runLintCheck(
   const lint = await runner(
     [
       localTool(root, "oxlint"),
-      ...bucket.workspace.lintArgs,
+      ...bucket.workspace.oxlintArgs,
       "-c",
-      bucket.workspace.lintConfig,
+      bucket.workspace.oxlintConfig,
       "--quiet",
       "--format=unix",
       ...bucket.lintCheckPaths,
@@ -440,56 +377,32 @@ type BucketEntry = {
   readonly formatPaths: string[];
 };
 
-function workspaceForPath(filePath: string): Workspace | null {
-  const extension = path.extname(filePath).toLowerCase();
-  if (!formatExtensions.has(extension) && !lintExtensions.has(extension)) {
-    return null;
-  }
-  if (filePath.startsWith("src/")) {
-    return rootWorkspace;
-  }
-  if (filePath.startsWith("scripts/")) {
-    return rootWorkspace;
-  }
-  if (filePath.startsWith(".codex/hooks/")) {
-    return codexHookWorkspace;
-  }
-  if (filePath.startsWith(".claude/hooks/")) {
-    return rootWorkspace;
-  }
-  if (filePath.startsWith("templates/")) {
-    return formatOnlyWorkspace;
-  }
-  if (filePath.startsWith("template-sources/")) {
-    return formatOnlyWorkspace;
-  }
-  return null;
+function workspaceForPath(filePath: string, root: string): Workspace | null {
+  return resolveLiveRepoWorkspace(filePath, root);
 }
 
-function isProductSurface(filePath: string): boolean {
-  return filePath.startsWith("templates/") || filePath.startsWith("template-sources/");
-}
-
-function bucketByWorkspace(filePaths: readonly string[]): Map<Workspace, BucketEntry> {
+function bucketByWorkspace(
+  filePaths: readonly string[],
+  root: string,
+): Map<Workspace, BucketEntry> {
   const buckets = new Map<Workspace, BucketEntry>();
   for (const filePath of filePaths) {
-    const workspace = workspaceForPath(filePath);
+    const workspace = workspaceForPath(filePath, root);
     if (workspace === null) {
       continue;
     }
-    const extension = path.extname(filePath).toLowerCase();
     let bucket = buckets.get(workspace);
     if (bucket === undefined) {
       bucket = { workspace, lintFixPaths: [], lintCheckPaths: [], formatPaths: [] };
       buckets.set(workspace, bucket);
     }
-    if (lintExtensions.has(extension) && workspace.lint) {
+    if (hasLintableExtension(filePath) && workspace.lint) {
       if (workspace.lintFix) {
         bucket.lintFixPaths.push(filePath);
       }
       bucket.lintCheckPaths.push(filePath);
     }
-    if (formatExtensions.has(extension)) {
+    if (hasFormattableExtension(filePath)) {
       bucket.formatPaths.push(filePath);
     }
   }

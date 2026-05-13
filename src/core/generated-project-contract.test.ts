@@ -27,12 +27,16 @@ test("buildGeneratedProjectContract models root and frontend package facts", () 
   expect(contract.packageJson.name).toBe("forge-tanstack-ai-effect");
   expect(contract.packageJson.bin).toEqual({ "forge-tanstack-ai-effect": "./src/index.ts" });
   expect(contract.packageJson.workspaces).toEqual(["apps/*"]);
-  expect(contract.packageJson.scripts["test"]).toBe("bun test ./src && bun run test:hooks");
+  expect(contract.packageJson.scripts["test"]).toBe(
+    "bun test ./src && bun --cwd apps/frontend run test && bun test ./.codex/hooks ./.claude/hooks",
+  );
+  expect(contract.packageJson.scripts["build"]).toBe("bun --cwd apps/frontend run build");
   expect(contract.packageJson.scripts["agents:sync"]).toBe(
     "bun scripts/agents/sync-agents-md.ts --write",
   );
+  expect(contract.packageJson.scripts["agents:check"]).toBeUndefined();
+  expect(contract.packageJson.scripts["effect:diagnose"]).toBeUndefined();
   expect(contract.packageJson.dependencies).toEqual({
-    "@effect/cli": "0.75.1",
     "@effect/platform": "0.96.1",
     "@effect/platform-bun": "0.89.0",
     effect: "3.21.2",

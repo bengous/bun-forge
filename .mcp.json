@@ -2,7 +2,7 @@
   "mcpServers": {
     "bun": {
       "command": "bunx",
-      "args": ["-y", "mcp-bun@latest"],
+      "args": ["-y", "mcp-bun@1.3.0"],
       "env": {
         "DISABLE_NOTIFICATIONS": "true"
       },

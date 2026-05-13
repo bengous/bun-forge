@@ -2,20 +2,12 @@
 
 import { CODE_PATTERN, classifyScopes, expandConfigScope, getChangedFiles } from "./detect-scope";
 import { resolveProjectRoot } from "./resolve-bin";
+import { runGeneratedValidationStep } from "./validation-runner.ts";
 
-function run(label: string, cmd: string[], cwd: string, errors: string[]): void {
-  const result = Bun.spawnSync(cmd, {
-    cwd,
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-
-  if (result.exitCode !== 0) {
-    const output = [result.stderr.toString(), result.stdout.toString()]
-      .filter(Boolean)
-      .join("\n")
-      .trim();
-    errors.push(`[${label}] ${output || `exited with code ${result.exitCode}`}`);
+function runGeneratedStep(step: string, cwd: string, errors: string[]): void {
+  const result = runGeneratedValidationStep(step, cwd);
+  if (result.exit !== 0) {
+    errors.push(`[${result.step}] ${result.output || `exited with code ${result.exit}`}`);
   }
 }
 
@@ -32,15 +24,10 @@ async function main(): Promise<void> {
   const errors: string[] = [];
 
   if (scopes.has("backend") || scopes.has("scripts")) {
-    run("typecheck", ["bun", "run", "--silent", "typecheck"], projectRoot, errors);
+    runGeneratedStep("typecheck", projectRoot, errors);
   }
   if (scopes.has("frontend")) {
-    run(
-      "typecheck:frontend",
-      ["bun", "run", "--silent", "typecheck:frontend"],
-      projectRoot,
-      errors,
-    );
+    runGeneratedStep("typecheck:frontend", projectRoot, errors);
   }
 
   if (errors.length > 0) {

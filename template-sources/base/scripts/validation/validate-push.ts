@@ -3,6 +3,7 @@
 import { expandConfigScope, getChangedScopes } from "./detect-scope";
 import { resolveProjectRoot } from "./resolve-bin";
 import { GENERATED_PROJECT_PUSH_VALIDATION_POLICY } from "./validation-plan.ts";
+import { resolveValidationStepCommand, runGeneratedValidationStep } from "./validation-runner.ts";
 
 async function main(): Promise<void> {
   const projectRoot = resolveProjectRoot(import.meta.dir);
@@ -16,7 +17,21 @@ async function main(): Promise<void> {
   const errors: string[] = [];
 
   async function runScript(script: string): Promise<void> {
-    const result = await Bun.$`bun run --silent ${script}`.cwd(projectRoot).nothrow().quiet();
+    const command = resolveValidationStepCommand(script, projectRoot);
+    if (command !== undefined) {
+      const result = runGeneratedValidationStep(script, projectRoot);
+      if (result.exit !== 0) {
+        errors.push(`[${result.step}] ${result.output || `exited with code ${result.exit}`}`);
+      }
+      return;
+    }
+
+    const result = Bun.spawnSync([process.execPath, "run", "--silent", script], {
+      cwd: projectRoot,
+      stdout: "pipe",
+      stderr: "pipe",
+      ...(process.platform === "win32" ? { windowsHide: true } : {}),
+    });
     if (result.exitCode !== 0) {
       const output = [result.stderr.toString(), result.stdout.toString()]
         .filter(Boolean)
@@ -27,10 +42,9 @@ async function main(): Promise<void> {
   }
 
   async function runSteps(steps: readonly string[]): Promise<void> {
-    await steps.reduce(async (previous, step) => {
-      await previous;
+    for (const step of steps) {
       await runScript(step);
-    }, Promise.resolve());
+    }
   }
 
   if (scopes.has("backend") || scopes.has("scripts")) {

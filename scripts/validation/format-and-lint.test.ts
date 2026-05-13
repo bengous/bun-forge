@@ -10,7 +10,6 @@ import {
   lintFixCommand,
   parseFilePath,
   parseFilePaths,
-  productContractCommand,
   resolveWorkspace,
 } from "./format-and-lint";
 import {
@@ -21,6 +20,8 @@ import {
   resolveLiveRepoWorkspace,
 } from "./format-and-lint-routing.ts";
 import { repoRelativePath } from "./repo-path.ts";
+
+const generatedPresence = { backend: true, frontend: true } as const;
 
 describe("format-and-lint hook input parsing", () => {
   test("keeps single file path compatibility", () => {
@@ -96,10 +97,6 @@ describe("format-and-lint command specs", () => {
       ".codex/hooks/lib.ts",
     ]);
   });
-
-  test("builds product contract command as a pure spec", () => {
-    expect(productContractCommand()).toEqual(["bun", "run", "--silent", "test:project-contract"]);
-  });
 });
 
 describe("format-and-lint workspace resolution", () => {
@@ -124,7 +121,11 @@ describe("format-and-lint workspace resolution", () => {
   });
 
   test("generated project routes frontend workspace separately from root tooling", () => {
-    const workspace = resolveGeneratedProjectWorkspace("apps/frontend/src/main.tsx");
+    const workspace = resolveGeneratedProjectWorkspace(
+      "apps/frontend/src/main.tsx",
+      process.cwd(),
+      generatedPresence,
+    );
     expect(workspace?.name).toBe("frontend");
     expect(workspace?.oxlintConfig).toBe("apps/frontend/.oxlintrc.jsonc");
     expect(workspace?.oxlintArgs).toEqual(["--type-aware"]);
@@ -132,8 +133,20 @@ describe("format-and-lint workspace resolution", () => {
   });
 
   test("generated project does not route kitsmith product template surfaces", () => {
-    expect(resolveGeneratedProjectWorkspace("template-sources/ai/.codex/hooks/lib.ts")).toBeNull();
-    expect(resolveGeneratedProjectWorkspace("templates/package.json.tpl")).toBeNull();
+    expect(
+      resolveGeneratedProjectWorkspace(
+        "template-sources/ai/.codex/hooks/lib.ts",
+        process.cwd(),
+        generatedPresence,
+      ),
+    ).toBeNull();
+    expect(
+      resolveGeneratedProjectWorkspace(
+        "templates/package.json.tpl",
+        process.cwd(),
+        generatedPresence,
+      ),
+    ).toBeNull();
   });
 
   test("normalizes repo-relative and absolute touched paths before routing", () => {
@@ -167,12 +180,17 @@ describe("format-and-lint workspace resolution", () => {
       normalizeGeneratedPresetTouchedPath(String.raw`C:\repo\generated-app\src\index.ts`, root),
     ).toBe("src/index.ts");
     expect(
-      resolveGeneratedPresetWorkspace(String.raw`C:\repo\generated-app\src\index.ts`, root)?.name,
+      resolveGeneratedPresetWorkspace(
+        String.raw`C:\repo\generated-app\src\index.ts`,
+        root,
+        generatedPresence,
+      )?.name,
     ).toBe("root");
     expect(
       resolveGeneratedPresetWorkspace(
         String.raw`C:\repo\generated-app\apps\frontend\src\main.tsx`,
         root,
+        generatedPresence,
       )?.name,
     ).toBe("frontend");
   });

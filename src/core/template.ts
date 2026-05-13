@@ -10,17 +10,7 @@ import { TEMPLATES_DIR } from "./paths.ts";
 
 const TOKEN_PATTERN = /__([A-Z0-9_]+?)__/g;
 
-const FRONTEND_ROOT_SCRIPT_NAMES = [
-  "dev:frontend",
-  "typecheck:frontend",
-  "lint:frontend",
-  "format:check:frontend",
-  "lint:arch:frontend",
-  "lint:css:frontend",
-  "build:frontend",
-  "test:e2e",
-  "validate:frontend",
-] as const;
+const FRONTEND_ROOT_SCRIPT_NAMES = ["build"] as const;
 
 function quoteArray(values: readonly string[]): string {
   return values.map((value) => JSON.stringify(value)).join(", ");
@@ -92,27 +82,15 @@ function packageTemplateValues(contract: GeneratedProjectContract): Record<strin
         .join(",\n")}\n  },\n`
     : "";
 
-  const frontendUnitTestScript =
-    contract.packageJson.scripts["test:unit"] === undefined
-      ? ""
-      : `    "test:unit": ${JSON.stringify(contract.packageJson.scripts["test:unit"])},\n`;
-
-  const testHooksScript =
-    contract.packageJson.scripts["test:hooks"] !== undefined
-      ? `    "test:hooks": ${JSON.stringify(contract.packageJson.scripts["test:hooks"])},\n`
-      : "";
-
   const aiScripts =
     contract.packageJson.scripts["agents:sync"] !== undefined
-      ? `    "agents:sync": ${JSON.stringify(contract.packageJson.scripts["agents:sync"])},\n    "agents:check": ${JSON.stringify(contract.packageJson.scripts["agents:check"])},\n`
+      ? `    "agents:sync": ${JSON.stringify(contract.packageJson.scripts["agents:sync"])},\n`
       : "";
 
   return {
     BIN_BLOCK: binBlock,
     DEV_COMMAND: contract.packageJson.scripts["dev"] ?? "",
     TEST_COMMAND: contract.packageJson.scripts["test"] ?? "",
-    TEST_UNIT_SCRIPT: frontendUnitTestScript,
-    TEST_HOOKS_SCRIPT: testHooksScript,
     WORKSPACES_BLOCK: workspacesBlock,
     AI_SCRIPTS: aiScripts,
     ROOT_DEV_DEPENDENCIES: devDependencyEntries(contract.packageJson),
@@ -121,11 +99,6 @@ function packageTemplateValues(contract: GeneratedProjectContract): Record<strin
 
 function effectTemplateValues(contract: GeneratedProjectContract): Record<string, string> {
   const context = contract.templateContext;
-  const effectScripts =
-    contract.packageJson.scripts["effect:diagnose"] !== undefined
-      ? `    "effect:diagnose": ${JSON.stringify(contract.packageJson.scripts["effect:diagnose"])},\n    "effect:quickfixes": ${JSON.stringify(contract.packageJson.scripts["effect:quickfixes"])},\n`
-      : "";
-
   const effectDependenciesBlock = dependencyBlock(
     "dependencies",
     contract.packageJson.dependencies,
@@ -136,7 +109,7 @@ function effectTemplateValues(contract: GeneratedProjectContract): Record<string
     : "";
 
   return {
-    EFFECT_SCRIPTS: effectScripts,
+    EFFECT_SCRIPTS: "",
     EFFECT_DEPENDENCIES_BLOCK: effectDependenciesBlock,
     EFFECT_DEV_DEPENDENCIES: "",
     EFFECT_TSCONFIG_PLUGINS: effectTsconfigPlugins,
@@ -218,6 +191,19 @@ function projectConventionTemplateValues(context: TemplateContext): Record<strin
   };
 }
 
+function readmeCommandLines(contract: GeneratedProjectContract): string {
+  return [
+    ...(contract.packageJson.scripts["build"] === undefined
+      ? []
+      : [
+          "- `bun run build` - builds the frontend application and writes ignored assets under `apps/frontend/dist`.",
+        ]),
+    ...(contract.packageJson.scripts["agents:sync"] === undefined
+      ? []
+      : ["- `bun run agents:sync` - regenerates generated agent instructions from AI sources."]),
+  ].join("\n");
+}
+
 export function templateValuesFromContract(
   contract: GeneratedProjectContract,
 ): Record<string, string> {
@@ -236,6 +222,7 @@ export function templateValuesFromContract(
     ...frontendTemplateValues(contract),
     ...rootToolingTemplateValues(contract),
     ...projectConventionTemplateValues(context),
+    CONDITIONAL_COMMANDS_README: readmeCommandLines(contract),
   };
 }
 

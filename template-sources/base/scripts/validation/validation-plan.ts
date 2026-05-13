@@ -7,20 +7,34 @@ export type GeneratedProjectPushValidationPolicy = {
   readonly frontendSteps: readonly string[];
 };
 
+export const GENERATED_PROJECT_CHECK_PLAN: ValidationPlan = {
+  defaultSteps: ["format:check", "lint:errors", "typecheck", "test"],
+};
+
+const GENERATED_PROJECT_FRONTEND_STEPS = [
+  "typecheck:frontend",
+  "lint:frontend",
+  "format:check:frontend",
+  "lint:arch:frontend",
+  "lint:css:frontend",
+  "build:frontend",
+  "test:e2e",
+] as const;
+
 export const GENERATED_PROJECT_VALIDATE_PLAN: ValidationPlan = {
   defaultSteps: [
     "agents:check",
-    "format:check",
-    "lint:errors",
+    ...GENERATED_PROJECT_CHECK_PLAN.defaultSteps,
     "lint:arch",
-    "typecheck",
-    "test",
-    "validate:frontend",
+    "lint:dead",
+    "lint:dupes",
+    "check:links",
     "lint:audit",
+    ...GENERATED_PROJECT_FRONTEND_STEPS,
   ],
 };
 
 export const GENERATED_PROJECT_PUSH_VALIDATION_POLICY: GeneratedProjectPushValidationPolicy = {
   codeSteps: ["typecheck", "lint:errors", "format:check", "lint:arch", "test"],
-  frontendSteps: ["validate:frontend"],
+  frontendSteps: GENERATED_PROJECT_FRONTEND_STEPS,
 };

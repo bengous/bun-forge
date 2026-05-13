@@ -5,7 +5,6 @@ import { existsSync } from "node:fs";
 import {
   hasFormattableExtension,
   hasLintableExtension,
-  isProductSurface,
   resolveLiveRepoWorkspace,
 } from "./format-and-lint-routing.ts";
 import { resolveBin, resolveProjectRoot } from "./resolve-bin";
@@ -187,10 +186,6 @@ export function lintCheckCommand(
   ];
 }
 
-export function productContractCommand(): string[] {
-  return ["bun", "run", "--silent", "test:project-contract"];
-}
-
 if (import.meta.main) {
   const projectRoot = resolveProjectRoot(import.meta.dir);
   const oxlint = resolveBin(projectRoot, "oxlint");
@@ -209,7 +204,6 @@ if (import.meta.main) {
   const captureTarget = filePaths.length === 1 ? filePaths[0]! : null;
   const beforeFormat = captureTarget !== null ? await readTextFile(captureTarget) : null;
 
-  const needsProductContract = filePaths.some((filePath) => isProductSurface(filePath));
   const buckets = bucketByWorkspace(filePaths);
   const failures: string[] = [];
 
@@ -258,20 +252,6 @@ if (import.meta.main) {
     const finalContent = await readTextFile(captureTarget);
     if (beforeFormat !== null && finalContent !== null && finalContent !== beforeFormat) {
       updatedToolOutput = finalContent;
-    }
-  }
-
-  if (needsProductContract) {
-    const contract = Bun.spawnSync(productContractCommand(), {
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    if (contract.exitCode !== 0) {
-      const output = [contract.stderr.toString(), contract.stdout.toString()]
-        .filter(Boolean)
-        .join("\n")
-        .trim();
-      failures.push(output || `test:project-contract exited with code ${contract.exitCode}`);
     }
   }
 
