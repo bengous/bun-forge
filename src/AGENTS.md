@@ -1,6 +1,6 @@
 ## Antipattern Coverage
 
-Last audit: 2026-05-12 | OXLint 1.64.0 | TypeScript 6.0.3 | Bun 1.3.13
+Last audit: 2026-05-17 | OXLint 1.64.0 | TypeScript 6.0.3 | Bun 1.3.14
 
 Active rules: 250 | Available candidates: 456
 

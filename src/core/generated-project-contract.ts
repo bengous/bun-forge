@@ -456,7 +456,7 @@ function packageJsonContractForContext(
       ...(context.effect ? { "@effect/language-service": "0.85.1" } : {}),
       "@commitlint/cli": "21.0.0",
       "@commitlint/config-conventional": "21.0.0",
-      "@types/bun": "1.3.13",
+      "@types/bun": "1.3.14",
       "dependency-cruiser": "17.4.0",
       jscpd: "4.1.1",
       knip: "6.13.0",
