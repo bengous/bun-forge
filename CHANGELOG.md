@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.2 - 2026-05-17
+
+### Changed
+
+- Align the Bun tooling baseline to 1.3.14 for the repository and generated
+  projects, including `@types/bun` 1.3.14 and generated project mise defaults.
+
 ## 0.3.1 - 2026-05-13
 
 ### Changed
